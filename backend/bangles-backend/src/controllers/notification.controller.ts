@@ -6,7 +6,7 @@ import {
   getUserNotificationsService,
   markNotificationReadService,   
   getUnreadCountService,
-} from "../services/notification.service";
+} from "../services/notification.service";   
 
 export const getNotifications = async (req: AuthRequest, res: Response) => {
   try {

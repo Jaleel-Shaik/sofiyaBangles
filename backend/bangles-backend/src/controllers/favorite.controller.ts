@@ -3,7 +3,7 @@ import { AuthRequest } from "../types";
 import { getParam } from "../utils/params";
 import {
   addFavoriteService,
-  removeFavoriteService,  
+  removeFavoriteService,      
   getUserFavoritesService,
 } from "../services/favorite.service";
 
