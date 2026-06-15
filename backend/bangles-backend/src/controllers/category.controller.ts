@@ -2,7 +2,7 @@ import { Response } from "express";
 import { AuthRequest } from "../types";
 import { getParam, getQuery } from "../utils/params";
 import {
-  getCategoriesService,
+  getCategoriesService,     
   getCategoryByIdService,
   createCategoryService,
   updateCategoryService,

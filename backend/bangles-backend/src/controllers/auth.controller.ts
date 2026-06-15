@@ -41,6 +41,7 @@ export const login = async (req: AuthRequest, res: Response) => {
       data: result,
       message: "Login successful.",
     });
+    
   } catch (error: any) {
     if (error.message === "INVALID_CREDENTIALS") {
       res.status(401).json({
