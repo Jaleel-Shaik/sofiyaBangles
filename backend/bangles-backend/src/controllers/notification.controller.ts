@@ -4,7 +4,7 @@ import { getParam, getQuery } from "../utils/params";
 import {
   broadcastNotificationService,
   getUserNotificationsService,
-  markNotificationReadService,
+  markNotificationReadService,   
   getUnreadCountService,
 } from "../services/notification.service";
 
