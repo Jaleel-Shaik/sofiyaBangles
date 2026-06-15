@@ -6,7 +6,7 @@ import {
   getCategoryByIdService,
   createCategoryService,
   updateCategoryService,
-  deleteCategoryService,
+  deleteCategoryService, 
 } from "../services/category.service";
 import { getProductsService } from "../services/product.service";
 
