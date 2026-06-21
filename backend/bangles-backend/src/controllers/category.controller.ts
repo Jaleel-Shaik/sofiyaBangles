@@ -75,7 +75,11 @@ export const getCategoryProducts = async (
 
 export const createCategory = async (req: AuthRequest, res: Response) => {
   try {
-    const category = await createCategoryService(req.body, req.user!.userId);
+    const category = await createCategoryService(
+      req.body,
+      req.file as Express.Multer.File | undefined,
+      req.user!.userId
+    );
 
     res.status(201).json({
       success: true,
@@ -101,7 +105,12 @@ export const createCategory = async (req: AuthRequest, res: Response) => {
 export const updateCategory = async (req: AuthRequest, res: Response) => {
   try {
     const id = getParam(req, "id");
-    const category = await updateCategoryService(id, req.body, req.user!.userId);
+    const category = await updateCategoryService(
+      id,
+      req.body,
+      req.file as Express.Multer.File | undefined,
+      req.user!.userId
+    );
 
     res.json({
       success: true,

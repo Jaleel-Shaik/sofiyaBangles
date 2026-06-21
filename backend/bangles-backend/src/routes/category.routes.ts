@@ -13,6 +13,7 @@ import {
   createCategorySchema,
   updateCategorySchema,
 } from "../validations/category.schema";
+import { upload } from "../middlewares/upload.middleware";
 
 const router = Router();
 
@@ -27,12 +28,14 @@ router.get("/:id/products", getCategoryProducts);
 router.post(
   "/",
   requireRole("admin", "super_admin"),
+  upload.single("image"),
   validate(createCategorySchema),
   createCategory,
 );
 router.put(
   "/:id",
   requireRole("admin", "super_admin"),
+  upload.single("image"),
   validate(updateCategorySchema),
   updateCategory,
 );

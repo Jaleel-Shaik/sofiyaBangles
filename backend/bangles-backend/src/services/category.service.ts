@@ -7,6 +7,7 @@ import {
 } from "../repositories/category.repository";
 import { createAuditLogRepo } from "../repositories/audit.repository";
 import { CreateCategoryInput, UpdateCategoryInput } from "../validations/category.schema";
+import { uploadToCloudinary } from "../utils/cloudinary-upload";
 
 export const getCategoriesService = async () => {
   return getCategoriesRepo();
@@ -22,9 +23,19 @@ export const getCategoryByIdService = async (id: string) => {
 
 export const createCategoryService = async (
   input: CreateCategoryInput,
+  file: Express.Multer.File | undefined,
   actorId: string,
 ) => {
-  const category = await createCategoryRepo(input);
+  let imageUrl: string | undefined;
+
+  if (file) {
+    imageUrl = await uploadToCloudinary(file);
+  }
+
+  const category = await createCategoryRepo({
+    ...input,
+    ...(imageUrl && { image_url: imageUrl }),
+  });
 
   await createAuditLogRepo({
     actor_id: actorId,
@@ -40,6 +51,7 @@ export const createCategoryService = async (
 export const updateCategoryService = async (
   id: string,
   input: UpdateCategoryInput,
+  file: Express.Multer.File | undefined,
   actorId: string,
 ) => {
   const existing = await getCategoryByIdRepo(id);
@@ -47,7 +59,15 @@ export const updateCategoryService = async (
     throw new Error("CATEGORY_NOT_FOUND");
   }
 
-  const category = await updateCategoryRepo(id, input);
+  let imageUrl: string | undefined;
+  if (file) {
+    imageUrl = await uploadToCloudinary(file);
+  }
+
+  const category = await updateCategoryRepo(id, {
+    ...input,
+    ...(imageUrl && { image_url: imageUrl }),
+  });
 
   await createAuditLogRepo({
     actor_id: actorId,
