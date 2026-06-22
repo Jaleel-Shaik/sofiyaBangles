@@ -1,50 +1,82 @@
-import { pool } from "../config/supabase";
+import { db } from "../config/firebase";
 import { OverviewAnalytics, ProductsByCategory } from "../types";
 
 export const getOverviewAnalyticsRepo = async (): Promise<OverviewAnalytics> => {
-  const result = await pool.query(`
-    SELECT
-      (SELECT COUNT(*) FROM products WHERE is_active = true)::int AS "activeProducts",
-      (SELECT COUNT(*) FROM products)::int AS "totalProducts",
-      (SELECT COUNT(*) FROM categories WHERE is_active = true)::int AS "totalCategories",
-      (SELECT COUNT(*) FROM profiles WHERE role = 'user')::int AS "totalUsers",
-      (SELECT COUNT(*) FROM favorites)::int AS "totalFavorites"
-  `);
+  const activeProductsQuery = db.collection("products").where("is_active", "==", true).count().get();
+  const totalProductsQuery = db.collection("products").count().get();
+  const totalCategoriesQuery = db.collection("categories").where("is_active", "==", true).count().get();
+  const totalUsersQuery = db.collection("profiles").where("role", "==", "user").count().get();
+  const totalFavoritesQuery = db.collection("favorites").count().get();
 
-  return result.rows[0];
+  const [activeProducts, totalProducts, totalCategories, totalUsers, totalFavorites] = await Promise.all([
+    activeProductsQuery,
+    totalProductsQuery,
+    totalCategoriesQuery,
+    totalUsersQuery,
+    totalFavoritesQuery
+  ]);
+
+  return {
+    activeProducts: activeProducts.data().count,
+    totalProducts: totalProducts.data().count,
+    totalCategories: totalCategories.data().count,
+    totalUsers: totalUsers.data().count,
+    totalFavorites: totalFavorites.data().count
+  };
 };
 
 export const getProductsByCategoryRepo = async (): Promise<ProductsByCategory[]> => {
-  const result = await pool.query(`
-    SELECT
-      c.category_name,
-      COUNT(p.id)::int AS count
-    FROM categories c
-    LEFT JOIN products p ON c.id = p.category_id AND p.is_active = true
-    WHERE c.is_active = true
-    GROUP BY c.id, c.category_name
-    ORDER BY count DESC
-  `);
+  const categoriesSnapshot = await db.collection("categories").where("is_active", "==", true).get();
+  const productsSnapshot = await db.collection("products").where("is_active", "==", true).get();
 
-  return result.rows;
+  const categoryCounts = new Map<string, { name: string; count: number }>();
+
+  categoriesSnapshot.docs.forEach(doc => {
+    const data = doc.data();
+    categoryCounts.set(doc.id, { name: data.category_name, count: 0 });
+  });
+
+  productsSnapshot.docs.forEach(doc => {
+    const data = doc.data();
+    if (data.category_id && categoryCounts.has(data.category_id)) {
+      const cat = categoryCounts.get(data.category_id)!;
+      cat.count += 1;
+    }
+  });
+
+  const result: ProductsByCategory[] = Array.from(categoryCounts.values()).map(c => ({
+    category_name: c.name,
+    count: c.count
+  }));
+
+  result.sort((a, b) => b.count - a.count);
+  return result;
 };
 
 export const getRecentSignupsRepo = async (
   days: number = 30,
 ): Promise<{ date: string; count: number }[]> => {
-  const result = await pool.query(
-    `
-    SELECT
-      DATE(created_at) AS date,
-      COUNT(*)::int AS count
-    FROM profiles
-    WHERE created_at >= NOW() - INTERVAL '1 day' * $1
-      AND role = 'user'
-    GROUP BY DATE(created_at)
-    ORDER BY date
-  `,
-    [days],
-  );
+  const dateLimit = new Date();
+  dateLimit.setDate(dateLimit.getDate() - days);
 
-  return result.rows;
+  const snapshot = await db.collection("profiles")
+    .where("role", "==", "user")
+    .where("created_at", ">=", dateLimit.toISOString())
+    .get();
+
+  const countsByDate = new Map<string, number>();
+
+  snapshot.docs.forEach(doc => {
+    const data = doc.data();
+    if (data.created_at) {
+      // Extract YYYY-MM-DD
+      const dateStr = new Date(data.created_at).toISOString().split('T')[0];
+      countsByDate.set(dateStr, (countsByDate.get(dateStr) || 0) + 1);
+    }
+  });
+
+  const result = Array.from(countsByDate.entries()).map(([date, count]) => ({ date, count }));
+  result.sort((a, b) => a.date.localeCompare(b.date));
+
+  return result;
 };

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 
 interface User {
-  userId: string;
+  id: string;
   email: string;
   role: string;
   full_name?: string;

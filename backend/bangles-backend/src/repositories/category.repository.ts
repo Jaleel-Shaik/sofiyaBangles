@@ -1,20 +1,22 @@
-import { pool } from "../config/supabase";
+import { db } from "../config/firebase";
 import { Category } from "../types";
+import { v4 as uuidv4 } from 'uuid';
 
 export const getCategoriesRepo = async (): Promise<Category[]> => {
-  const result = await pool.query(
-    `SELECT * FROM categories WHERE is_active = true ORDER BY display_order, category_name`,
-  );
-  return result.rows;
+  const snapshot = await db.collection("categories")
+    .where("is_active", "==", true)
+    .orderBy("display_order")
+    .get();
+  
+  return snapshot.docs.map(doc => doc.data() as Category);
 };
 
 export const getCategoryByIdRepo = async (
   id: string,
 ): Promise<Category | null> => {
-  const result = await pool.query(`SELECT * FROM categories WHERE id = $1`, [
-    id,
-  ]);
-  return result.rows[0] || null;
+  const doc = await db.collection("categories").doc(id).get();
+  if (!doc.exists) return null;
+  return doc.data() as Category;
 };
 
 export const createCategoryRepo = async (data: {
@@ -22,62 +24,37 @@ export const createCategoryRepo = async (data: {
   image_url?: string;
   display_order?: number;
 }): Promise<Category> => {
-  const query = `
-    INSERT INTO categories (category_name, image_url, display_order)
-    VALUES ($1, $2, $3)
-    RETURNING *
-  `;
+  const newId = uuidv4();
+  const categoryData: Category = {
+    id: newId,
+    category_name: data.category_name,
+    image_url: data.image_url || null,
+    display_order: data.display_order || 0,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
 
-  const result = await pool.query(query, [
-    data.category_name,
-    data.image_url || null,
-    data.display_order || 0,
-  ]);
-  return result.rows[0];
+  await db.collection("categories").doc(newId).set(categoryData);
+  return categoryData;
 };
 
 export const updateCategoryRepo = async (
   id: string,
   data: Partial<{ category_name: string; image_url: string; display_order: number; is_active: boolean }>,
 ): Promise<Category> => {
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  const updateData: any = { ...data, updated_at: new Date().toISOString() };
+  Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
-  if (data.category_name !== undefined) {
-    fields.push(`category_name = $${paramIndex++}`);
-    values.push(data.category_name);
-  }
-  if (data.image_url !== undefined) {
-    fields.push(`image_url = $${paramIndex++}`);
-    values.push(data.image_url);
-  }
-  if (data.display_order !== undefined) {
-    fields.push(`display_order = $${paramIndex++}`);
-    values.push(data.display_order);
-  }
-  if (data.is_active !== undefined) {
-    fields.push(`is_active = $${paramIndex++}`);
-    values.push(data.is_active);
-  }
-
-  fields.push("updated_at = now()");
-  values.push(id);
-
-  const query = `
-    UPDATE categories
-    SET ${fields.join(", ")}
-    WHERE id = $${paramIndex}
-    RETURNING *
-  `;
-
-  const result = await pool.query(query, values);
-  return result.rows[0];
+  await db.collection("categories").doc(id).update(updateData);
+  
+  const doc = await db.collection("categories").doc(id).get();
+  return doc.data() as Category;
 };
 
 export const deleteCategoryRepo = async (id: string): Promise<void> => {
-  await pool.query(
-    `UPDATE categories SET is_active = false, updated_at = now() WHERE id = $1`,
-    [id],
-  );
+  await db.collection("categories").doc(id).update({
+    is_active: false,
+    updated_at: new Date().toISOString()
+  });
 };

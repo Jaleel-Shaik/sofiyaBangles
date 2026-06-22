@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { getFirestore, collection, getDocs, doc, setDoc, orderBy, query } from '@react-native-firebase/firestore';
 
 export interface Category {
   id: string;
@@ -8,10 +8,30 @@ export interface Category {
   is_active: boolean;
 }
 
+const DEFAULT_CATEGORIES = [
+  { id: 'cat-1', category_name: 'Bridal Bangles', image_url: 'https://images.unsplash.com/photo-1599643478524-fb66f453863a', display_order: 1, is_active: true },
+  { id: 'cat-2', category_name: 'Daily Wear', image_url: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a', display_order: 2, is_active: true },
+  { id: 'cat-3', category_name: 'Glass Bangles', image_url: 'https://images.unsplash.com/photo-1602751584552-8ba73aad10e1', display_order: 3, is_active: true },
+  { id: 'cat-4', category_name: 'Gold Plated', image_url: 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d', display_order: 4, is_active: true }
+];
+
 export const getCategories = async () => {
   try {
-    const response = await apiClient.get('/categories');
-    return response.data.data; // Array of categories
+    const db = getFirestore();
+    const categoriesRef = collection(db, 'categories');
+    const q = query(categoriesRef, orderBy('display_order', 'asc'));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      console.log('Categories collection is empty. Seeding defaults...');
+      // Seed default categories
+      for (const cat of DEFAULT_CATEGORIES) {
+        await setDoc(doc(db, 'categories', cat.id), cat);
+      }
+      return DEFAULT_CATEGORIES;
+    }
+
+    return snapshot.docs.map(document => ({ id: document.id, ...document.data() } as Category));
   } catch (error) {
     console.error('Error fetching categories', error);
     return [];

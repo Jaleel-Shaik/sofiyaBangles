@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "158053850417",
+    "project_id": "sofiya-bangles",
+    "storage_bucket": "sofiya-bangles.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:158053850417:android:f98d34b29cfdded89e2410",
+        "android_client_info": {
+          "package_name": "com.jaleel.sofiyabangles"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMDKsitwaLyqcvHM-tUwtkpRJXmyZ1J4c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

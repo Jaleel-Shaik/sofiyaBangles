@@ -1,4 +1,4 @@
-import { pool } from "../config/supabase";
+import { db } from "../config/firebase";
 import { Profile } from "../types";
 
 export const getAllUsersRepo = async (options: {
@@ -8,69 +8,60 @@ export const getAllUsersRepo = async (options: {
   search?: string;
 }): Promise<{ users: Omit<Profile, "password_hash">[]; total: number }> => {
   const { page, limit, role, search } = options;
-  const offset = (page - 1) * limit;
-
-  let whereClause = "WHERE 1=1";
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  let query: FirebaseFirestore.Query = db.collection("profiles");
 
   if (role) {
-    whereClause += ` AND role = $${paramIndex++}`;
-    values.push(role);
+    query = query.where("role", "==", role);
   }
+
+  // Firestore doesn't support native ILIKE search easily without external tools like Algolia.
+  // We'll fetch all matching the role, then filter manually if search is present.
+  // This is a naive implementation suitable for small to medium datasets.
+  const snapshot = await query.orderBy("created_at", "desc").get();
+  
+  let allUsers = snapshot.docs.map(doc => {
+    const data = doc.data() as Profile;
+    const { password_hash, ...safeData } = data;
+    return safeData as Omit<Profile, "password_hash">;
+  });
 
   if (search) {
-    whereClause += ` AND (full_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
-    paramIndex++;
-    values.push(`%${search}%`);
+    const lowerSearch = search.toLowerCase();
+    allUsers = allUsers.filter(u => 
+      (u.full_name && u.full_name.toLowerCase().includes(lowerSearch)) || 
+      (u.email && u.email.toLowerCase().includes(lowerSearch))
+    );
   }
 
-  const countQuery = `SELECT COUNT(*) as total FROM profiles ${whereClause}`;
-  const countResult = await pool.query(countQuery, values);
-  const total = parseInt(countResult.rows[0].total, 10);
+  const total = allUsers.length;
+  const offset = (page - 1) * limit;
+  const paginatedUsers = allUsers.slice(offset, offset + limit);
 
-  const dataQuery = `
-    SELECT id, full_name, email, phone, avatar_url, role,
-           is_active, created_at, updated_at
-    FROM profiles
-    ${whereClause}
-    ORDER BY created_at DESC
-    LIMIT $${paramIndex++} OFFSET $${paramIndex}
-  `;
-
-  values.push(limit, offset);
-
-  const result = await pool.query(dataQuery, values);
-
-  return { users: result.rows, total };
+  return { users: paginatedUsers, total };
 };
 
 export const getUserByIdRepo = async (
   id: string,
 ): Promise<Omit<Profile, "password_hash"> | null> => {
-  const query = `
-    SELECT id, full_name, email, phone, avatar_url, role,
-           is_active, created_at, updated_at
-    FROM profiles
-    WHERE id = $1
-  `;
+  const doc = await db.collection("profiles").doc(id).get();
+  if (!doc.exists) return null;
 
-  const result = await pool.query(query, [id]);
-  return result.rows[0] || null;
+  const data = doc.data() as Profile;
+  const { password_hash, ...safeData } = data;
+  return safeData;
 };
 
 export const updateUserRoleRepo = async (
   id: string,
   role: string,
 ): Promise<Omit<Profile, "password_hash">> => {
-  const query = `
-    UPDATE profiles
-    SET role = $1, updated_at = now()
-    WHERE id = $2
-    RETURNING id, full_name, email, phone, avatar_url, role,
-              is_active, created_at, updated_at
-  `;
+  await db.collection("profiles").doc(id).update({
+    role,
+    updated_at: new Date().toISOString()
+  });
 
-  const result = await pool.query(query, [role, id]);
-  return result.rows[0];
+  const doc = await db.collection("profiles").doc(id).get();
+  const data = doc.data() as Profile;
+  const { password_hash, ...safeData } = data;
+  return safeData;
 };

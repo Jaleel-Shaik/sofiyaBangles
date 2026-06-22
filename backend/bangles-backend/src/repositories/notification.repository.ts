@@ -1,5 +1,6 @@
-import { pool } from "../config/supabase";
+import { db } from "../config/firebase";
 import { Notification } from "../types";
+import { v4 as uuidv4 } from 'uuid';
 
 export const createNotificationRepo = async (data: {
   title: string;
@@ -9,22 +10,21 @@ export const createNotificationRepo = async (data: {
   sent_by?: string;
   user_id?: string | null;
 }): Promise<Notification> => {
-  const query = `
-    INSERT INTO notifications (title, body, type, product_id, sent_by, user_id)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *
-  `;
+  const newId = uuidv4();
+  const notification: Notification = {
+    id: newId,
+    title: data.title,
+    body: data.body || null,
+    type: data.type || "new_arrival",
+    product_id: data.product_id || null,
+    sent_by: data.sent_by || null,
+    user_id: data.user_id || null,
+    is_read: false,
+    created_at: new Date().toISOString()
+  };
 
-  const result = await pool.query(query, [
-    data.title,
-    data.body || null,
-    data.type || "new_arrival",
-    data.product_id || null,
-    data.sent_by || null,
-    data.user_id || null,
-  ]);
-
-  return result.rows[0];
+  await db.collection("notifications").doc(newId).set(notification);
+  return notification;
 };
 
 export const broadcastNotificationRepo = async (data: {
@@ -34,23 +34,36 @@ export const broadcastNotificationRepo = async (data: {
   product_id?: string | null;
   sent_by: string;
 }): Promise<number> => {
-  // Insert a notification for every active user
-  const query = `
-    INSERT INTO notifications (title, body, type, product_id, sent_by, user_id)
-    SELECT $1, $2, $3, $4, $5, p.id
-    FROM profiles p
-    WHERE p.is_active = true AND p.role = 'user'
-  `;
+  const usersSnapshot = await db.collection("profiles")
+    .where("is_active", "==", true)
+    .where("role", "==", "user")
+    .get();
 
-  const result = await pool.query(query, [
-    data.title,
-    data.body || null,
-    data.type || "announcement",
-    data.product_id || null,
-    data.sent_by,
-  ]);
+  if (usersSnapshot.empty) return 0;
 
-  return result.rowCount || 0;
+  const batch = db.batch();
+  let count = 0;
+
+  usersSnapshot.docs.forEach(doc => {
+    const newId = uuidv4();
+    const notification: Notification = {
+      id: newId,
+      title: data.title,
+      body: data.body || null,
+      type: data.type || "announcement",
+      product_id: data.product_id || null,
+      sent_by: data.sent_by,
+      user_id: doc.id,
+      is_read: false,
+      created_at: new Date().toISOString()
+    };
+    const ref = db.collection("notifications").doc(newId);
+    batch.set(ref, notification);
+    count++;
+  });
+
+  await batch.commit();
+  return count;
 };
 
 export const getUserNotificationsRepo = async (
@@ -58,47 +71,56 @@ export const getUserNotificationsRepo = async (
   page: number = 1,
   limit: number = 20,
 ): Promise<{ notifications: Notification[]; total: number }> => {
+  const query = db.collection("notifications").where("user_id", "==", userId);
+  const countSnapshot = await query.count().get();
+  const total = countSnapshot.data().count;
+
   const offset = (page - 1) * limit;
 
-  const countResult = await pool.query(
-    `SELECT COUNT(*) as total FROM notifications WHERE user_id = $1`,
-    [userId],
-  );
-  const total = parseInt(countResult.rows[0].total, 10);
+  const snapshot = await query.orderBy("created_at", "desc").get();
+  
+  // Apply pagination in memory since we need offset
+  const allDocs = snapshot.docs.map(doc => doc.data() as Notification);
+  const paginated = allDocs.slice(offset, offset + limit);
 
-  const query = `
-    SELECT n.*, p.product_name
-    FROM notifications n
-    LEFT JOIN products p ON n.product_id = p.id
-    WHERE n.user_id = $1
-    ORDER BY n.created_at DESC
-    LIMIT $2 OFFSET $3
-  `;
+  const notificationsWithProducts = await Promise.all(paginated.map(async (n) => {
+    let product_name = undefined;
+    if (n.product_id) {
+      const pDoc = await db.collection("products").doc(n.product_id).get();
+      if (pDoc.exists) {
+        product_name = pDoc.data()?.product_name;
+      }
+    }
+    return { ...n, product_name };
+  }));
 
-  const result = await pool.query(query, [userId, limit, offset]);
-
-  return { notifications: result.rows, total };
+  return { notifications: notificationsWithProducts, total };
 };
 
 export const markNotificationReadRepo = async (
   id: string,
   userId: string,
 ): Promise<Notification | null> => {
-  const query = `
-    UPDATE notifications
-    SET is_read = true
-    WHERE id = $1 AND user_id = $2
-    RETURNING *
-  `;
+  const docRef = db.collection("notifications").doc(id);
+  const doc = await docRef.get();
+  
+  if (!doc.exists) return null;
+  const data = doc.data() as Notification;
+  
+  if (data.user_id !== userId) return null;
 
-  const result = await pool.query(query, [id, userId]);
-  return result.rows[0] || null;
+  await docRef.update({ is_read: true });
+  
+  const updatedDoc = await docRef.get();
+  return updatedDoc.data() as Notification;
 };
 
 export const getUnreadCountRepo = async (userId: string): Promise<number> => {
-  const result = await pool.query(
-    `SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = false`,
-    [userId],
-  );
-  return parseInt(result.rows[0].count, 10);
+  const countSnapshot = await db.collection("notifications")
+    .where("user_id", "==", userId)
+    .where("is_read", "==", false)
+    .count()
+    .get();
+    
+  return countSnapshot.data().count;
 };

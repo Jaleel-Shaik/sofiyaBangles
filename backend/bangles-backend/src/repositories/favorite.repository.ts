@@ -1,67 +1,92 @@
-import { pool } from "../config/supabase";
+import { db } from "../config/firebase";
 import { Favorite, Product } from "../types";
+import { v4 as uuidv4 } from 'uuid';
 
 export const addFavoriteRepo = async (
   userId: string,
   productId: string,
 ): Promise<Favorite> => {
-  const query = `
-    INSERT INTO favorites (user_id, product_id)
-    VALUES ($1, $2)
-    ON CONFLICT (user_id, product_id) DO NOTHING
-    RETURNING *
-  `;
+  const existingSnapshot = await db.collection("favorites")
+    .where("user_id", "==", userId)
+    .where("product_id", "==", productId)
+    .limit(1)
+    .get();
 
-  const result = await pool.query(query, [userId, productId]);
-
-  // If already existed, fetch it
-  if (result.rows.length === 0) {
-    const existing = await pool.query(
-      `SELECT * FROM favorites WHERE user_id = $1 AND product_id = $2`,
-      [userId, productId],
-    );
-    return existing.rows[0];
+  if (!existingSnapshot.empty) {
+    return existingSnapshot.docs[0].data() as Favorite;
   }
 
-  return result.rows[0];
+  const newId = uuidv4();
+  const favoriteData: Favorite = {
+    id: newId,
+    user_id: userId,
+    product_id: productId,
+    created_at: new Date().toISOString()
+  };
+
+  await db.collection("favorites").doc(newId).set(favoriteData);
+  return favoriteData;
 };
 
 export const removeFavoriteRepo = async (
   userId: string,
   productId: string,
 ): Promise<void> => {
-  await pool.query(
-    `DELETE FROM favorites WHERE user_id = $1 AND product_id = $2`,
-    [userId, productId],
-  );
+  const snapshot = await db.collection("favorites")
+    .where("user_id", "==", userId)
+    .where("product_id", "==", productId)
+    .get();
+
+  const batch = db.batch();
+  snapshot.docs.forEach(doc => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
 };
 
 export const getUserFavoritesRepo = async (
   userId: string,
 ): Promise<Product[]> => {
-  const query = `
-    SELECT
-      p.*,
-      c.category_name,
-      true AS is_favorited
-    FROM favorites f
-    JOIN products p ON f.product_id = p.id
-    LEFT JOIN categories c ON p.category_id = c.id
-    WHERE f.user_id = $1 AND p.is_active = true
-    ORDER BY f.created_at DESC
-  `;
+  const favSnapshot = await db.collection("favorites")
+    .where("user_id", "==", userId)
+    .orderBy("created_at", "desc")
+    .get();
 
-  const result = await pool.query(query, [userId]);
-  return result.rows;
+  if (favSnapshot.empty) return [];
+
+  const favorites = favSnapshot.docs.map(doc => doc.data() as Favorite);
+
+  const productPromises = favorites.map(async (fav) => {
+    const productDoc = await db.collection("products").doc(fav.product_id).get();
+    if (!productDoc.exists) return null;
+    
+    const p = productDoc.data() as Product;
+    if (!p.is_active) return null;
+
+    let category_name = undefined;
+    if (p.category_id) {
+      const catDoc = await db.collection("categories").doc(p.category_id).get();
+      if (catDoc.exists) {
+        category_name = catDoc.data()?.category_name;
+      }
+    }
+
+    return { ...p, category_name, is_favorited: true } as Product;
+  });
+
+  const products = await Promise.all(productPromises);
+  return products.filter((p): p is Product => p !== null);
 };
 
 export const isFavoritedRepo = async (
   userId: string,
   productId: string,
 ): Promise<boolean> => {
-  const result = await pool.query(
-    `SELECT 1 FROM favorites WHERE user_id = $1 AND product_id = $2`,
-    [userId, productId],
-  );
-  return result.rows.length > 0;
+  const snapshot = await db.collection("favorites")
+    .where("user_id", "==", userId)
+    .where("product_id", "==", productId)
+    .limit(1)
+    .get();
+
+  return !snapshot.empty;
 };

@@ -1,5 +1,6 @@
-import { pool } from "../config/supabase";
+import { db } from "../config/firebase";
 import { AuditLog } from "../types";
+import { v4 as uuidv4 } from 'uuid';
 
 export const createAuditLogRepo = async (data: {
   actor_id: string;
@@ -9,44 +10,48 @@ export const createAuditLogRepo = async (data: {
   old_data?: Record<string, unknown>;
   new_data?: Record<string, unknown>;
 }): Promise<AuditLog> => {
-  const query = `
-    INSERT INTO audit_logs (actor_id, action, table_name, record_id, old_data, new_data)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *
-  `;
+  const newId = uuidv4();
+  const auditLog: AuditLog = {
+    id: newId,
+    actor_id: data.actor_id,
+    action: data.action,
+    table_name: data.table_name,
+    record_id: data.record_id || null,
+    old_data: data.old_data || null,
+    new_data: data.new_data || null,
+    created_at: new Date().toISOString()
+  };
 
-  const result = await pool.query(query, [
-    data.actor_id,
-    data.action,
-    data.table_name,
-    data.record_id || null,
-    data.old_data ? JSON.stringify(data.old_data) : null,
-    data.new_data ? JSON.stringify(data.new_data) : null,
-  ]);
-
-  return result.rows[0];
+  await db.collection("audit_logs").doc(newId).set(auditLog);
+  return auditLog;
 };
 
 export const getAuditLogsRepo = async (
   page: number = 1,
   limit: number = 50,
 ): Promise<{ logs: AuditLog[]; total: number }> => {
+  const query = db.collection("audit_logs");
+  const countSnapshot = await query.count().get();
+  const total = countSnapshot.data().count;
+
   const offset = (page - 1) * limit;
 
-  const countResult = await pool.query(
-    `SELECT COUNT(*) as total FROM audit_logs`,
-  );
-  const total = parseInt(countResult.rows[0].total, 10);
+  const snapshot = await query.orderBy("created_at", "desc").get();
+  
+  // Apply pagination in memory
+  const allDocs = snapshot.docs.map(doc => doc.data() as AuditLog);
+  const paginated = allDocs.slice(offset, offset + limit);
 
-  const query = `
-    SELECT al.*, p.full_name AS actor_name
-    FROM audit_logs al
-    LEFT JOIN profiles p ON al.actor_id = p.id
-    ORDER BY al.created_at DESC
-    LIMIT $1 OFFSET $2
-  `;
+  const logsWithActorName = await Promise.all(paginated.map(async (log) => {
+    let actor_name = undefined;
+    if (log.actor_id) {
+      const pDoc = await db.collection("profiles").doc(log.actor_id).get();
+      if (pDoc.exists) {
+        actor_name = pDoc.data()?.full_name;
+      }
+    }
+    return { ...log, actor_name };
+  }));
 
-  const result = await pool.query(query, [limit, offset]);
-
-  return { logs: result.rows, total };
+  return { logs: logsWithActorName, total };
 };

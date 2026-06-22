@@ -22,11 +22,11 @@ export default function HomeScreen() {
 
   const fetchData = async () => {
     try {
-      const [fetchedProducts, fetchedCategories] = await Promise.all([
+      const [fetchedProductsResponse, fetchedCategories] = await Promise.all([
         getProducts(1, 10),
         getCategories()
       ]);
-      setProducts(fetchedProducts);
+      setProducts(fetchedProductsResponse.products);
       setCategories(fetchedCategories);
     } catch (error) {
       console.error('Failed to load home data', error);

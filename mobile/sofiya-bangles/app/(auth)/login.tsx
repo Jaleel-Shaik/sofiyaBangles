@@ -1,12 +1,13 @@
 import { View, Text, Alert, Platform, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { login, register } from '../../src/api/auth';
+import { login, register, signInWithGoogle } from '../../src/api/auth';
 import { Ionicons } from '@expo/vector-icons';
 import TextInputField from '../../src/components/TextInputField';
 import Button from '../../src/components/Button';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useAuthStore } from '../../src/store/authStore';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState<'user' | 'admin'>('user');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -48,14 +50,52 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (isLogin) {
+        // Pass role if your backend requires it for login, otherwise login typically infers it
+        // The user requested: "selecting role either admin or the user he should navigate to the as per the role"
         const res = await login(email, password);
-        Alert.alert('Success', res.message || 'Login successful!');
+        // Ensure the store is updated, then redirect
+        const userRole = res.user?.role || role; // fallback if backend doesn't return role immediately
+        if (userRole === 'admin') {
+          router.replace('/(admin)/(tabs)/dashboard' as any);
+        } else {
+          router.replace('/(tabs)/home');
+        }
       } else {
-        const res = await register(email, password, fullName);
+        const res: any = await register(email, password, fullName, role);
         Alert.alert('Success', res.message || 'Registration successful!');
+        // We could redirect immediately or require them to login
+        if (res.user) {
+           const userRole = res.user.role || role;
+           if (userRole === 'admin') {
+             router.replace('/(admin)/(tabs)/dashboard' as any);
+           } else {
+             router.replace('/(tabs)/home');
+           }
+        } else {
+           setIsLogin(true);
+        }
       }
     } catch (error: any) {
       Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true);
+      const res = await signInWithGoogle();
+      if (res.user) {
+        const userRole = res.user.role || 'user';
+        if (userRole === 'admin') {
+          router.replace('/(admin)/(tabs)/dashboard' as any);
+        } else {
+          router.replace('/(tabs)/home');
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('Google Sign-In Error', error.message);
     } finally {
       setLoading(false);
     }
@@ -82,7 +122,7 @@ export default function LoginScreen() {
         </View>
 
         {/* Interactive Toggle */}
-        <View className="flex-row bg-white p-1.5 rounded-full mb-8 shadow-sm">
+        <View className="flex-row bg-white p-1.5 rounded-full mb-6 shadow-sm">
           <TouchableOpacity 
             className={`flex-1 py-3 items-center rounded-full ${isLogin ? 'bg-[#FF1F4B]' : 'bg-transparent'}`}
             onPress={() => setIsLogin(true)}
@@ -96,6 +136,23 @@ export default function LoginScreen() {
             activeOpacity={0.8}
           >
             <Text className={`font-bold ${!isLogin ? 'text-white' : 'text-slate-500'}`}>Sign Up</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Role Toggle */}
+        <View className="flex-row items-center justify-center mb-6 space-x-4">
+          <Text className="text-sm font-semibold text-rose-800 mr-2">I am an:</Text>
+          <TouchableOpacity 
+            className={`px-4 py-2 rounded-full border ${role === 'admin' ? 'bg-rose-100 border-rose-400' : 'bg-white border-gray-200'}`}
+            onPress={() => setRole('admin')}
+          >
+            <Text className={`text-sm font-bold ${role === 'admin' ? 'text-rose-700' : 'text-gray-500'}`}>Admin</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            className={`px-4 py-2 rounded-full border ${role === 'user' ? 'bg-rose-100 border-rose-400' : 'bg-white border-gray-200'}`}
+            onPress={() => setRole('user')}
+          >
+            <Text className={`text-sm font-bold ${role === 'user' ? 'text-rose-700' : 'text-gray-500'}`}>User</Text>
           </TouchableOpacity>
         </View>
 
@@ -148,6 +205,21 @@ export default function LoginScreen() {
               elevation: 8 
             }}
           />
+
+          <View className="flex-row items-center my-6">
+            <View className="flex-1 h-px bg-gray-300" />
+            <Text className="mx-4 text-gray-500 font-semibold">OR</Text>
+            <View className="flex-1 h-px bg-gray-300" />
+          </View>
+
+          <TouchableOpacity 
+            className="flex-row items-center justify-center bg-white border border-gray-200 py-3 rounded-full shadow-sm"
+            onPress={handleGoogleSignIn}
+            disabled={loading}
+          >
+            <Ionicons name="logo-google" size={24} color="#db4437" />
+            <Text className="ml-3 font-bold text-slate-700">Continue with Google</Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAwareScrollView>
     </SafeAreaView>

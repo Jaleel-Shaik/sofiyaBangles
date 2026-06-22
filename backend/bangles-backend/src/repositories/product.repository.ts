@@ -1,5 +1,6 @@
-import { pool } from "../config/supabase";
+import { db } from "../config/firebase";
 import { Product } from "../types";
+import { v4 as uuidv4 } from 'uuid';
 
 export const createProductRepo = async (payload: {
   product_name: string;
@@ -9,24 +10,22 @@ export const createProductRepo = async (payload: {
   category_id?: string;
   quantity?: number;
 }): Promise<Product> => {
-  const query = `
-    INSERT INTO products
-      (product_name, description, price, image_url, category_id, quantity)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *
-  `;
+  const newId = uuidv4();
+  const productData: Product = {
+    id: newId,
+    product_name: payload.product_name,
+    description: payload.description || null,
+    price: payload.price,
+    image_url: payload.image_url || null,
+    category_id: payload.category_id || null,
+    quantity: payload.quantity || 0,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
 
-  const values = [
-    payload.product_name,
-    payload.description || null,
-    payload.price,
-    payload.image_url || null,
-    payload.category_id || null,
-    payload.quantity || 0,
-  ];
-
-  const result = await pool.query(query, values);
-  return result.rows[0];
+  await db.collection("products").doc(newId).set(productData);
+  return productData;
 };
 
 export const getProductsRepo = async (options: {
@@ -37,89 +36,82 @@ export const getProductsRepo = async (options: {
   userId?: string;
 }): Promise<{ products: Product[]; total: number }> => {
   const { page, limit, categoryId, search, userId } = options;
-  const offset = (page - 1) * limit;
-
-  let whereClause = "WHERE p.is_active = true";
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  
+  let query: FirebaseFirestore.Query = db.collection("products").where("is_active", "==", true);
 
   if (categoryId) {
-    whereClause += ` AND p.category_id = $${paramIndex++}`;
-    values.push(categoryId);
+    query = query.where("category_id", "==", categoryId);
   }
+
+  const snapshot = await query.orderBy("created_at", "desc").get();
+  let allProducts = snapshot.docs.map(doc => doc.data() as Product);
 
   if (search) {
-    whereClause += ` AND (p.product_name ILIKE $${paramIndex} OR p.description ILIKE $${paramIndex})`;
-    paramIndex++;
-    values.push(`%${search}%`);
+    const lowerSearch = search.toLowerCase();
+    allProducts = allProducts.filter(p => 
+      (p.product_name && p.product_name.toLowerCase().includes(lowerSearch)) ||
+      (p.description && p.description.toLowerCase().includes(lowerSearch))
+    );
   }
 
-  // Count query
-  const countQuery = `
-    SELECT COUNT(*) as total
-    FROM products p
-    ${whereClause}
-  `;
-  const countResult = await pool.query(countQuery, values);
-  const total = parseInt(countResult.rows[0].total, 10);
+  const total = allProducts.length;
+  const offset = (page - 1) * limit;
+  const paginatedProducts = allProducts.slice(offset, offset + limit);
 
-  // Data query with optional favorite join
-  let selectFavorite = "";
-  let joinFavorite = "";
+  // Fetch categories and favorites concurrently for the paginated products
+  const productsWithDetails = await Promise.all(paginatedProducts.map(async (p) => {
+    let category_name = undefined;
+    if (p.category_id) {
+      const catDoc = await db.collection("categories").doc(p.category_id).get();
+      if (catDoc.exists) {
+        category_name = catDoc.data()?.category_name;
+      }
+    }
 
-  if (userId) {
-    selectFavorite = `, CASE WHEN f.id IS NOT NULL THEN true ELSE false END AS is_favorited`;
-    joinFavorite = `LEFT JOIN favorites f ON p.id = f.product_id AND f.user_id = $${paramIndex++}`;
-    values.push(userId);
-  }
+    let is_favorited = false;
+    if (userId) {
+      const favSnapshot = await db.collection("favorites")
+        .where("user_id", "==", userId)
+        .where("product_id", "==", p.id)
+        .limit(1)
+        .get();
+      is_favorited = !favSnapshot.empty;
+    }
 
-  const dataQuery = `
-    SELECT
-      p.*,
-      c.category_name
-      ${selectFavorite}
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    ${joinFavorite}
-    ${whereClause}
-    ORDER BY p.created_at DESC
-    LIMIT $${paramIndex++} OFFSET $${paramIndex}
-  `;
+    return { ...p, category_name, is_favorited };
+  }));
 
-  values.push(limit, offset);
-
-  const result = await pool.query(dataQuery, values);
-
-  return { products: result.rows, total };
+  return { products: productsWithDetails, total };
 };
 
 export const getProductByIdRepo = async (
   id: string,
   userId?: string,
 ): Promise<Product | null> => {
-  let selectFavorite = "";
-  let joinFavorite = "";
-  const values: unknown[] = [id];
+  const doc = await db.collection("products").doc(id).get();
+  if (!doc.exists) return null;
 
-  if (userId) {
-    selectFavorite = `, CASE WHEN f.id IS NOT NULL THEN true ELSE false END AS is_favorited`;
-    joinFavorite = `LEFT JOIN favorites f ON p.id = f.product_id AND f.user_id = $2`;
-    values.push(userId);
+  const product = doc.data() as Product;
+
+  let category_name = undefined;
+  if (product.category_id) {
+    const catDoc = await db.collection("categories").doc(product.category_id).get();
+    if (catDoc.exists) {
+      category_name = catDoc.data()?.category_name;
+    }
   }
 
-  const query = `
-    SELECT
-      p.*,
-      c.category_name
-      ${selectFavorite}
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    ${joinFavorite}
-    WHERE p.id = $1
-  `;
+  let is_favorited = false;
+  if (userId) {
+    const favSnapshot = await db.collection("favorites")
+      .where("user_id", "==", userId)
+      .where("product_id", "==", id)
+      .limit(1)
+      .get();
+    is_favorited = !favSnapshot.empty;
+  }
 
-  const result = await pool.query(query, values);
-  return result.rows[0] || null;
+  return { ...product, category_name, is_favorited };
 };
 
 export const updateProductRepo = async (
@@ -134,63 +126,49 @@ export const updateProductRepo = async (
     is_active: boolean;
   }>,
 ): Promise<Product> => {
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  const updateData: any = { ...data, updated_at: new Date().toISOString() };
+  Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
-  const allowedFields = [
-    "product_name",
-    "description",
-    "price",
-    "image_url",
-    "category_id",
-    "quantity",
-    "is_active",
-  ] as const;
-
-  for (const field of allowedFields) {
-    if (data[field] !== undefined) {
-      fields.push(`${field} = $${paramIndex++}`);
-      values.push(data[field]);
-    }
-  }
-
-  fields.push("updated_at = now()");
-  values.push(id);
-
-  const query = `
-    UPDATE products
-    SET ${fields.join(", ")}
-    WHERE id = $${paramIndex}
-    RETURNING *
-  `;
-
-  const result = await pool.query(query, values);
-  return result.rows[0];
+  await db.collection("products").doc(id).update(updateData);
+  
+  const doc = await db.collection("products").doc(id).get();
+  return doc.data() as Product;
 };
 
 export const deleteProductRepo = async (id: string): Promise<void> => {
-  // Soft delete
-  await pool.query(
-    `UPDATE products SET is_active = false, updated_at = now() WHERE id = $1`,
-    [id],
-  );
+  await db.collection("products").doc(id).update({
+    is_active: false,
+    updated_at: new Date().toISOString()
+  });
 };
 
 export const searchProductsRepo = async (
-  query: string,
+  queryText: string,
   limit: number = 20,
 ): Promise<Product[]> => {
-  const sql = `
-    SELECT p.*, c.category_name
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    WHERE p.is_active = true
-      AND (p.product_name ILIKE $1 OR p.description ILIKE $1)
-    ORDER BY p.created_at DESC
-    LIMIT $2
-  `;
+  const snapshot = await db.collection("products")
+    .where("is_active", "==", true)
+    .orderBy("created_at", "desc")
+    .get();
 
-  const result = await pool.query(sql, [`%${query}%`, limit]);
-  return result.rows;
+  const lowerQuery = queryText.toLowerCase();
+  const allProducts = snapshot.docs.map(doc => doc.data() as Product);
+  
+  const filtered = allProducts.filter(p => 
+    (p.product_name && p.product_name.toLowerCase().includes(lowerQuery)) ||
+    (p.description && p.description.toLowerCase().includes(lowerQuery))
+  ).slice(0, limit);
+
+  const productsWithDetails = await Promise.all(filtered.map(async (p) => {
+    let category_name = undefined;
+    if (p.category_id) {
+      const catDoc = await db.collection("categories").doc(p.category_id).get();
+      if (catDoc.exists) {
+        category_name = catDoc.data()?.category_name;
+      }
+    }
+    return { ...p, category_name };
+  }));
+
+  return productsWithDetails;
 };

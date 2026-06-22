@@ -5,7 +5,7 @@ import { useAuthStore } from "../src/store/authStore";
 import "../global.css";
 
 export default function RootLayout() {
-  const { isLoading, token, restoreToken } = useAuthStore();
+  const { isLoading, token, restoreToken, user } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
 
@@ -26,13 +26,17 @@ export default function RootLayout() {
         router.replace("/(auth)/login");
       }, delay);
     } else if (token && (inAuthGroup || onSplashScreen)) {
-      // Logged in, redirect to home
+      // Logged in, redirect to home or admin dashboard based on role
       const delay = onSplashScreen ? 2000 : 0;
       setTimeout(() => {
-        router.replace("/(tabs)/home");
+        if (user?.role === 'admin') {
+          router.replace("/(admin)/(tabs)/dashboard" as any);
+        } else {
+          router.replace("/(tabs)/home");
+        }
       }, delay);
     }
-  }, [token, segments, isLoading]);
+  }, [token, segments, isLoading, user]);
 
   return (
     <>
@@ -41,6 +45,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)/login" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(admin)" />
         <Stack.Screen name="products/[id]" />
       </Stack>
     </>
