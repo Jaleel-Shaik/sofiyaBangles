@@ -26,13 +26,13 @@ router.get("/:id", getProductById);
 router.post(
   "/",
   requireRole("admin", "super_admin"),
-  upload.single("image"),
+  upload.array("images", 5),
   createProduct,
 );
 router.put(
   "/:id",
   requireRole("admin", "super_admin"),
-  upload.single("image"),
+  upload.array("images", 5),
   updateProduct,
 );
 router.patch(

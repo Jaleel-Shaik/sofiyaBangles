@@ -14,6 +14,8 @@ export default function ProductDetailScreen() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [mainImage, setMainImage] = useState<string>('');
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -21,6 +23,11 @@ export default function ProductDetailScreen() {
       if (typeof id === 'string') {
         const data = await getProductById(id);
         setProduct(data);
+        if (data && data.images && data.images.length > 0) {
+          setMainImage(data.images[0]);
+        } else if (data && data.image_url) {
+          setMainImage(data.image_url);
+        }
         
         // Check if favorite
         const favs = await getFavorites();
@@ -49,7 +56,7 @@ export default function ProductDetailScreen() {
   const openWhatsApp = () => {
     if (!product) return;
     const phone = process.env.EXPO_PUBLIC_WHATSAPP_NUMBER || '+1234567890';
-    const text = `Hello, I want to inquire about the ${product.product_name}. Is it available?`;
+    const text = `Hello, I want to purchase ${product.product_name}.\nUnique Code: ${product.unique_code || 'N/A'}\nQuantity: ${selectedQuantity}\nIs this available?`;
     Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(text)}`);
   };
 
@@ -87,33 +94,44 @@ export default function ProductDetailScreen() {
         <View className="items-center px-6 pb-6 bg-[#FFF0F3]" style={{ paddingTop: Math.max(insets.top + 60, 80) }}>
           <View className="w-full aspect-square bg-white rounded-3xl shadow-sm overflow-hidden">
             <Image 
-              source={{ uri: product.image_url || 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a' }} 
+              source={{ uri: mainImage || 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a' }} 
               className="w-full h-full"
               resizeMode="cover"
             />
           </View>
           
-          <View className="flex-row gap-4 mt-6">
-            {[1, 2, 3].map((item) => (
-              <View key={item} className={`w-14 h-14 rounded-full overflow-hidden border-2 ${item === 1 ? 'border-rose-400' : 'border-white'} shadow-sm`}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-6 flex-row">
+            {(product.images && product.images.length > 0 ? product.images : [product.image_url || 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a']).map((img, index) => (
+              <TouchableOpacity 
+                key={index} 
+                onPress={() => setMainImage(img)}
+                className={`w-14 h-14 rounded-xl overflow-hidden border-2 mr-4 ${mainImage === img ? 'border-rose-400' : 'border-white'} shadow-sm`}
+              >
                  <Image 
-                  source={{ uri: product.image_url || 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a' }} 
+                  source={{ uri: img }} 
                   className="w-full h-full opacity-80"
+                  resizeMode="cover"
                 />
-              </View>
+              </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
         </View>
 
         {/* Details Section */}
         <View className="bg-white flex-1 rounded-t-3xl px-6 pt-8 pb-32 shadow-sm border-t border-slate-100">
           <View className="flex-row justify-between items-start mb-2">
-            <Text className="text-2xl font-extrabold text-slate-900 flex-1 pr-4">
-              {product.product_name}
-            </Text>
+            <View className="flex-1 pr-4">
+              <Text className="text-2xl font-extrabold text-slate-900">
+                {product.product_name}
+              </Text>
+              {product.unique_code && (
+                <Text className="text-sm font-bold text-slate-400 mt-1">Code: {product.unique_code}</Text>
+              )}
+            </View>
             <View className="flex-row items-center bg-amber-50 px-2 py-1 rounded-lg">
               <Ionicons name="star" size={14} color="#f59e0b" />
-              <Text className="text-amber-600 font-bold ml-1 text-xs">4.8</Text>
+              <Text className="text-amber-600 font-bold ml-1 text-xs">{product.rating || '4.8'}</Text>
+              <Text className="text-slate-400 ml-1 text-xs">({product.reviews || 0})</Text>
             </View>
           </View>
 
@@ -126,6 +144,30 @@ export default function ProductDetailScreen() {
               icon={product.quantity > 0 ? 'checkmark-circle-outline' : 'close-circle-outline'}
             />
           </View>
+
+          {/* Quantity Selector */}
+          {product.quantity > 0 && (
+            <View className="flex-row items-center mb-6">
+              <Text className="text-sm font-bold text-slate-800 mr-4">Quantity</Text>
+              <View className="flex-row items-center border border-slate-200 rounded-full bg-slate-50">
+                <TouchableOpacity 
+                  className="w-10 h-10 items-center justify-center rounded-l-full"
+                  onPress={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
+                >
+                  <Ionicons name="remove" size={20} color="#334155" />
+                </TouchableOpacity>
+                <Text className="w-10 text-center font-bold text-slate-800 text-lg">
+                  {selectedQuantity}
+                </Text>
+                <TouchableOpacity 
+                  className="w-10 h-10 items-center justify-center rounded-r-full"
+                  onPress={() => setSelectedQuantity(Math.min(product.quantity, selectedQuantity + 1))}
+                >
+                  <Ionicons name="add" size={20} color="#334155" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           <Text className="text-sm font-bold text-slate-800 mb-2">Description</Text>
           <Text className="text-slate-500 text-sm leading-6 mb-8">

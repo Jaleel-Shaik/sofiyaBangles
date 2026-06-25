@@ -20,7 +20,7 @@ export default function AddProductScreen() {
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState('10');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchCats = async () => {
@@ -40,10 +40,12 @@ export default function AddProductScreen() {
       return;
     }
 
-    if (!imageUrl) {
-      Alert.alert('Validation Error', 'Please select an image for the product.');
+    if (imageUrls.length === 0) {
+      Alert.alert('Validation Error', 'Please select at least one image for the product.');
       return;
     }
+
+    const catName = categories.find(c => c.id === selectedCategory)?.category_name || 'PRD';
 
     setLoading(true);
     try {
@@ -52,8 +54,9 @@ export default function AddProductScreen() {
         price: parseFloat(price),
         description,
         category_id: selectedCategory,
+        categoryName: catName,
         quantity: parseInt(quantity, 10),
-      }, imageUrl);
+      }, imageUrls);
       router.replace('/(admin)/add-product/success' as any);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to add product');
@@ -65,14 +68,18 @@ export default function AddProductScreen() {
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsMultipleSelection: true,
       quality: 0.8,
     });
 
     if (!result.canceled) {
-      setImageUrl(result.assets[0].uri);
+      const selectedUris = result.assets.map(a => a.uri);
+      setImageUrls(prev => [...prev, ...selectedUris]);
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImageUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -87,20 +94,27 @@ export default function AddProductScreen() {
       </View>
 
       <ScrollView className="flex-1 px-4 py-6" showsVerticalScrollIndicator={false}>
-        {/* Image Upload Placeholder */}
-        <TouchableOpacity 
-          className="w-full h-48 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 items-center justify-center mb-6 overflow-hidden"
-          onPress={pickImage}
-        >
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} className="w-full h-full" resizeMode="cover" />
-          ) : (
-            <>
-              <Ionicons name="camera-outline" size={40} color="#cbd5e1" />
-              <Text className="text-slate-400 font-medium mt-2">Tap to upload image</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {/* Image Upload Area */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
+          {imageUrls.map((uri, idx) => (
+            <View key={idx} className="relative mr-4">
+              <Image source={{ uri }} className="w-32 h-32 rounded-2xl bg-slate-100" resizeMode="cover" />
+              <TouchableOpacity 
+                className="absolute -top-2 -right-2 bg-red-500 rounded-full w-6 h-6 items-center justify-center border-2 border-white"
+                onPress={() => removeImage(idx)}
+              >
+                <Ionicons name="close" size={14} color="white" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          <TouchableOpacity 
+            className="w-32 h-32 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 items-center justify-center mr-4"
+            onPress={pickImage}
+          >
+            <Ionicons name="camera-outline" size={32} color="#cbd5e1" />
+            <Text className="text-slate-400 font-medium mt-1 text-xs">Add Photo</Text>
+          </TouchableOpacity>
+        </ScrollView>
 
         {/* Basic Info */}
         <Text className="text-lg font-bold text-slate-800 mb-4">Basic Information</Text>

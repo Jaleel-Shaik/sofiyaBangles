@@ -1,7 +1,7 @@
 import { db } from "../config/firebase";
 import { OverviewAnalytics, ProductsByCategory } from "../types";
 
-export const getOverviewAnalyticsRepo = async (): Promise<OverviewAnalytics> => {
+export const getOverviewAnalyticsModel = async (): Promise<OverviewAnalytics> => {
   const activeProductsQuery = db.collection("products").where("is_active", "==", true).count().get();
   const totalProductsQuery = db.collection("products").count().get();
   const totalCategoriesQuery = db.collection("categories").where("is_active", "==", true).count().get();
@@ -25,7 +25,7 @@ export const getOverviewAnalyticsRepo = async (): Promise<OverviewAnalytics> => 
   };
 };
 
-export const getProductsByCategoryRepo = async (): Promise<ProductsByCategory[]> => {
+export const getProductsByCategoryModel = async (): Promise<ProductsByCategory[]> => {
   const categoriesSnapshot = await db.collection("categories").where("is_active", "==", true).get();
   const productsSnapshot = await db.collection("products").where("is_active", "==", true).get();
 
@@ -53,7 +53,7 @@ export const getProductsByCategoryRepo = async (): Promise<ProductsByCategory[]>
   return result;
 };
 
-export const getRecentSignupsRepo = async (
+export const getRecentSignupsModel = async (
   days: number = 30,
 ): Promise<{ date: string; count: number }[]> => {
   const dateLimit = new Date();

@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 export const createProductSchema = z.object({
+  unique_code: z
+    .string()
+    .max(50, "Unique code must be under 50 characters")
+    .trim()
+    .optional(),
   product_name: z
     .string()
     .min(2, "Product name must be at least 2 characters")
@@ -20,6 +25,10 @@ export const createProductSchema = z.object({
     .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative"))
     .default(0),
   category_id: z.string().uuid("Invalid category ID").optional(),
+  images: z.array(z.string().url("Invalid image URL")).optional(),
+  likes: z.number().int().min(0).default(0).optional(),
+  rating: z.number().min(0).max(5).default(0).optional(),
+  reviews: z.number().int().min(0).default(0).optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

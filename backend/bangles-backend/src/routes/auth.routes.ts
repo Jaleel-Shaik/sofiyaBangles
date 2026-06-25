@@ -4,6 +4,8 @@ import {
   login,
   getMe,
   updateProfile,
+  sendOtp,
+  verifyOtp,
 } from "../controllers/auth.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
@@ -14,6 +16,8 @@ const router = Router();
 // Public routes
 router.post("/register", validate(registerSchema), register);
 router.post("/login", validate(loginSchema), login);
+router.post("/send-otp", sendOtp);
+router.post("/verify-otp", verifyOtp);
 
 // Protected routes
 router.get("/me", authenticate, getMe);

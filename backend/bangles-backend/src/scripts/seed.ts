@@ -1,22 +1,22 @@
-import { createCategoryRepo } from '../repositories/category.repository';
-import { createProductRepo } from '../repositories/product.repository';
+import { createCategoryModel } from '../models/category.model';
+import { createProductModel } from '../models/product.model';
 
 const seedData = async () => {
   try {
     console.log('Seeding categories...');
-    const bridal = await createCategoryRepo({
+    const bridal = await createCategoryModel({
       category_name: 'Bridal',
       image_url: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a',
       display_order: 1
     });
 
-    const glass = await createCategoryRepo({
+    const glass = await createCategoryModel({
       category_name: 'Glass Bangles',
       image_url: 'https://images.unsplash.com/photo-1617038260897-41a1f14a8ca5',
       display_order: 2
     });
 
-    const stone = await createCategoryRepo({
+    const stone = await createCategoryModel({
       category_name: 'Stone Studded',
       image_url: 'https://images.unsplash.com/photo-1588444837495-c6cfeb53f32d',
       display_order: 3
@@ -25,7 +25,7 @@ const seedData = async () => {
     console.log('Seeding products...');
     
     // Bridal products
-    await createProductRepo({
+    await createProductModel({
       product_name: 'Royal Bridal Gold Set',
       description: 'Elegant handcrafted gold bangles perfect for your special day.',
       price: 2499,
@@ -34,7 +34,7 @@ const seedData = async () => {
       quantity: 10
     });
 
-    await createProductRepo({
+    await createProductModel({
       product_name: 'Traditional Bridal Chura',
       description: 'Classic red and white bridal chura set.',
       price: 1599,
@@ -44,7 +44,7 @@ const seedData = async () => {
     });
 
     // Glass products
-    await createProductRepo({
+    await createProductModel({
       product_name: 'Festive Glass Bangles (Red)',
       description: 'Beautiful red glass bangles that chime wonderfully.',
       price: 299,
@@ -54,7 +54,7 @@ const seedData = async () => {
     });
 
     // Stone products
-    await createProductRepo({
+    await createProductModel({
       product_name: 'Diamond Studded Premium Set',
       description: 'American diamond studded bangles for party wear.',
       price: 3999,

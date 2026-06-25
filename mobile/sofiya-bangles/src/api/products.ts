@@ -2,12 +2,17 @@ import { getFirestore, collection, query, where, orderBy, getDocs, getDoc, doc, 
 
 export interface Product {
   id: string;
+  unique_code: string;
   product_name: string;
   description: string;
   price: number;
   image_url: string;
+  images?: string[];
   category_id: string;
   quantity: number;
+  likes?: number;
+  rating?: number;
+  reviews?: number;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

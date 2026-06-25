@@ -2,7 +2,7 @@ import { db } from "../config/firebase";
 import { Favorite, Product } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
-export const addFavoriteRepo = async (
+export const addFavoriteModel = async (
   userId: string,
   productId: string,
 ): Promise<Favorite> => {
@@ -28,7 +28,7 @@ export const addFavoriteRepo = async (
   return favoriteData;
 };
 
-export const removeFavoriteRepo = async (
+export const removeFavoriteModel = async (
   userId: string,
   productId: string,
 ): Promise<void> => {
@@ -44,7 +44,7 @@ export const removeFavoriteRepo = async (
   await batch.commit();
 };
 
-export const getUserFavoritesRepo = async (
+export const getUserFavoritesModel = async (
   userId: string,
 ): Promise<Product[]> => {
   const favSnapshot = await db.collection("favorites")
@@ -78,7 +78,7 @@ export const getUserFavoritesRepo = async (
   return products.filter((p): p is Product => p !== null);
 };
 
-export const isFavoritedRepo = async (
+export const isFavoritedModel = async (
   userId: string,
   productId: string,
 ): Promise<boolean> => {

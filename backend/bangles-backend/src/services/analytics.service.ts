@@ -1,17 +1,17 @@
 import {
-  getOverviewAnalyticsRepo,
-  getProductsByCategoryRepo,
-  getRecentSignupsRepo,
-} from "../repositories/analytics.repository";
+  getOverviewAnalyticsModel,
+  getProductsByCategoryModel,
+  getRecentSignupsModel,
+} from "../models/analytics.model";
 
 export const getOverviewAnalyticsService = async () => {
-  return getOverviewAnalyticsRepo();
+  return getOverviewAnalyticsModel();
 };
 
 export const getProductsByCategoryService = async () => {
-  return getProductsByCategoryRepo();
+  return getProductsByCategoryModel();
 };
 
 export const getRecentSignupsService = async (days?: number) => {
-  return getRecentSignupsRepo(days);
+  return getRecentSignupsModel(days);
 };

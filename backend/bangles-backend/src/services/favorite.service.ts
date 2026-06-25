@@ -1,20 +1,20 @@
 import {
-  addFavoriteRepo,
-  removeFavoriteRepo,
-  getUserFavoritesRepo,
-} from "../repositories/favorite.repository";
+  addFavoriteModel,
+  removeFavoriteModel,
+  getUserFavoritesModel,
+} from "../models/favorite.model";
 
 export const addFavoriteService = async (userId: string, productId: string) => {
-  return addFavoriteRepo(userId, productId);
+  return addFavoriteModel(userId, productId);
 };
 
 export const removeFavoriteService = async (
   userId: string,
   productId: string,
 ) => {
-  return removeFavoriteRepo(userId, productId);
+  return removeFavoriteModel(userId, productId);
 };
 
 export const getUserFavoritesService = async (userId: string) => {
-  return getUserFavoritesRepo(userId);
+  return getUserFavoritesModel(userId);
 };

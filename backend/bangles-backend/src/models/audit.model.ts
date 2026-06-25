@@ -2,7 +2,7 @@ import { db } from "../config/firebase";
 import { AuditLog } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
-export const createAuditLogRepo = async (data: {
+export const createAuditLogModel = async (data: {
   actor_id: string;
   action: string;
   table_name: string;
@@ -26,7 +26,7 @@ export const createAuditLogRepo = async (data: {
   return auditLog;
 };
 
-export const getAuditLogsRepo = async (
+export const getAuditLogsModel = async (
   page: number = 1,
   limit: number = 50,
 ): Promise<{ logs: AuditLog[]; total: number }> => {

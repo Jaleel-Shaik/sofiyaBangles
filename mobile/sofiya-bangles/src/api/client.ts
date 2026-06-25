@@ -19,7 +19,11 @@ apiClient.interceptors.request.use(
     try {
       const token = await SecureStore.getItemAsync('auth_token');
       if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
+        if (typeof config.headers.set === 'function') {
+          config.headers.set('Authorization', `Bearer ${token}`);
+        } else {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
     } catch (error) {
       console.error('Error fetching token from SecureStore:', error);

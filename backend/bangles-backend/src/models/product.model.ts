@@ -2,23 +2,59 @@ import { db } from "../config/firebase";
 import { Product } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
-export const createProductRepo = async (payload: {
+export const createProductModel = async (payload: {
+  unique_code?: string;
   product_name: string;
   description?: string;
   price: number;
   image_url?: string;
+  images?: string[];
   category_id?: string;
   quantity?: number;
+  likes?: number;
+  rating?: number;
+  reviews?: number;
 }): Promise<Product> => {
   const newId = uuidv4();
+  let generatedCode = payload.unique_code;
+
+  if (!generatedCode && payload.category_id) {
+    const catDoc = await db.collection("categories").doc(payload.category_id).get();
+    let catName = "PRD";
+    if (catDoc.exists) {
+      catName = catDoc.data()?.category_name || "PRD";
+    }
+    const prefix = catName.substring(0, 3).toUpperCase();
+    
+    const counterRef = db.collection("counters").doc(`category_${payload.category_id}`);
+    
+    generatedCode = await db.runTransaction(async (t) => {
+      const doc = await t.get(counterRef);
+      let nextSeq = 1001;
+      if (doc.exists) {
+        const data = doc.data();
+        if (data && typeof data.sequence === 'number') {
+          nextSeq = data.sequence + 1;
+        }
+      }
+      t.set(counterRef, { sequence: nextSeq }, { merge: true });
+      return `${prefix}-${nextSeq}`;
+    });
+  }
+
   const productData: Product = {
     id: newId,
+    unique_code: generatedCode || `PRD-${Date.now().toString().slice(-4)}`,
     product_name: payload.product_name,
     description: payload.description || null,
     price: payload.price,
     image_url: payload.image_url || null,
+    images: payload.images || [],
     category_id: payload.category_id || null,
     quantity: payload.quantity || 0,
+    likes: payload.likes || 0,
+    rating: payload.rating || 0,
+    reviews: payload.reviews || 0,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
@@ -28,7 +64,7 @@ export const createProductRepo = async (payload: {
   return productData;
 };
 
-export const getProductsRepo = async (options: {
+export const getProductsModel = async (options: {
   page: number;
   limit: number;
   categoryId?: string;
@@ -84,7 +120,7 @@ export const getProductsRepo = async (options: {
   return { products: productsWithDetails, total };
 };
 
-export const getProductByIdRepo = async (
+export const getProductByIdModel = async (
   id: string,
   userId?: string,
 ): Promise<Product | null> => {
@@ -114,15 +150,20 @@ export const getProductByIdRepo = async (
   return { ...product, category_name, is_favorited };
 };
 
-export const updateProductRepo = async (
+export const updateProductModel = async (
   id: string,
   data: Partial<{
+    unique_code: string;
     product_name: string;
     description: string;
     price: number;
     image_url: string;
+    images: string[];
     category_id: string;
     quantity: number;
+    likes: number;
+    rating: number;
+    reviews: number;
     is_active: boolean;
   }>,
 ): Promise<Product> => {
@@ -135,14 +176,14 @@ export const updateProductRepo = async (
   return doc.data() as Product;
 };
 
-export const deleteProductRepo = async (id: string): Promise<void> => {
+export const deleteProductModel = async (id: string): Promise<void> => {
   await db.collection("products").doc(id).update({
     is_active: false,
     updated_at: new Date().toISOString()
   });
 };
 
-export const searchProductsRepo = async (
+export const searchProductsModel = async (
   queryText: string,
   limit: number = 20,
 ): Promise<Product[]> => {

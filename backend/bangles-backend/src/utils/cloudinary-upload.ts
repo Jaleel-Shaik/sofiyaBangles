@@ -1,26 +1,34 @@
-import cloudinary from "../config/cloudinary";
+import { v2 as cloudinary } from "cloudinary";
 import streamifier from "streamifier";
+import { env } from "../config/env";
 
-export const uploadToCloudinary = (
-  file: Express.Multer.File,
-): Promise<string> => {
+cloudinary.config({
+  cloud_name: env.CLOUD_NAME,
+  api_key: env.CLOUD_API_KEY,
+  api_secret: env.CLOUD_API_SECRET,
+});
+
+export const uploadToCloudinary = async (file: Express.Multer.File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: "bangles-products",
+        folder: "sofiya_bangles/products",
       },
       (error, result) => {
-        if (error) {
+        if (result) {
+          resolve(result.secure_url);
+        } else {
           reject(error);
-          return;
         }
-
-
-        console.log("Cloudinary upload result:", result);
-        resolve(result?.secure_url || "");
-      },
+      }
     );
 
     streamifier.createReadStream(file.buffer).pipe(stream);
   });
+};
+
+export const uploadMultipleToCloudinary = async (files: Express.Multer.File[]): Promise<string[]> => {
+  if (!files || files.length === 0) return [];
+  const uploadPromises = files.map((file) => uploadToCloudinary(file));
+  return Promise.all(uploadPromises);
 };

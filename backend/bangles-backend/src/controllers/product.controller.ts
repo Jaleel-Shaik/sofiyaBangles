@@ -15,7 +15,7 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
   try {
     const product = await createProductService(
       req.body,
-      req.file as Express.Multer.File | undefined,
+      req.files as Express.Multer.File[] | undefined,
       req.user!.userId,
     );
 
@@ -98,7 +98,7 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
     const product = await updateProductService(
       id,
       req.body,
-      req.file as Express.Multer.File | undefined,
+      req.files as Express.Multer.File[] | undefined,
       req.user!.userId,
     );
 

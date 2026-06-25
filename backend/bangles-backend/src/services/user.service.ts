@@ -1,9 +1,9 @@
 import {
-  getAllUsersRepo,
-  getUserByIdRepo,
-  updateUserRoleRepo,
-} from "../repositories/user.repository";
-import { createAuditLogRepo } from "../repositories/audit.repository";
+  getAllUsersModel,
+  getUserByIdModel,
+  updateUserRoleModel,
+} from "../models/user.model";
+import { createAuditLogModel } from "../models/audit.model";
 
 export const getAllUsersService = async (options: {
   page?: number;
@@ -14,11 +14,11 @@ export const getAllUsersService = async (options: {
   const page = options.page || 1;
   const limit = Math.min(options.limit || 20, 100);
 
-  return getAllUsersRepo({ page, limit, role: options.role, search: options.search });
+  return getAllUsersModel({ page, limit, role: options.role, search: options.search });
 };
 
 export const getUserByIdService = async (id: string) => {
-  const user = await getUserByIdRepo(id);
+  const user = await getUserByIdModel(id);
   if (!user) {
     throw new Error("USER_NOT_FOUND");
   }
@@ -30,7 +30,7 @@ export const updateUserRoleService = async (
   role: string,
   actorId: string,
 ) => {
-  const existing = await getUserByIdRepo(id);
+  const existing = await getUserByIdModel(id);
   if (!existing) {
     throw new Error("USER_NOT_FOUND");
   }
@@ -40,9 +40,9 @@ export const updateUserRoleService = async (
     throw new Error("INVALID_ROLE");
   }
 
-  const updated = await updateUserRoleRepo(id, role);
+  const updated = await updateUserRoleModel(id, role);
 
-  await createAuditLogRepo({
+  await createAuditLogModel({
     actor_id: actorId,
     action: "USER_ROLE_CHANGED",
     table_name: "profiles",

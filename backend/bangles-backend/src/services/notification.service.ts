@@ -1,17 +1,17 @@
 import {
-  broadcastNotificationRepo,
-  getUserNotificationsRepo,
-  markNotificationReadRepo,
-  getUnreadCountRepo,
-} from "../repositories/notification.repository";
-import { createAuditLogRepo } from "../repositories/audit.repository";
+  broadcastNotificationModel,
+  getUserNotificationsModel,
+  markNotificationReadModel,
+  getUnreadCountModel,
+} from "../models/notification.model";
+import { createAuditLogModel } from "../models/audit.model";
 import { BroadcastNotificationInput } from "../validations/notification.schema";
 
 export const broadcastNotificationService = async (
   input: BroadcastNotificationInput,
   actorId: string,
 ) => {
-  const sentCount = await broadcastNotificationRepo({
+  const sentCount = await broadcastNotificationModel({
     title: input.title,
     body: input.body,
     type: input.type,
@@ -19,7 +19,7 @@ export const broadcastNotificationService = async (
     sent_by: actorId,
   });
 
-  await createAuditLogRepo({
+  await createAuditLogModel({
     actor_id: actorId,
     action: "NOTIFICATION_BROADCAST",
     table_name: "notifications",
@@ -34,14 +34,14 @@ export const getUserNotificationsService = async (
   page?: number,
   limit?: number,
 ) => {
-  return getUserNotificationsRepo(userId, page, limit);
+  return getUserNotificationsModel(userId, page, limit);
 };
 
 export const markNotificationReadService = async (
   id: string,
   userId: string,
 ) => {
-  const notification = await markNotificationReadRepo(id, userId);
+  const notification = await markNotificationReadModel(id, userId);
   if (!notification) {
     throw new Error("NOTIFICATION_NOT_FOUND");
   }
@@ -49,5 +49,5 @@ export const markNotificationReadService = async (
 };
 
 export const getUnreadCountService = async (userId: string) => {
-  return getUnreadCountRepo(userId);
+  return getUnreadCountModel(userId);
 };

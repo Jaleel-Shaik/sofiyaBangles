@@ -41,12 +41,17 @@ export interface Category {
 
 export interface Product {
   id: string;
+  unique_code: string;
   product_name: string;
   description: string | null;
   price: number;
   image_url: string | null;
+  images?: string[];
   category_id: string | null;
   quantity: number;
+  likes: number;
+  rating: number;
+  reviews: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;

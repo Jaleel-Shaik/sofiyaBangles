@@ -2,7 +2,7 @@ import { db } from "../config/firebase";
 import { Profile } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
-export const createProfileRepo = async (data: {
+export const createProfileModel = async (data: {
   full_name: string;
   email: string;
   password_hash: string;
@@ -29,7 +29,7 @@ export const createProfileRepo = async (data: {
   return profileData;
 };
 
-export const findProfileByEmailRepo = async (
+export const findProfileByEmailModel = async (
   email: string,
 ): Promise<Profile | null> => {
   const snapshot = await db.collection("profiles").where("email", "==", email).limit(1).get();
@@ -37,7 +37,7 @@ export const findProfileByEmailRepo = async (
   return snapshot.docs[0].data() as Profile;
 };
 
-export const findProfileByIdRepo = async (
+export const findProfileByIdModel = async (
   id: string,
 ): Promise<Profile | null> => {
   const doc = await db.collection("profiles").doc(id).get();
@@ -49,7 +49,7 @@ export const findProfileByIdRepo = async (
   return safeData as Profile;
 };
 
-export const updateProfileRepo = async (
+export const updateProfileModel = async (
   id: string,
   data: Partial<Pick<Profile, "full_name" | "phone" | "avatar_url" | "expo_push_token">>,
 ): Promise<Profile> => {

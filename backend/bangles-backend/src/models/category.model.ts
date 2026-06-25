@@ -2,7 +2,7 @@ import { db } from "../config/firebase";
 import { Category } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
-export const getCategoriesRepo = async (): Promise<Category[]> => {
+export const getCategoriesModel = async (): Promise<Category[]> => {
   const snapshot = await db.collection("categories")
     .where("is_active", "==", true)
     .orderBy("display_order")
@@ -11,7 +11,7 @@ export const getCategoriesRepo = async (): Promise<Category[]> => {
   return snapshot.docs.map(doc => doc.data() as Category);
 };
 
-export const getCategoryByIdRepo = async (
+export const getCategoryByIdModel = async (
   id: string,
 ): Promise<Category | null> => {
   const doc = await db.collection("categories").doc(id).get();
@@ -19,7 +19,7 @@ export const getCategoryByIdRepo = async (
   return doc.data() as Category;
 };
 
-export const createCategoryRepo = async (data: {
+export const createCategoryModel = async (data: {
   category_name: string;
   image_url?: string;
   display_order?: number;
@@ -39,7 +39,7 @@ export const createCategoryRepo = async (data: {
   return categoryData;
 };
 
-export const updateCategoryRepo = async (
+export const updateCategoryModel = async (
   id: string,
   data: Partial<{ category_name: string; image_url: string; display_order: number; is_active: boolean }>,
 ): Promise<Category> => {
@@ -52,7 +52,7 @@ export const updateCategoryRepo = async (
   return doc.data() as Category;
 };
 
-export const deleteCategoryRepo = async (id: string): Promise<void> => {
+export const deleteCategoryModel = async (id: string): Promise<void> => {
   await db.collection("categories").doc(id).update({
     is_active: false,
     updated_at: new Date().toISOString()

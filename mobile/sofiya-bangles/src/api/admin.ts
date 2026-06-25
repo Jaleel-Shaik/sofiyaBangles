@@ -1,5 +1,6 @@
 import { getFirestore, collection, getCountFromServer, query, where, addDoc } from '@react-native-firebase/firestore';
-import { getStorage, ref, putFile, getDownloadURL } from '@react-native-firebase/storage';
+import * as SecureStore from 'expo-secure-store';
+import { apiClient } from './client';
 
 export const getOverviewAnalytics = async () => {
   try {
@@ -21,30 +22,51 @@ export const getOverviewAnalytics = async () => {
   }
 };
 
-export const createProduct = async (productData: any, imageUri?: string) => {
+export const createProduct = async (productData: any, imageUris: string[] = []) => {
   try {
-    let finalImageUrl = productData.image_url || 'https://images.unsplash.com/photo-1599643478524-fb66f453863a';
+    const formData = new FormData();
 
-    // If an actual image URI is provided from image picker, upload it to Firebase Storage
-    if (imageUri && !imageUri.startsWith('http')) {
-      const filename = imageUri.substring(imageUri.lastIndexOf('/') + 1);
-      const storage = getStorage();
-      const reference = ref(storage, `products/${filename}`);
-      await putFile(reference, imageUri);
-      finalImageUrl = await getDownloadURL(reference);
-    }
-
-    const db = getFirestore();
-    const productsRef = collection(db, 'products');
-    const docRef = await addDoc(productsRef, {
-      ...productData,
-      image_url: finalImageUrl,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      is_active: true
+    // Append product fields
+    Object.keys(productData).forEach(key => {
+      if (key !== 'categoryName' && productData[key] !== undefined && productData[key] !== null) {
+        formData.append(key, String(productData[key]));
+      }
     });
 
-    return { success: true, id: docRef.id };
+    // Append images
+    if (imageUris && imageUris.length > 0) {
+      imageUris.forEach((uri, index) => {
+        const extension = uri.split('.').pop() || 'jpg';
+        formData.append('images', {
+          uri,
+          type: `image/${extension === 'jpg' ? 'jpeg' : extension}`,
+          name: `image_${index}.${extension}`,
+        } as any);
+      });
+    }
+
+    const token = await SecureStore.getItemAsync('auth_token');
+    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
+
+    const response = await fetch(`${API_URL}/products`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      throw new Error(responseData.message || 'Failed to create product');
+    }
+
+    return {
+      success: true,
+      id: responseData.data.id,
+      unique_code: responseData.data.unique_code,
+    };
   } catch (error: any) {
     throw new Error(error.message || 'Failed to create product');
   }

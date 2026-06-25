@@ -1,7 +1,7 @@
 import { db } from "../config/firebase";
 import { Profile } from "../types";
 
-export const getAllUsersRepo = async (options: {
+export const getAllUsersModel = async (options: {
   page: number;
   limit: number;
   role?: string;
@@ -40,7 +40,7 @@ export const getAllUsersRepo = async (options: {
   return { users: paginatedUsers, total };
 };
 
-export const getUserByIdRepo = async (
+export const getUserByIdModel = async (
   id: string,
 ): Promise<Omit<Profile, "password_hash"> | null> => {
   const doc = await db.collection("profiles").doc(id).get();
@@ -51,7 +51,7 @@ export const getUserByIdRepo = async (
   return safeData;
 };
 
-export const updateUserRoleRepo = async (
+export const updateUserRoleModel = async (
   id: string,
   role: string,
 ): Promise<Omit<Profile, "password_hash">> => {

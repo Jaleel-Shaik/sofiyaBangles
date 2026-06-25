@@ -2,7 +2,7 @@ import { db } from "../config/firebase";
 import { Notification } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
-export const createNotificationRepo = async (data: {
+export const createNotificationModel = async (data: {
   title: string;
   body?: string;
   type?: string;
@@ -27,7 +27,7 @@ export const createNotificationRepo = async (data: {
   return notification;
 };
 
-export const broadcastNotificationRepo = async (data: {
+export const broadcastNotificationModel = async (data: {
   title: string;
   body?: string;
   type?: string;
@@ -66,7 +66,7 @@ export const broadcastNotificationRepo = async (data: {
   return count;
 };
 
-export const getUserNotificationsRepo = async (
+export const getUserNotificationsModel = async (
   userId: string,
   page: number = 1,
   limit: number = 20,
@@ -97,7 +97,7 @@ export const getUserNotificationsRepo = async (
   return { notifications: notificationsWithProducts, total };
 };
 
-export const markNotificationReadRepo = async (
+export const markNotificationReadModel = async (
   id: string,
   userId: string,
 ): Promise<Notification | null> => {
@@ -115,7 +115,7 @@ export const markNotificationReadRepo = async (
   return updatedDoc.data() as Notification;
 };
 
-export const getUnreadCountRepo = async (userId: string): Promise<number> => {
+export const getUnreadCountModel = async (userId: string): Promise<number> => {
   const countSnapshot = await db.collection("notifications")
     .where("user_id", "==", userId)
     .where("is_read", "==", false)

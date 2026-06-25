@@ -1,33 +1,34 @@
-import { uploadToCloudinary } from "../utils/cloudinary-upload";
+import { uploadMultipleToCloudinary } from "../utils/cloudinary-upload";
 import {
-  createProductRepo,
-  getProductsRepo,
-  getProductByIdRepo,
-  updateProductRepo,
-  deleteProductRepo,
-  searchProductsRepo,
-} from "../repositories/product.repository";
-import { createAuditLogRepo } from "../repositories/audit.repository";
+  createProductModel,
+  getProductsModel,
+  getProductByIdModel,
+  updateProductModel,
+  deleteProductModel,
+  searchProductsModel,
+} from "../models/product.model";
+import { createAuditLogModel } from "../models/audit.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.schema";
 
 export const createProductService = async (
   input: CreateProductInput,
-  file: Express.Multer.File | undefined,
+  files: Express.Multer.File[] | undefined,
   actorId: string,
 ) => {
-  let imageUrl: string | undefined;
+  let imageUrls: string[] = [];
 
-  if (file) {
-    imageUrl = await uploadToCloudinary(file);
+  if (files && files.length > 0) {
+    imageUrls = await uploadMultipleToCloudinary(files);
   }
 
-  const product = await createProductRepo({
+  const product = await createProductModel({
     ...input,
-    image_url: imageUrl,
+    images: imageUrls,
+    image_url: imageUrls.length > 0 ? imageUrls[0] : undefined,
   });
 
   // Audit log
-  await createAuditLogRepo({
+  await createAuditLogModel({
     actor_id: actorId,
     action: "PRODUCT_CREATED",
     table_name: "products",
@@ -48,7 +49,7 @@ export const getProductsService = async (options: {
   const page = options.page || 1;
   const limit = Math.min(options.limit || 20, 100);
 
-  return getProductsRepo({
+  return getProductsModel({
     page,
     limit,
     categoryId: options.categoryId,
@@ -58,7 +59,7 @@ export const getProductsService = async (options: {
 };
 
 export const getProductByIdService = async (id: string, userId?: string) => {
-  const product = await getProductByIdRepo(id, userId);
+  const product = await getProductByIdModel(id, userId);
   if (!product) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
@@ -68,27 +69,27 @@ export const getProductByIdService = async (id: string, userId?: string) => {
 export const updateProductService = async (
   id: string,
   input: UpdateProductInput,
-  file: Express.Multer.File | undefined,
+  files: Express.Multer.File[] | undefined,
   actorId: string,
 ) => {
   // Verify product exists
-  const existing = await getProductByIdRepo(id);
+  const existing = await getProductByIdModel(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  let imageUrl: string | undefined;
-  if (file) {
-    imageUrl = await uploadToCloudinary(file);
+  let imageUrls: string[] | undefined;
+  if (files && files.length > 0) {
+    imageUrls = await uploadMultipleToCloudinary(files);
   }
 
-  const product = await updateProductRepo(id, {
+  const product = await updateProductModel(id, {
     ...input,
-    ...(imageUrl && { image_url: imageUrl }),
+    ...(imageUrls && imageUrls.length > 0 && { images: imageUrls, image_url: imageUrls[0] }),
   });
 
   // Audit log
-  await createAuditLogRepo({
+  await createAuditLogModel({
     actor_id: actorId,
     action: "PRODUCT_UPDATED",
     table_name: "products",
@@ -105,15 +106,15 @@ export const updateStockService = async (
   quantity: number,
   actorId: string,
 ) => {
-  const existing = await getProductByIdRepo(id);
+  const existing = await getProductByIdModel(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  const product = await updateProductRepo(id, { quantity });
+  const product = await updateProductModel(id, { quantity });
 
   // Audit log
-  await createAuditLogRepo({
+  await createAuditLogModel({
     actor_id: actorId,
     action: "STOCK_UPDATED",
     table_name: "products",
@@ -126,15 +127,15 @@ export const updateStockService = async (
 };
 
 export const deleteProductService = async (id: string, actorId: string) => {
-  const existing = await getProductByIdRepo(id);
+  const existing = await getProductByIdModel(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  await deleteProductRepo(id);
+  await deleteProductModel(id);
 
   // Audit log
-  await createAuditLogRepo({
+  await createAuditLogModel({
     actor_id: actorId,
     action: "PRODUCT_DELETED",
     table_name: "products",
@@ -144,5 +145,5 @@ export const deleteProductService = async (id: string, actorId: string) => {
 };
 
 export const searchProductsService = async (query: string, limit?: number) => {
-  return searchProductsRepo(query, limit);
+  return searchProductsModel(query, limit);
 };

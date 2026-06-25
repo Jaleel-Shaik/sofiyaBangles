@@ -3,15 +3,17 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { AuthRequest, JwtPayload } from "../types";
 
+import { auth, db } from "../config/firebase";
+
 /**
  * Verifies the JWT token from Authorization header.
  * Attaches decoded user to `req.user`.
  */
-export const authenticate = (
+export const authenticate = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction,
-): void => {
+): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -25,16 +27,40 @@ export const authenticate = (
   const token = authHeader.split(" ")[1];
 
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    let decoded: any;
+    let isFirebaseToken = false;
+
+    try {
+      // Try verifying as an Express custom JWT first
+      decoded = jwt.verify(token, env.JWT_SECRET);
+    } catch (e) {
+      // If it fails, try verifying as a Firebase ID token
+      decoded = await auth.verifyIdToken(token);
+      isFirebaseToken = true;
+    }
+
+    let role = decoded.role;
+    let userId = decoded.userId || decoded.uid;
+
+    // If it's a Firebase token and lacks a role in claims, fetch from Firestore
+    if (isFirebaseToken && !role) {
+      const profileDoc = await db.collection("profiles").doc(userId).get();
+      if (profileDoc.exists) {
+        role = profileDoc.data()?.role || "user";
+      } else {
+        role = "user";
+      }
+    }
 
     req.user = {
-      userId: decoded.userId,
+      userId,
       email: decoded.email,
-      role: decoded.role,
+      role: role,
     };
 
     next();
   } catch (error) {
+    console.error("JWT/Firebase Verification Error:", error);
     res.status(401).json({
       success: false,
       message: "Invalid or expired token.",

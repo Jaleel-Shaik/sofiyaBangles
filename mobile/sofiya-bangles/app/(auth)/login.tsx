@@ -1,7 +1,7 @@
 import { View, Text, Alert, Platform, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { login, register, signInWithGoogle } from '../../src/api/auth';
+import { login, register, signInWithGoogle, sendOtp, verifyOtp } from '../../src/api/auth';
 import { Ionicons } from '@expo/vector-icons';
 import TextInputField from '../../src/components/TextInputField';
 import Button from '../../src/components/Button';
@@ -15,59 +15,114 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'user' | 'admin'>('user');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<{ fullName?: string; email?: string; password?: string }>({});
+  const [showOtpScreen, setShowOtpScreen] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [tempAdminData, setTempAdminData] = useState<{user: any, token: string} | null>(null);
+
+  const handleVerifyOtp = async () => {
+    if (loading) return; // Prevent double clicks
+    
+    if (!otp.trim() || otp.length < 6) {
+      Alert.alert('Validation Error', 'Please enter a valid 6-digit OTP.');
+      return;
+    }
+    setLoading(true);
+    try {
+       await verifyOtp(email, otp);
+       Alert.alert('Success', 'OTP verified successfully!');
+       if (tempAdminData) {
+         await useAuthStore.getState().login(tempAdminData.user, tempAdminData.token);
+         router.replace('/(admin)/(tabs)/dashboard' as any);
+       }
+    } catch (error: any) {
+       Alert.alert('Error', error.message);
+    } finally {
+       setLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
+    if (loading) return; // Prevent double clicks
+    
     // Client-side validation
+    setErrors({});
+    let hasError = false;
+    const newErrors: { fullName?: string; email?: string; password?: string } = {};
+
     if (!isLogin && !fullName.trim()) {
-      Alert.alert('Validation Error', 'Please enter your full name.');
-      return;
+      newErrors.fullName = 'Please enter your full name.';
+      hasError = true;
     }
 
     if (!email.trim()) {
-      Alert.alert('Validation Error', 'Please enter your email address.');
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      Alert.alert('Validation Error', 'Please enter a valid email address.');
-      return;
+      newErrors.email = 'Please enter your email address.';
+      hasError = true;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        newErrors.email = 'Please enter a valid email address.';
+        hasError = true;
+      }
     }
 
     if (!password) {
-      Alert.alert('Validation Error', 'Please enter your password.');
-      return;
+      newErrors.password = 'Please enter your password.';
+      hasError = true;
+    } else if (!isLogin && password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters long.';
+      hasError = true;
     }
 
-    if (!isLogin && password.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters long.');
+    if (hasError) {
+      setErrors(newErrors);
       return;
     }
 
     setLoading(true);
     try {
       if (isLogin) {
-        // Pass role if your backend requires it for login, otherwise login typically infers it
         // The user requested: "selecting role either admin or the user he should navigate to the as per the role"
-        const res = await login(email, password);
+        const res: any = await login(email, password);
+        
+        if (res.requiresOtp) {
+           await sendOtp(email, res.user?.phone);
+           setTempAdminData({ user: res.user, token: res.token });
+           setShowOtpScreen(true);
+           setLoading(false);
+           return;
+        }
+
         // Ensure the store is updated, then redirect
-        const userRole = res.user?.role || role; // fallback if backend doesn't return role immediately
+        const userRole = res.user?.role; // get role from the backend/database
         if (userRole === 'admin') {
           router.replace('/(admin)/(tabs)/dashboard' as any);
         } else {
           router.replace('/(tabs)/home');
         }
       } else {
-        const res: any = await register(email, password, fullName, role);
+        if (role === 'admin') {
+          const allowedAdminEmails = ['jaleelbashashaik18@gmail.com', 'shaikjaleelbasha10@gmail.com'];
+          if (!allowedAdminEmails.includes(email.toLowerCase().trim())) {
+            Alert.alert('Access Denied', 'No access to admin role. Contact admin.');
+            setLoading(false);
+            return;
+          }
+        }
+
+        const res: any = await register(email, password, fullName, role, phone);
         Alert.alert('Success', res.message || 'Registration successful!');
-        // We could redirect immediately or require them to login
         if (res.user) {
            const userRole = res.user.role || role;
            if (userRole === 'admin') {
-             router.replace('/(admin)/(tabs)/dashboard' as any);
+             // For admin, force them to login so they go through the OTP flow
+             Alert.alert('Admin Created', 'Please log in to verify your mobile number.');
+             setIsLogin(true);
            } else {
              router.replace('/(tabs)/home');
            }
@@ -85,14 +140,12 @@ export default function LoginScreen() {
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
-      const res = await signInWithGoogle();
-      if (res.user) {
-        const userRole = res.user.role || 'user';
-        if (userRole === 'admin') {
-          router.replace('/(admin)/(tabs)/dashboard' as any);
-        } else {
-          router.replace('/(tabs)/home');
-        }
+      const res: any = await signInWithGoogle();
+
+      if (res.user?.role === 'admin') {
+        router.replace('/(admin)/(tabs)/dashboard' as any);
+      } else {
+        router.replace('/(tabs)/home');
       }
     } catch (error: any) {
       Alert.alert('Google Sign-In Error', error.message);
@@ -125,46 +178,132 @@ export default function LoginScreen() {
         <View className="flex-row bg-white p-1.5 rounded-full mb-6 shadow-sm">
           <TouchableOpacity 
             className={`flex-1 py-3 items-center rounded-full ${isLogin ? 'bg-[#FF1F4B]' : 'bg-transparent'}`}
-            onPress={() => setIsLogin(true)}
+            onPress={() => {
+              setIsLogin(true);
+              setErrors({});
+            }}
             activeOpacity={0.8}
           >
             <Text className={`font-bold ${isLogin ? 'text-white' : 'text-slate-500'}`}>Login</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             className={`flex-1 py-3 items-center rounded-full ${!isLogin ? 'bg-[#FF1F4B]' : 'bg-transparent'}`}
-            onPress={() => setIsLogin(false)}
+            onPress={() => {
+              setIsLogin(false);
+              setErrors({});
+            }}
             activeOpacity={0.8}
           >
             <Text className={`font-bold ${!isLogin ? 'text-white' : 'text-slate-500'}`}>Sign Up</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Role Toggle */}
-        <View className="flex-row items-center justify-center mb-6 space-x-4">
-          <Text className="text-sm font-semibold text-rose-800 mr-2">I am an:</Text>
-          <TouchableOpacity 
-            className={`px-4 py-2 rounded-full border ${role === 'admin' ? 'bg-rose-100 border-rose-400' : 'bg-white border-gray-200'}`}
-            onPress={() => setRole('admin')}
-          >
-            <Text className={`text-sm font-bold ${role === 'admin' ? 'text-rose-700' : 'text-gray-500'}`}>Admin</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            className={`px-4 py-2 rounded-full border ${role === 'user' ? 'bg-rose-100 border-rose-400' : 'bg-white border-gray-200'}`}
-            onPress={() => setRole('user')}
-          >
-            <Text className={`text-sm font-bold ${role === 'user' ? 'text-rose-700' : 'text-gray-500'}`}>User</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Modern Role Dropdown */}
+        {!isLogin && (
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-gray-700 mb-2 ml-1">Select Role</Text>
+            <TouchableOpacity 
+              className={`flex-row items-center justify-between bg-white border border-gray-200 px-5 py-4 shadow-sm ${isDropdownOpen ? 'rounded-t-2xl' : 'rounded-2xl'}`}
+              onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+              activeOpacity={0.8}
+            >
+              <View className="flex-row items-center">
+                <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${role === 'admin' ? 'bg-rose-100' : 'bg-blue-100'}`}>
+                  <Ionicons name={role === 'admin' ? 'shield-checkmark' : 'person'} size={16} color={role === 'admin' ? '#FF1F4B' : '#3b82f6'} />
+                </View>
+                <Text className="text-base font-semibold text-slate-700 capitalize">{role}</Text>
+              </View>
+              <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color="#94a3b8" />
+            </TouchableOpacity>
+
+            {isDropdownOpen && (
+              <View className="bg-white rounded-b-2xl shadow-sm border-x border-b border-gray-200 overflow-hidden">
+                <TouchableOpacity 
+                  className={`flex-row items-center px-5 py-4 ${role === 'user' ? 'bg-slate-50' : ''}`}
+                  onPress={() => { setRole('user'); setIsDropdownOpen(false); }}
+                >
+                  <View className="w-8 h-8 rounded-full items-center justify-center mr-3 bg-blue-100">
+                    <Ionicons name="person" size={16} color="#3b82f6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-base font-bold text-slate-700">User</Text>
+                    <Text className="text-xs text-slate-500">Regular shopping experience</Text>
+                  </View>
+                  {role === 'user' && <Ionicons name="checkmark" size={20} color="#FF1F4B" />}
+                </TouchableOpacity>
+                
+                <View className="h-[1px] bg-gray-100 mx-4" />
+                
+                <TouchableOpacity 
+                  className={`flex-row items-center px-5 py-4 ${role === 'admin' ? 'bg-slate-50' : ''}`}
+                  onPress={() => { setRole('admin'); setIsDropdownOpen(false); }}
+                >
+                  <View className="w-8 h-8 rounded-full items-center justify-center mr-3 bg-rose-100">
+                    <Ionicons name="shield-checkmark" size={16} color="#FF1F4B" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-base font-bold text-slate-700">Admin</Text>
+                    <Text className="text-xs text-slate-500">Manage store & inventory</Text>
+                  </View>
+                  {role === 'admin' && <Ionicons name="checkmark" size={20} color="#FF1F4B" />}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Input Fields Wrapper */}
+        {showOtpScreen ? (
+          <View>
+            <View className="mb-4">
+              <Text className="text-base text-gray-600 text-center">
+                We've sent a 6-digit OTP to your registered mobile number. Please enter it below.
+              </Text>
+            </View>
+            <TextInputField
+              label="Enter OTP"
+              placeholder="123456"
+              keyboardType="number-pad"
+              maxLength={6}
+              value={otp}
+              onChangeText={setOtp}
+            />
+            <Button
+              title="Verify OTP"
+              onPress={handleVerifyOtp}
+              loading={loading}
+              className="mt-2 shadow-md bg-[#FF1F4B]"
+              style={{ 
+                shadowColor: '#FF1F4B', 
+                shadowOffset: { width: 0, height: 4 }, 
+                shadowOpacity: 0.3, 
+                shadowRadius: 8, 
+                elevation: 8 
+              }}
+            />
+            <TouchableOpacity onPress={() => setShowOtpScreen(false)} className="mt-6 items-center py-2">
+              <Text className="text-slate-500 font-semibold">Back to Login</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
         <View>
           {!isLogin && (
-            <TextInputField
-              label="Full Name"
-              placeholder="John Doe"
-              value={fullName}
-              onChangeText={setFullName}
-            />
+            <>
+              <TextInputField
+                label="Full Name"
+                placeholder="John Doe"
+                value={fullName}
+                onChangeText={(text) => { setFullName(text); setErrors(prev => ({ ...prev, fullName: undefined })); }}
+                error={errors.fullName}
+              />
+              <TextInputField
+                label="Mobile Number"
+                placeholder="+919390902587"
+                keyboardType="phone-pad"
+                value={phone}
+                onChangeText={setPhone}
+              />
+            </>
           )}
 
           <TextInputField
@@ -173,7 +312,8 @@ export default function LoginScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => { setEmail(text); setErrors(prev => ({ ...prev, email: undefined })); }}
+            error={errors.email}
           />
 
           <TextInputField
@@ -181,7 +321,8 @@ export default function LoginScreen() {
             placeholder="••••••••"
             secureTextEntry={!showPassword}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => { setPassword(text); setErrors(prev => ({ ...prev, password: undefined })); }}
+            error={errors.password}
             rightIcon={
               <Ionicons 
                 name={showPassword ? "eye-off" : "eye"} 
@@ -221,6 +362,7 @@ export default function LoginScreen() {
             <Text className="ml-3 font-bold text-slate-700">Continue with Google</Text>
           </TouchableOpacity>
         </View>
+        )}
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );

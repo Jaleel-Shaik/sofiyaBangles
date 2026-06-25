@@ -2,6 +2,7 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, si
 import { getFirestore, doc, getDoc, setDoc } from '@react-native-firebase/firestore';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useAuthStore } from '../store/authStore';
+import { apiClient } from './client';
 
 // Configure Google Sign-In (You can call this once in an app initialization file like App.tsx or here)
 GoogleSignin.configure({
@@ -20,8 +21,12 @@ export const login = async (email: string, password: string) => {
     if (userDoc.data() != null) {
       const userData = userDoc.data() as any;
       const user = { ...userData, id: userCredential.user.uid };
-      // Use Firebase token for session
       const token = await userCredential.user.getIdToken();
+      if (user.role === 'admin') {
+        return { success: true, user, token, requiresOtp: true };
+      }
+      
+      // Use Firebase token for session
       await useAuthStore.getState().login(user, token);
       return { success: true, user };
     } else {
@@ -32,7 +37,7 @@ export const login = async (email: string, password: string) => {
   }
 };
 
-export const register = async (email: string, password: string, fullName: string, role: string = 'user') => {
+export const register = async (email: string, password: string, fullName: string, role: string = 'user', phone: string = '') => {
   try {
     const auth = getAuth();
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -42,6 +47,7 @@ export const register = async (email: string, password: string, fullName: string
       id: uid,
       email,
       full_name: fullName,
+      phone,
       role: role,
       created_at: new Date().toISOString(),
       is_active: true
@@ -52,6 +58,14 @@ export const register = async (email: string, password: string, fullName: string
     await setDoc(userRef, userData);
     
     const token = await userCredential.user.getIdToken();
+    
+    if (userData.role === 'admin') {
+      // Do NOT log them in automatically so they are forced to go through OTP flow
+      // Also log them out of Firebase Auth so they start fresh on the login screen
+      await auth.signOut();
+      return { success: true, message: "Registered successfully. Please log in to verify OTP.", user: userData };
+    }
+
     await useAuthStore.getState().login(userData, token);
     
     return { success: true, user: userData };
@@ -80,9 +94,6 @@ export const signInWithGoogle = async () => {
 
     // Check if user exists in Firestore
     const db = getFirestore();
-    const userRef = doc(db, 'profiles', uid);
-    const userDoc = await getDoc(userRef);
-    
     let userData: any;
     if (userDoc.data() != null) {
       userData = { ...userDoc.data(), id: uid };
@@ -92,7 +103,7 @@ export const signInWithGoogle = async () => {
         id: uid,
         email: userCredential.user.email || '',
         full_name: userCredential.user.displayName || 'Google User',
-        role: 'user', // Default to user
+        role: 'user', // Default strictly to user
         created_at: new Date().toISOString(),
         is_active: true,
         avatar_url: userCredential.user.photoURL || null
@@ -107,6 +118,24 @@ export const signInWithGoogle = async () => {
   } catch (error: any) {
     console.error("Google Sign-In Error", error);
     throw new Error(error.message || 'Google Sign-In failed');
+  }
+};
+
+export const sendOtp = async (email: string, phone?: string) => {
+  try {
+    const res = await apiClient.post('/auth/send-otp', { email, phone });
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || 'Failed to send OTP');
+  }
+};
+
+export const verifyOtp = async (email: string, otp: string) => {
+  try {
+    const res = await apiClient.post('/auth/verify-otp', { email, otp });
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || 'Failed to verify OTP');
   }
 };
 

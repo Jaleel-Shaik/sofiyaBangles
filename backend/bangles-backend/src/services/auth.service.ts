@@ -1,17 +1,17 @@
 import bcrypt from "bcryptjs";
 import {
-  createProfileRepo,
-  findProfileByEmailRepo,
-  findProfileByIdRepo,
-  updateProfileRepo,
-} from "../repositories/auth.repository";
+  createProfileModel,
+  findProfileByEmailModel,
+  findProfileByIdModel,
+  updateProfileModel,
+} from "../models/auth.model";
 import { generateToken } from "../middlewares/auth.middleware";
 import { RegisterInput, LoginInput } from "../validations/auth.schema";
-import { createAuditLogRepo } from "../repositories/audit.repository";
+import { createAuditLogModel } from "../models/audit.model";
 
 export const registerService = async (input: RegisterInput) => {
   // Check if email already exists
-  const existing = await findProfileByEmailRepo(input.email);
+  const existing = await findProfileByEmailModel(input.email);
   if (existing) {
     throw new Error("EMAIL_EXISTS");
   }
@@ -21,11 +21,12 @@ export const registerService = async (input: RegisterInput) => {
   const password_hash = await bcrypt.hash(input.password, salt);
 
   // Create profile
-  const profile = await createProfileRepo({
+  const profile = await createProfileModel({
     full_name: input.full_name,
     email: input.email,
     password_hash,
     phone: input.phone,
+    role: input.role,
   });
 
   // Generate JWT
@@ -36,7 +37,7 @@ export const registerService = async (input: RegisterInput) => {
   });
 
   // Audit log
-  await createAuditLogRepo({
+  await createAuditLogModel({
     actor_id: profile.id,
     action: "USER_REGISTERED",
     table_name: "profiles",
@@ -50,7 +51,7 @@ export const registerService = async (input: RegisterInput) => {
 
 export const loginService = async (input: LoginInput) => {
   // Find user
-  const profile = await findProfileByEmailRepo(input.email);
+  const profile = await findProfileByEmailModel(input.email);
   if (!profile) {
     throw new Error("INVALID_CREDENTIALS");
   }
@@ -81,7 +82,7 @@ export const loginService = async (input: LoginInput) => {
 };
 
 export const getMeService = async (userId: string) => {
-  const profile = await findProfileByIdRepo(userId);
+  const profile = await findProfileByIdModel(userId);
   if (!profile) {
     throw new Error("USER_NOT_FOUND");
   }
@@ -92,5 +93,5 @@ export const updateProfileService = async (
   userId: string,
   data: { full_name?: string; phone?: string; avatar_url?: string; expo_push_token?: string },
 ) => {
-  return updateProfileRepo(userId, data);
+  return updateProfileModel(userId, data);
 };
