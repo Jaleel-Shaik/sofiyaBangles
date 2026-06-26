@@ -2,9 +2,24 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect } from 'react';
+import { useFavoriteStore } from '../../src/store/favoriteStore';
+import { useNotificationStore } from '../../src/store/notificationStore';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { fetchFavorites, initialized: favInit } = useFavoriteStore();
+  const { fetchNotifications, initialized: notifInit, unreadCount } = useNotificationStore();
+  
+  useEffect(() => {
+    if (!favInit) {
+      fetchFavorites();
+    }
+    if (!notifInit) {
+      fetchNotifications();
+    }
+  }, [favInit, notifInit]);
+
   // We ensure there's a baseline of 10px padding on devices without safe area, plus extra space below text
   const bottomPadding = Math.max(insets.bottom, 10) + 8; 
   
@@ -60,7 +75,12 @@ export default function TabLayout() {
         options={{
           title: 'Notifications',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "notifications" : "notifications-outline"} size={26} color={color} />
+            <View>
+              <Ionicons name={focused ? "notifications" : "notifications-outline"} size={26} color={color} />
+              {unreadCount > 0 && (
+                <View className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+              )}
+            </View>
           ),
         }}
       />

@@ -37,3 +37,23 @@ export const getCategories = async () => {
     return [];
   }
 };
+
+export const createCategory = async (categoryName: string): Promise<Category> => {
+  try {
+    const db = getFirestore();
+    const id = `cat-${Date.now()}`;
+    const newCategory: Category = {
+      id,
+      category_name: categoryName,
+      // Generic Unsplash image for default categories
+      image_url: 'https://images.unsplash.com/photo-1599643478524-fb66f453863a',
+      display_order: 99, // Put new categories at the end
+      is_active: true
+    };
+    await setDoc(doc(db, 'categories', id), newCategory);
+    return newCategory;
+  } catch (error) {
+    console.error('Error creating category', error);
+    throw error;
+  }
+};

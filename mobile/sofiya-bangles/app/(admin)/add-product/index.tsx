@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import TextInputField from '../../../src/components/TextInputField';
 import Button from '../../../src/components/Button';
 import { getCategories, Category } from '../../../src/api/categories';
-import { createProduct } from '../../../src/api/admin';
+import { createProduct, createCategoryWithImage } from '../../../src/api/admin';
 
 export default function AddProductScreen() {
   const router = useRouter();
@@ -21,6 +21,12 @@ export default function AddProductScreen() {
   const [quantity, setQuantity] = useState('10');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  
+  // Category Creation State
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryImg, setNewCategoryImg] = useState<string | null>(null);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [creatingCat, setCreatingCat] = useState(false);
 
   useEffect(() => {
     const fetchCats = async () => {
@@ -33,6 +39,39 @@ export default function AddProductScreen() {
     };
     fetchCats();
   }, []);
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      Alert.alert('Validation Error', 'Please enter a category name');
+      return;
+    }
+    setCreatingCat(true);
+    try {
+      // If no image is provided, we can pass undefined.
+      const newCat = await createCategoryWithImage(newCategoryName.trim(), newCategoryImg || undefined);
+      setCategories(prev => [...prev, newCat]);
+      setSelectedCategory(newCat.id);
+      setIsAddingCategory(false);
+      setNewCategoryName('');
+      setNewCategoryImg(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to create category');
+    } finally {
+      setCreatingCat(false);
+    }
+  };
+
+  const pickCatImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: false,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setNewCategoryImg(result.assets[0].uri);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!name || !price || !selectedCategory) {
@@ -143,7 +182,7 @@ export default function AddProductScreen() {
 
         {/* Category Selection */}
         <Text className="text-sm font-bold text-slate-700 mb-2 ml-1">Category *</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
           {categories.map((cat) => (
             <TouchableOpacity 
               key={cat.id}
@@ -155,8 +194,50 @@ export default function AddProductScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity 
+            className="px-4 py-2 rounded-full border border-dashed border-slate-300 bg-slate-50 flex-row items-center mr-3"
+            onPress={() => setIsAddingCategory(true)}
+          >
+            <Ionicons name="add" size={16} color="#64748b" />
+            <Text className="font-bold text-slate-600 ml-1">New Category</Text>
+          </TouchableOpacity>
         </ScrollView>
-
+        
+        {isAddingCategory && (
+          <View className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-6">
+            <View className="flex-row items-center mb-3">
+              <TouchableOpacity onPress={pickCatImage} className="mr-3">
+                {newCategoryImg ? (
+                  <Image source={{ uri: newCategoryImg }} className="w-12 h-12 rounded-full border border-slate-200" />
+                ) : (
+                  <View className="w-12 h-12 rounded-full bg-slate-200 items-center justify-center border border-dashed border-slate-400">
+                    <Ionicons name="image-outline" size={20} color="#64748b" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TextInput
+                placeholder="Enter category name..."
+                value={newCategoryName}
+                onChangeText={setNewCategoryName}
+                className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
+                autoFocus
+              />
+            </View>
+            {creatingCat ? (
+              <ActivityIndicator size="small" color="#FF1F4B" className="my-2" />
+            ) : (
+              <View className="flex-row items-center">
+                <TouchableOpacity onPress={() => setIsAddingCategory(false)} className="p-2">
+                  <Ionicons name="close" size={20} color="#94a3b8" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleCreateCategory} className="bg-[#FF1F4B] px-4 py-2 rounded-lg ml-2">
+                  <Text className="text-white font-bold text-xs">Save</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+        
         {/* Inventory Info */}
         <Text className="text-lg font-bold text-slate-800 mb-4">Inventory</Text>
         <TextInputField

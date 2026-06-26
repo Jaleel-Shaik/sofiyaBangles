@@ -3,18 +3,24 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface SearchInputProps extends TextInputProps {
   onFilterPress?: () => void;
+  onSearchPress?: () => void;
   showFilter?: boolean;
 }
 
-export default function SearchInput({ onFilterPress, showFilter = true, className = '', ...props }: SearchInputProps) {
+export default function SearchInput({ onFilterPress, onSearchPress, showFilter = false, className = '', ...props }: SearchInputProps) {
   return (
-    <View className={`flex-row items-center bg-white px-5 py-4 rounded-full shadow-sm border border-rose-100 ${className}`}>
-      <Ionicons name="search" size={24} color="#f43f5e" />
+    <View className={`flex-row items-center bg-white px-5 py-2.5 rounded-full shadow-sm border border-rose-100 ${className}`}>
       <TextInput 
-        className="flex-1 ml-3 text-slate-700 text-base"
+        className="flex-1 mr-3 text-slate-700 text-base py-1"
         placeholderTextColor="#94a3b8"
         {...props}
       />
+      <TouchableOpacity 
+        className="bg-rose-50 p-2.5 rounded-full"
+        onPress={onSearchPress}
+      >
+        <Ionicons name="search" size={20} color="#f43f5e" />
+      </TouchableOpacity>
       {showFilter && (
         <TouchableOpacity 
           className="bg-rose-100 p-2.5 rounded-full ml-3"

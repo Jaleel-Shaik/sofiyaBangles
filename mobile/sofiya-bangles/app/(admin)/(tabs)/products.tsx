@@ -1,8 +1,9 @@
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl, Modal, TextInput, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 import { getProducts, Product } from '../../../src/api/products';
-import ProductCard from '../../../src/components/ProductCard';
+import { getCategories, Category } from '../../../src/api/categories';
+import AdminProductCard from '../../../src/components/AdminProductCard';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Button from '../../../src/components/Button';
@@ -19,11 +20,17 @@ export default function AdminProducts() {
   const [sellQuantity, setSellQuantity] = useState('1');
   const [updatingStock, setUpdatingStock] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  const fetchProducts = async () => {
+  const fetchProductsAndCategories = async () => {
     try {
-      const data = await getProducts();
-      setProducts(data.products || []);
+      const [productsData, categoriesData] = await Promise.all([
+        getProducts(),
+        getCategories()
+      ]);
+      setProducts(productsData.products || []);
+      setCategories(categoriesData);
     } catch (error) {
       console.error(error);
     } finally {
@@ -33,12 +40,12 @@ export default function AdminProducts() {
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchProductsAndCategories();
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchProducts();
+    fetchProductsAndCategories();
   };
 
   const handleUpdateStock = async () => {
@@ -57,7 +64,7 @@ export default function AdminProducts() {
         updated_at: new Date().toISOString()
       });
       setStockModalVisible(false);
-      fetchProducts();
+      fetchProductsAndCategories();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update stock');
     } finally {
@@ -83,7 +90,7 @@ export default function AdminProducts() {
       });
       setStockModalVisible(false);
       setSellQuantity('1'); // reset
-      fetchProducts();
+      fetchProductsAndCategories();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to sell product');
     } finally {
@@ -92,6 +99,12 @@ export default function AdminProducts() {
   };
 
   const filteredProducts = products.filter(p => {
+    // 1. Category Filter
+    if (selectedCategory !== 'all' && p.category_id !== selectedCategory) {
+      return false;
+    }
+    
+    // 2. Search Filter
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -114,7 +127,7 @@ export default function AdminProducts() {
       </View>
 
       <View className="px-4 py-3 bg-white border-b border-slate-100">
-        <View className="flex-row items-center bg-slate-100 rounded-full px-4 py-2">
+        <View className="flex-row items-center bg-slate-100 rounded-full px-4 py-2 mb-3">
           <Ionicons name="search" size={20} color="#64748b" />
           <TextInput
             placeholder="Search by Unique Code or Name..."
@@ -128,6 +141,27 @@ export default function AdminProducts() {
             </TouchableOpacity>
           )}
         </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+          <TouchableOpacity 
+            className={`px-4 py-1.5 rounded-full border mr-2 ${selectedCategory === 'all' ? 'bg-[#FF1F4B] border-[#FF1F4B]' : 'bg-white border-slate-200'}`}
+            onPress={() => setSelectedCategory('all')}
+          >
+            <Text className={`font-bold text-sm ${selectedCategory === 'all' ? 'text-white' : 'text-slate-600'}`}>
+              All Categories
+            </Text>
+          </TouchableOpacity>
+          {categories.map((cat) => (
+            <TouchableOpacity 
+              key={cat.id}
+              className={`px-4 py-1.5 rounded-full border mr-2 ${selectedCategory === cat.id ? 'bg-[#FF1F4B] border-[#FF1F4B]' : 'bg-white border-slate-200'}`}
+              onPress={() => setSelectedCategory(cat.id)}
+            >
+              <Text className={`font-bold text-sm ${selectedCategory === cat.id ? 'text-white' : 'text-slate-600'}`}>
+                {cat.category_name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {loading ? (
@@ -147,20 +181,14 @@ export default function AdminProducts() {
           }
           renderItem={({ item }) => (
             <View style={{ width: '48%' }}>
-              <ProductCard 
+              <AdminProductCard 
                 product={item} 
-              />
-              <TouchableOpacity 
-                className="bg-slate-800 py-2 rounded-xl mt-[-10px] mb-4 shadow-sm flex-row items-center justify-center"
-                onPress={() => {
-                  setSelectedProduct(item);
-                  setNewQuantity(item.quantity.toString());
+                onUpdateStock={(product) => {
+                  setSelectedProduct(product);
+                  setNewQuantity(product.quantity.toString());
                   setStockModalVisible(true);
                 }}
-              >
-                <Ionicons name="cube-outline" size={16} color="white" />
-                <Text className="text-white font-bold ml-1 text-xs">Update Stock</Text>
-              </TouchableOpacity>
+              />
             </View>
           )}
           ListEmptyComponent={

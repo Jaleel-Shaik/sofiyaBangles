@@ -139,3 +139,14 @@ export const verifyOtp = async (email: string, otp: string) => {
   }
 };
 
+export const updateUserProfile = async (uid: string, data: any) => {
+  try {
+    const db = getFirestore();
+    const userRef = doc(db, 'profiles', uid);
+    await setDoc(userRef, data, { merge: true });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Update Profile Error", error);
+    throw new Error(error.message || 'Failed to update profile');
+  }
+};

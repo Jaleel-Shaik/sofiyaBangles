@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { getProductById, Product } from '../../src/api/products';
 import { addFavorite, removeFavorite, getFavorites } from '../../src/api/favorites';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from '../../src/components/Button';
 import Badge from '../../src/components/Badge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +28,22 @@ export default function ProductDetailScreen() {
           setMainImage(data.images[0]);
         } else if (data && data.image_url) {
           setMainImage(data.image_url);
+        }
+        
+        // Save to visited history
+        if (data) {
+          try {
+            const historyStr = await AsyncStorage.getItem('@visited_products');
+            let history: any[] = historyStr ? JSON.parse(historyStr) : [];
+            // Remove if already exists to move it to the front
+            history = history.filter(item => item.id !== data.id);
+            history.unshift({ id: data.id, category_id: data.category_id });
+            // Keep only last 20
+            if (history.length > 20) history = history.slice(0, 20);
+            await AsyncStorage.setItem('@visited_products', JSON.stringify(history));
+          } catch (e) {
+            console.error('Error saving visited product', e);
+          }
         }
         
         // Check if favorite

@@ -11,6 +11,8 @@ export default function CategoriesScreen() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSearch, setActiveSearch] = useState('');
 
   useEffect(() => {
     const fetchCats = async () => {
@@ -20,6 +22,18 @@ export default function CategoriesScreen() {
     };
     fetchCats();
   }, []);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setActiveSearch(searchQuery.trim().toLowerCase());
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const filteredCategories = categories.filter(cat => 
+    cat.category_name.toLowerCase().includes(activeSearch)
+  );
 
   if (loading) {
     return (
@@ -46,21 +60,35 @@ export default function CategoriesScreen() {
       
       {/* Search - Visually inside header but placed below */}
       <View className="px-6 bg-[#FFF0F3] pb-6">
-        <SearchInput placeholder="Search categories..." showFilter={false} className="border-0 shadow-sm" />
+        <SearchInput 
+          placeholder="Search categories..." 
+          showFilter={false} 
+          className="border-0 shadow-sm" 
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
       </View>
 
       {/* Grid */}
       <View className="px-6 py-6">
         <View className="flex-row flex-wrap justify-between gap-y-4">
-          {categories.map((cat) => (
-            <CategoryItem 
-              key={cat.id}
-              name={cat.category_name}
-              size="large"
-              subtitle={`${Math.floor(Math.random() * 50) + 10} items`}
-              onPress={() => router.push({ pathname: '/(tabs)/home', params: { categoryId: cat.id } })}
-            />
-          ))}
+          {filteredCategories.length > 0 ? (
+            filteredCategories.map((cat) => (
+              <CategoryItem 
+                key={cat.id}
+                name={cat.category_name}
+                imageUrl={cat.image_url}
+                size="large"
+                subtitle={`${Math.floor(Math.random() * 50) + 10} items`}
+                onPress={() => router.push({ pathname: '/category/[id]', params: { id: cat.id, name: cat.category_name } })}
+              />
+            ))
+          ) : (
+            <View className="w-full py-10 items-center justify-center">
+              <Ionicons name="search-outline" size={40} color="#FF1F4B" className="opacity-50 mb-4" />
+              <Text className="text-slate-500 font-medium">No categories found for "{activeSearch}"</Text>
+            </View>
+          )}
         </View>
       </View>
 

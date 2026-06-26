@@ -8,6 +8,9 @@ interface User {
   full_name?: string;
   phone?: string;
   avatar_url?: string;
+  address?: string;
+  size_preference?: string;
+  language?: string;
 }
 
 interface AuthState {
@@ -17,6 +20,7 @@ interface AuthState {
   login: (user: User, token: string) => Promise<void>;
   logout: () => Promise<void>;
   restoreToken: () => Promise<void>;
+  updateUser: (data: Partial<User>) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -57,6 +61,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (error) {
       console.error('Error restoring auth info', error);
       set({ isLoading: false });
+    }
+  },
+
+  updateUser: async (data: Partial<User>) => {
+    const { user } = get();
+    if (!user) return;
+    
+    const updatedUser = { ...user, ...data };
+    try {
+      await SecureStore.setItemAsync('auth_user', JSON.stringify(updatedUser));
+      set({ user: updatedUser });
+    } catch (error) {
+      console.error('Error updating local user data', error);
     }
   }
 }));

@@ -2,6 +2,7 @@ import { View, Text, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Product } from '../api/products';
+import { useFavoriteStore } from '../store/favoriteStore';
 import Badge from './Badge';
 
 interface ProductCardProps {
@@ -10,8 +11,12 @@ interface ProductCardProps {
   onToggleFavorite?: () => void;
 }
 
-export default function ProductCard({ product, isFavorite, onToggleFavorite }: ProductCardProps) {
+export default function ProductCard({ product, isFavorite: propIsFavorite, onToggleFavorite }: ProductCardProps) {
   const router = useRouter();
+  const { favoriteIds, toggleFavorite } = useFavoriteStore();
+  
+  // Use global state if available, fallback to prop for isolated components
+  const isFavorite = favoriteIds.includes(product.id) || propIsFavorite;
 
   return (
     <TouchableOpacity 
@@ -30,6 +35,7 @@ export default function ProductCard({ product, isFavorite, onToggleFavorite }: P
           className="absolute top-2 right-2 bg-white rounded-full p-2 shadow-md"
           onPress={(e) => {
             e.stopPropagation();
+            toggleFavorite(product.id);
             if (onToggleFavorite) onToggleFavorite();
           }}
         >
