@@ -12,6 +12,9 @@ import favoriteRoutes from "./routes/favorite.routes";
 import notificationRoutes from "./routes/notification.routes";
 import userRoutes from "./routes/user.routes";
 import analyticsRoutes from "./routes/analytics.routes";
+import sizePreferenceRoutes from "./routes/sizePreference.routes";
+import modelTypeRoutes from "./routes/modelType.routes";
+import settingsRoutes from "./routes/settings.routes";
 
 // Middleware
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware";
@@ -63,6 +66,9 @@ app.use("/api/favorites", favoriteRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/sizes", sizePreferenceRoutes);
+app.use("/api/model-types", modelTypeRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // ─── Error Handling ──────────────────────────────────────
 app.use(notFoundHandler);

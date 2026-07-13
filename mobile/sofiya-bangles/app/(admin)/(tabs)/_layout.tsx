@@ -1,9 +1,22 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter, Redirect, Href } from "expo-router";
+import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuthStore } from "../../../src/store/authStore";
 
 export default function AdminTabsLayout() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { token, user, isLoading } = useAuthStore();
+  
+  if (isLoading) return null;
+  
+  if (!token) return <Redirect href="/(auth)/login" />;
+  if (user?.role !== 'admin') {
+    if (user?.role === 'user') return <Redirect href="/(tabs)/home" />;
+    return <Redirect href="/(auth)/login" />;
+  }
+
   // We ensure there's a baseline of 10px padding on devices without safe area, plus extra space below text
   const bottomPadding = Math.max(insets.bottom, 10) + 8; 
 
@@ -46,11 +59,35 @@ export default function AdminTabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="alerts"
+        name="add"
         options={{
-          title: "Alerts",
+          title: "",
+          tabBarIcon: ({ color, size }) => (
+            <View style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: '#C1275A',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginTop: -20, // push it up out of the bar
+              shadowColor: '#C1275A',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 5,
+            }}>
+              <Ionicons name="add" size={32} color="#ffffff" />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="categories"
+        options={{
+          title: "Categories",
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "notifications" : "notifications-outline"} size={26} color={color} />
+            <Ionicons name={focused ? "folder" : "folder-outline"} size={26} color={color} />
           ),
         }}
       />
@@ -63,6 +100,10 @@ export default function AdminTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="manage-model-types" options={{ href: null }} />
+      <Tabs.Screen name="model-products/[id]" options={{ href: null }} />
+      <Tabs.Screen name="edit-product/[id]" options={{ href: null }} />
+      <Tabs.Screen name="add-success" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -5,10 +5,14 @@ import { v4 as uuidv4 } from 'uuid';
 export const getCategoriesModel = async (): Promise<Category[]> => {
   const snapshot = await db.collection("categories")
     .where("is_active", "==", true)
-    .orderBy("display_order")
     .get();
   
-  return snapshot.docs.map(doc => doc.data() as Category);
+  const categories = snapshot.docs.map(doc => doc.data() as Category);
+  
+  // Sort locally to avoid composite index requirement
+  categories.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+  
+  return categories;
 };
 
 export const getCategoryByIdModel = async (
@@ -23,6 +27,10 @@ export const createCategoryModel = async (data: {
   category_name: string;
   image_url?: string;
   display_order?: number;
+  model_type_id?: string;
+  size_type?: 'none' | 'standard' | 'custom' | 'both';
+  standard_sizes?: string[];
+  custom_measurement_fields?: string[];
 }): Promise<Category> => {
   const newId = uuidv4();
   const categoryData: Category = {
@@ -31,6 +39,10 @@ export const createCategoryModel = async (data: {
     image_url: data.image_url || null,
     display_order: data.display_order || 0,
     is_active: true,
+    model_type_id: data.model_type_id || null,
+    size_type: data.size_type || 'none',
+    standard_sizes: data.standard_sizes || [],
+    custom_measurement_fields: data.custom_measurement_fields || [],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
@@ -41,7 +53,7 @@ export const createCategoryModel = async (data: {
 
 export const updateCategoryModel = async (
   id: string,
-  data: Partial<{ category_name: string; image_url: string; display_order: number; is_active: boolean }>,
+  data: Partial<{ category_name: string; image_url: string; display_order: number; is_active: boolean; model_type_id: string; size_type: string; standard_sizes: string[]; custom_measurement_fields: string[] }>,
 ): Promise<Category> => {
   const updateData: any = { ...data, updated_at: new Date().toISOString() };
   Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);

@@ -1,6 +1,6 @@
 import { View, Text, Alert, Platform, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, Href } from 'expo-router';
 import { login, register, signInWithGoogle, sendOtp, verifyOtp } from '../../src/api/auth';
 import { Ionicons } from '@expo/vector-icons';
 import TextInputField from '../../src/components/TextInputField';
@@ -38,7 +38,7 @@ export default function LoginScreen() {
        Alert.alert('Success', 'OTP verified successfully!');
        if (tempAdminData) {
          await useAuthStore.getState().login(tempAdminData.user, tempAdminData.token);
-         router.replace('/(admin)/(tabs)/dashboard' as any);
+         router.replace('/(admin)/(tabs)/dashboard');
        }
     } catch (error: any) {
        Alert.alert('Error', error.message);
@@ -101,7 +101,7 @@ export default function LoginScreen() {
         // Ensure the store is updated, then redirect
         const userRole = res.user?.role; // get role from the backend/database
         if (userRole === 'admin') {
-          router.replace('/(admin)/(tabs)/dashboard' as any);
+          router.replace('/(admin)/(tabs)/dashboard');
         } else {
           router.replace('/(tabs)/home');
         }
@@ -142,11 +142,11 @@ export default function LoginScreen() {
       setLoading(true);
       const res: any = await signInWithGoogle();
 
-      if (res.user?.role === 'admin') {
-        router.replace('/(admin)/(tabs)/dashboard' as any);
-      } else {
-        router.replace('/(tabs)/home');
-      }
+        if (res.user?.role === 'admin') {
+          router.replace('/(admin)/(tabs)/dashboard');
+        } else {
+          router.replace('/(tabs)/home');
+        }
     } catch (error: any) {
       Alert.alert('Google Sign-In Error', error.message);
     } finally {
@@ -168,7 +168,7 @@ export default function LoginScreen() {
           <View className="w-20 h-20 bg-white rounded-full items-center justify-center shadow-sm mb-4">
             <Ionicons name="sparkles-outline" size={32} color="#FF1F4B" />
           </View>
-          <Text className="text-3xl font-extrabold text-[#90132B] font-serif">Sofiya Bangles</Text>
+          <Text className="text-3xl font-extrabold text-[#FF1F4B] font-serif">Sofiya Bangles</Text>
           <Text className="text-rose-500 mt-2 text-center text-sm">
             Discover beautiful, handcrafted jewelry.
           </Text>

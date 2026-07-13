@@ -23,7 +23,7 @@ interface AuthState {
   updateUser: (data: Partial<User>) => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isLoading: true,
@@ -54,13 +54,25 @@ export const useAuthStore = create<AuthState>((set) => ({
       const userStr = await SecureStore.getItemAsync('auth_user');
       
       if (token && userStr) {
-        set({ token, user: JSON.parse(userStr), isLoading: false });
+        try {
+          const parsedUser = JSON.parse(userStr);
+          set({ token, user: parsedUser, isLoading: false });
+        } catch (parseError) {
+          console.error('Corrupted user data in SecureStore, cleaning up...', parseError);
+          await SecureStore.deleteItemAsync('auth_token');
+          await SecureStore.deleteItemAsync('auth_user');
+          set({ token: null, user: null, isLoading: false });
+        }
       } else {
         set({ isLoading: false });
       }
     } catch (error) {
       console.error('Error restoring auth info', error);
-      set({ isLoading: false });
+      try {
+        await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('auth_user');
+      } catch (e) {}
+      set({ token: null, user: null, isLoading: false });
     }
   },
 

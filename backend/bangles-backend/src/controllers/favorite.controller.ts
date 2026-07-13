@@ -35,6 +35,10 @@ export const addFavorite = async (req: AuthRequest, res: Response) => {
       message: "Added to favorites.",
     });
   } catch (error: any) {
+    if (error.message === "PRODUCT_NOT_FOUND") {
+      res.status(404).json({ success: false, message: "Product not found or inactive." });
+      return;
+    }
     console.error("AddFavorite error:", error);
     res.status(500).json({
       success: false,

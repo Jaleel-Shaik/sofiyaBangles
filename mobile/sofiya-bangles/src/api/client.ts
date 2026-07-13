@@ -8,6 +8,7 @@ console.log('Using API URL:', API_URL);
 
 export const apiClient = axios.create({
   baseURL: API_URL,
+  timeout: 15000, // 15 seconds timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -40,10 +41,14 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Token is invalid or expired, log out automatically
-      import('../store/authStore').then(({ useAuthStore }) => {
-        useAuthStore.getState().logout();
-      });
+      const url = error.config?.url || '';
+      const isAuthRoute = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/send-otp') || url.includes('/auth/verify-otp');
+      if (!isAuthRoute) {
+        // Token is invalid or expired, log out automatically
+        import('../store/authStore').then(({ useAuthStore }) => {
+          useAuthStore.getState().logout();
+        });
+      }
     }
     return Promise.reject(error);
   }

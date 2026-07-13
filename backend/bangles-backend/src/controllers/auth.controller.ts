@@ -111,29 +111,54 @@ import { db, auth } from "../config/firebase";
 
 // In-memory fallback for local dev without service account
 const memoryOtps = new Map<string, { otp: string, expiresAt: string }>();
+const otpCooldowns = new Map<string, number>();
 
 export const sendOtp = async (req: AuthRequest, res: Response) => {
   try {
-    const { email, phone } = req.body;
+    const { email } = req.body;
     if (!email) {
       res.status(400).json({ success: false, message: "Email is required." });
       return;
     }
 
-    let phoneNumber = phone;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // Try Firestore first
+    // Cooldown check (60 seconds)
+    const lastRequest = otpCooldowns.get(normalizedEmail) || 0;
+    if (Date.now() - lastRequest < 60000) {
+      res.status(429).json({
+        success: false,
+        message: "Please wait 60 seconds before requesting another OTP.",
+      });
+      return;
+    }
+
+    let phoneNumber: string | undefined = undefined;
+
+    // Verify user is an admin in Firestore
     try {
-      const snapshot = await db.collection("profiles").where("email", "==", email).where("role", "==", "admin").limit(1).get();
+      const snapshot = await db.collection("profiles")
+        .where("email", "==", normalizedEmail)
+        .where("role", "==", "admin")
+        .limit(1)
+        .get();
       if (!snapshot.empty) {
-        phoneNumber = snapshot.docs[0].data().phone || phoneNumber;
+        phoneNumber = snapshot.docs[0].data().phone;
       }
     } catch (dbErr) {
-      console.log("⚠️ Firestore unavailable. Using fallback phone number if provided.");
+      console.log("⚠️ Firestore read error while verifying admin email:", dbErr);
+    }
+
+    if (!phoneNumber && process.env.NODE_ENV === "development" && req.body.phone) {
+      // In dev mode ONLY, allow fallback phone for testing
+      phoneNumber = req.body.phone;
     }
 
     if (!phoneNumber) {
-      res.status(400).json({ success: false, message: "No phone number available to send OTP." });
+      res.status(404).json({
+        success: false,
+        message: "Admin profile with this email not found or missing registered phone number.",
+      });
       return;
     }
 
@@ -143,15 +168,17 @@ export const sendOtp = async (req: AuthRequest, res: Response) => {
 
     // Store OTP
     try {
-      await db.collection("admin_otps").doc(email).set({
+      await db.collection("admin_otps").doc(normalizedEmail).set({
         otp,
         expiresAt,
         createdAt: new Date().toISOString()
       });
     } catch (dbErr) {
       console.log("⚠️ Firestore unavailable. Storing OTP in memory.");
-      memoryOtps.set(email, { otp, expiresAt });
+      memoryOtps.set(normalizedEmail, { otp, expiresAt });
     }
+
+    otpCooldowns.set(normalizedEmail, Date.now());
 
     // Send via Twilio
     const { env } = require("../config/env");
@@ -177,7 +204,7 @@ export const sendOtp = async (req: AuthRequest, res: Response) => {
     }
 
     console.log(`\n========================================`);
-    console.log(`🔑 ADMIN OTP GENERATED FOR ${email}`);
+    console.log(`🔑 ADMIN OTP GENERATED FOR ${normalizedEmail}`);
     console.log(`=> ${otp} <=`);
     console.log(`========================================\n`);
 
@@ -239,18 +266,29 @@ export const verifyOtp = async (req: AuthRequest, res: Response) => {
       console.log("⚠️ Firestore delete failed, ignored.");
     }
 
-    // Fetch user profile to ensure they are admin (safely)
+    // Fetch user profile to ensure they are admin
     let userData: any = null;
-    let uid = email; // Fallback UID
+    let uid = email;
     try {
-      const profileSnapshot = await db.collection("profiles").where("email", "==", email).where("role", "==", "admin").limit(1).get();
+      const profileSnapshot = await db.collection("profiles")
+        .where("email", "==", email)
+        .where("role", "==", "admin")
+        .limit(1)
+        .get();
       if (!profileSnapshot.empty) {
         userData = profileSnapshot.docs[0].data();
         uid = profileSnapshot.docs[0].id;
       }
     } catch (dbErr) {
-      console.log("⚠️ Firestore profile fetch failed, using fallback.");
-      userData = { email, role: 'admin' };
+      console.log("⚠️ Firestore profile fetch failed:", dbErr);
+    }
+
+    if (!userData) {
+      res.status(403).json({
+        success: false,
+        message: "Admin access denied. Profile not found or not an admin.",
+      });
+      return;
     }
 
     // Create a custom token for the admin

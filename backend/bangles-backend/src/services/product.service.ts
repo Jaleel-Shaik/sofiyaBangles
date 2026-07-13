@@ -6,6 +6,8 @@ import {
   updateProductModel,
   deleteProductModel,
   searchProductsModel,
+  getRecommendedProductsModel,
+  getNewArrivalsModel
 } from "../models/product.model";
 import { createAuditLogModel } from "../models/audit.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.schema";
@@ -46,8 +48,8 @@ export const getProductsService = async (options: {
   search?: string;
   userId?: string;
 }) => {
-  const page = options.page || 1;
-  const limit = Math.min(options.limit || 20, 100);
+  const page = Math.max(1, Math.floor(Number(options.page) || 1));
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(options.limit) || 20)));
 
   return getProductsModel({
     page,
@@ -144,6 +146,41 @@ export const deleteProductService = async (id: string, actorId: string) => {
   });
 };
 
-export const searchProductsService = async (query: string, limit?: number) => {
-  return searchProductsModel(query, limit);
+export const searchProductsService = async (query: string, limit?: number, userId?: string) => {
+  return searchProductsModel(query, limit, userId);
+};
+
+export const getRecommendedProductsService = async (options: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  userId?: string;
+}) => {
+  const page = options.page || 1;
+  const limit = Math.min(options.limit || 20, 100);
+
+  return getRecommendedProductsModel({
+    page,
+    limit,
+    search: options.search,
+    userId: options.userId,
+  });
+};
+
+export const getNewArrivalsService = async (options: {
+  daysAgo?: number;
+  page?: number;
+  limit?: number;
+  userId?: string;
+}) => {
+  const page = options.page || 1;
+  const limit = Math.min(options.limit || 20, 100);
+  const daysAgo = options.daysAgo || 7;
+
+  return getNewArrivalsModel({
+    daysAgo,
+    page,
+    limit,
+    userId: options.userId,
+  });
 };

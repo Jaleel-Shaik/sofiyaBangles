@@ -69,6 +69,63 @@ export const authenticate = async (
 };
 
 /**
+ * Optionally verifies the JWT token from Authorization header.
+ * Attaches decoded user to `req.user` if valid, otherwise leaves it undefined.
+ */
+export const optionalAuthenticate = async (
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    next();
+    return;
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    let decoded: any;
+    let isFirebaseToken = false;
+
+    try {
+      decoded = jwt.verify(token, env.JWT_SECRET);
+    } catch (e) {
+      decoded = await auth.verifyIdToken(token);
+      isFirebaseToken = true;
+    }
+
+    let role = decoded.role;
+    let userId = decoded.userId || decoded.uid;
+
+    if (isFirebaseToken && !role) {
+      try {
+        const profileDoc = await db.collection("profiles").doc(userId).get();
+        if (profileDoc.exists) {
+          role = profileDoc.data()?.role || "user";
+        } else {
+          role = "user";
+        }
+      } catch (e) {
+        role = "user";
+      }
+    }
+
+    req.user = {
+      userId,
+      email: decoded.email,
+      role: role,
+    };
+  } catch (error) {
+    // Token invalid or expired; leave req.user undefined for optional auth
+  }
+
+  next();
+};
+
+/**
  * Generates a JWT token for a user.
  */
 export const generateToken = (payload: JwtPayload): string => {

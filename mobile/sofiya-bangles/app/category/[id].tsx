@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, FlatList, ActivityIndicator } from 'react
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { getProducts, Product } from '../../src/api/products';
+import { getCategories, Category } from '../../src/api/categories';
 import ProductCard from '../../src/components/ProductCard';
 import Header from '../../src/components/Header';
 import SearchInput from '../../src/components/SearchInput';
@@ -16,6 +17,7 @@ export default function CategoryScreen() {
   const categoryName = name as string || 'Category Products';
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [modelTypeId, setModelTypeId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -38,7 +40,13 @@ export default function CategoryScreen() {
     setPage(1);
     setActiveSearch(searchQuery.trim());
     try {
-      const response = await getProducts(1, 20, categoryId, searchQuery.trim());
+      const [response, cats] = await Promise.all([
+        getProducts(1, 20, categoryId, searchQuery.trim()),
+        getCategories()
+      ]);
+      const currentCategory = cats.find(c => c.id === categoryId);
+      setModelTypeId(currentCategory?.model_type_id);
+
       setProducts(response.products);
       setHasMore(response.products.length >= 20);
     } catch (error) {
@@ -114,7 +122,7 @@ export default function CategoryScreen() {
           showsVerticalScrollIndicator={false}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          renderItem={({ item }) => <ProductCard product={item} />}
+          renderItem={({ item }) => <ProductCard product={item} categoryId={id as string} />}
           ListEmptyComponent={
             <View className="items-center justify-center py-24 mt-10">
               <View className="w-24 h-24 rounded-full bg-rose-50 items-center justify-center mb-6">

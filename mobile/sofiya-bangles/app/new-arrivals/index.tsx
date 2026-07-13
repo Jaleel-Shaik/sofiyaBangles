@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView }
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { getNewArrivals, Product } from '../../src/api/products';
+import { getCategories, Category } from '../../src/api/categories';
 import ProductCard from '../../src/components/ProductCard';
 import Header from '../../src/components/Header';
 import FilterPill from '../../src/components/FilterPill';
@@ -13,6 +14,7 @@ export default function NewArrivalsScreen() {
   const insets = useSafeAreaInsets();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [daysAgo, setDaysAgo] = useState(1);
   const [page, setPage] = useState(1);
@@ -27,8 +29,12 @@ export default function NewArrivalsScreen() {
     setLoading(true);
     setPage(1);
     try {
-      const response = await getNewArrivals(daysAgo, 1, 20);
+      const [response, fetchedCategories] = await Promise.all([
+        getNewArrivals(daysAgo, 1, 20),
+        getCategories()
+      ]);
       setProducts(response.products);
+      setCategories(fetchedCategories);
       setHasMore(response.products.length >= 20);
     } catch (error) {
       console.error('Failed to fetch new arrivals', error);
@@ -109,7 +115,10 @@ export default function NewArrivalsScreen() {
           showsVerticalScrollIndicator={false}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          renderItem={({ item }) => <ProductCard product={item} />}
+          renderItem={({ item }) => {
+            const cat = categories.find(c => c.id === item.category_id);
+            return <ProductCard product={item} categoryId={cat?.id} />;
+          }}
           ListEmptyComponent={
             <View className="items-center justify-center py-24 mt-10">
               <View className="w-24 h-24 rounded-full bg-rose-50 items-center justify-center mb-6">

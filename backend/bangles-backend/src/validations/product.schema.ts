@@ -24,11 +24,19 @@ export const createProductSchema = z.object({
     .transform((val) => Number(val))
     .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative"))
     .default(0),
-  category_id: z.string().uuid("Invalid category ID").optional(),
+  category_id: z.string().optional(),
   images: z.array(z.string().url("Invalid image URL")).optional(),
   likes: z.number().int().min(0).default(0).optional(),
   rating: z.number().min(0).max(5).default(0).optional(),
   reviews: z.number().int().min(0).default(0).optional(),
+  has_variants: z.boolean().optional().default(false),
+  variants: z.array(z.any()).optional().default([]), // using any to bypass complex schema for now, or define z.object
+  accepts_custom_size: z.boolean().optional().default(false),
+  custom_size_price: z
+    .union([z.string(), z.number()])
+    .transform((val) => Number(val))
+    .pipe(z.number().positive("Price must be positive").max(9999999, "Price too high"))
+    .optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

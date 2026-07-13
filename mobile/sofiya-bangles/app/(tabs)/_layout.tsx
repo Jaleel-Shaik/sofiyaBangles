@@ -1,15 +1,17 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect, Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import { useFavoriteStore } from '../../src/store/favoriteStore';
 import { useNotificationStore } from '../../src/store/notificationStore';
+import { useAuthStore } from '../../src/store/authStore';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { fetchFavorites, initialized: favInit } = useFavoriteStore();
   const { fetchNotifications, initialized: notifInit, unreadCount } = useNotificationStore();
+  const { token, user, isLoading } = useAuthStore();
   
   useEffect(() => {
     if (!favInit) {
@@ -19,6 +21,14 @@ export default function TabLayout() {
       fetchNotifications();
     }
   }, [favInit, notifInit]);
+
+  if (isLoading) return null;
+  
+  if (!token) return <Redirect href="/(auth)/login" />;
+  if (user?.role !== 'user') {
+    if (user?.role === 'admin') return <Redirect href="/(admin)/(tabs)/dashboard" />;
+    return <Redirect href="/(auth)/login" />;
+  }
 
   // We ensure there's a baseline of 10px padding on devices without safe area, plus extra space below text
   const bottomPadding = Math.max(insets.bottom, 10) + 8; 
@@ -84,13 +94,20 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+    <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person" : "person-outline"} size={26} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="size-preferences"
+        options={{
+          href: null,
+          title: 'My Sizes',
         }}
       />
     </Tabs>

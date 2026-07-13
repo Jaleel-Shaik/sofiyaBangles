@@ -9,12 +9,26 @@ import {
   updateStockService,
   deleteProductService,
   searchProductsService,
+  getRecommendedProductsService,
+  getNewArrivalsService
 } from "../services/product.service";
 
 export const createProduct = async (req: AuthRequest, res: Response) => {
   try {
+    let parsedBody = { ...req.body };
+    
+    if (typeof parsedBody.has_variants === 'string') {
+      parsedBody.has_variants = parsedBody.has_variants === 'true';
+    }
+    if (typeof parsedBody.accepts_custom_size === 'string') {
+      parsedBody.accepts_custom_size = parsedBody.accepts_custom_size === 'true';
+    }
+    if (typeof parsedBody.variants === 'string') {
+      try { parsedBody.variants = JSON.parse(parsedBody.variants); } catch (e) {}
+    }
+
     const product = await createProductService(
-      req.body,
+      parsedBody,
       req.files as Express.Multer.File[] | undefined,
       req.user!.userId,
     );
@@ -95,9 +109,21 @@ export const getProductById = async (req: AuthRequest, res: Response) => {
 export const updateProduct = async (req: AuthRequest, res: Response) => {
   try {
     const id = getParam(req, "id");
+    
+    let parsedBody = { ...req.body };
+    if (typeof parsedBody.has_variants === 'string') {
+      parsedBody.has_variants = parsedBody.has_variants === 'true';
+    }
+    if (typeof parsedBody.accepts_custom_size === 'string') {
+      parsedBody.accepts_custom_size = parsedBody.accepts_custom_size === 'true';
+    }
+    if (typeof parsedBody.variants === 'string') {
+      try { parsedBody.variants = JSON.parse(parsedBody.variants); } catch (e) {}
+    }
+
     const product = await updateProductService(
       id,
-      req.body,
+      parsedBody,
       req.files as Express.Multer.File[] | undefined,
       req.user!.userId,
     );
@@ -194,6 +220,7 @@ export const searchProducts = async (req: AuthRequest, res: Response) => {
     const products = await searchProductsService(
       q,
       limit ? Number(limit) : undefined,
+      req.user?.userId
     );
 
     res.json({
@@ -205,6 +232,70 @@ export const searchProducts = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Search failed.",
+    });
+  }
+};
+
+export const getRecommendedProducts = async (req: AuthRequest, res: Response) => {
+  try {
+    const page = getQuery(req, "page");
+    const limit = getQuery(req, "limit");
+    const search = getQuery(req, "search");
+
+    const result = await getRecommendedProductsService({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search: search,
+      userId: req.user?.userId,
+    });
+
+    res.json({
+      success: true,
+      data: result.products,
+      pagination: {
+        page: Number(page) || 1,
+        limit: Number(limit) || 20,
+        total: result.total,
+        totalPages: Math.ceil(result.total / (Number(limit) || 20)),
+      },
+    });
+  } catch (error: any) {
+    console.error("GetRecommendedProducts error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch recommended products.",
+    });
+  }
+};
+
+export const getNewArrivals = async (req: AuthRequest, res: Response) => {
+  try {
+    const page = getQuery(req, "page");
+    const limit = getQuery(req, "limit");
+    const daysAgo = getQuery(req, "daysAgo");
+
+    const result = await getNewArrivalsService({
+      daysAgo: daysAgo ? Number(daysAgo) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      userId: req.user?.userId,
+    });
+
+    res.json({
+      success: true,
+      data: result.products,
+      pagination: {
+        page: Number(page) || 1,
+        limit: Number(limit) || 20,
+        total: result.total,
+        totalPages: Math.ceil(result.total / (Number(limit) || 20)),
+      },
+    });
+  } catch (error: any) {
+    console.error("GetNewArrivals error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch new arrivals.",
     });
   }
 };

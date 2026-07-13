@@ -75,8 +75,10 @@ export const getCategoryProducts = async (
 
 export const createCategory = async (req: AuthRequest, res: Response) => {
   try {
+    let parsedBody = { ...req.body };
+
     const category = await createCategoryService(
-      req.body,
+      parsedBody,
       req.file as Express.Multer.File | undefined,
       req.user!.userId
     );
@@ -105,9 +107,11 @@ export const createCategory = async (req: AuthRequest, res: Response) => {
 export const updateCategory = async (req: AuthRequest, res: Response) => {
   try {
     const id = getParam(req, "id");
+    let parsedBody = { ...req.body };
+
     const category = await updateCategoryService(
       id,
-      req.body,
+      parsedBody,
       req.file as Express.Multer.File | undefined,
       req.user!.userId
     );

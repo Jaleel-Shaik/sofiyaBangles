@@ -54,7 +54,7 @@ export default function NotificationsScreen() {
     <View className="flex-1 bg-[#FAFAFA]">
       <View className="px-6 pb-6 bg-[#FFF0F3]" style={{ paddingTop: Math.max(insets.top + 16, 40) }}>
         <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-3xl font-extrabold text-[#90132B]">Notifications 🔔</Text>
+          <Text className="text-3xl font-extrabold text-[#FF1F4B]">Notifications 🔔</Text>
           <TouchableOpacity onPress={() => {
             if (isEditMode) {
               setIsEditMode(false);

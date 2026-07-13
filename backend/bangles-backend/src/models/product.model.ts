@@ -1,6 +1,24 @@
 import { db } from "../config/firebase";
-import { Product } from "../types";
+import { Product, UserSizePreference } from "../types";
 import { v4 as uuidv4 } from 'uuid';
+import { getSizePreferencesModel } from "./sizePreference.model";
+
+const applySizeFilter = (p: Product, prefs: UserSizePreference[]) => {
+  if (!p.category_id) return true;
+  const pref = prefs.find(pr => pr.category_id === p.category_id);
+  if (!pref) return true;
+
+  if (pref.is_custom) {
+    return p.accepts_custom_size === true;
+  } else {
+    if (p.has_variants) {
+      if (!p.variants || p.variants.length === 0) return false;
+      return p.variants.some(v => v.size === pref.standard_size && v.quantity > 0);
+    } else {
+      return true;
+    }
+  }
+};
 
 export const createProductModel = async (payload: {
   unique_code?: string;
@@ -14,6 +32,10 @@ export const createProductModel = async (payload: {
   likes?: number;
   rating?: number;
   reviews?: number;
+  has_variants?: boolean;
+  variants?: any[]; // ProductVariant[]
+  accepts_custom_size?: boolean;
+  custom_size_price?: number | string;
 }): Promise<Product> => {
   const newId = uuidv4();
   let generatedCode = payload.unique_code;
@@ -56,6 +78,10 @@ export const createProductModel = async (payload: {
     rating: payload.rating || 0,
     reviews: payload.reviews || 0,
     is_active: true,
+    has_variants: payload.has_variants || false,
+    variants: payload.variants || [],
+    accepts_custom_size: payload.accepts_custom_size || false,
+    custom_size_price: payload.custom_size_price || payload.price,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
@@ -79,8 +105,24 @@ export const getProductsModel = async (options: {
     query = query.where("category_id", "==", categoryId);
   }
 
-  const snapshot = await query.orderBy("created_at", "desc").get();
+  const snapshot = await query.get();
   let allProducts = snapshot.docs.map(doc => doc.data() as Product);
+
+  let sizePreferences: UserSizePreference[] = [];
+  if (userId) {
+    sizePreferences = await getSizePreferencesModel(userId);
+  }
+
+  if (sizePreferences.length > 0) {
+    allProducts = allProducts.filter(p => applySizeFilter(p, sizePreferences));
+  }
+
+  // Sort locally by created_at descending
+  allProducts.sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return dateB - dateA;
+  });
 
   if (search) {
     const lowerSearch = search.toLowerCase();
@@ -165,6 +207,10 @@ export const updateProductModel = async (
     rating: number;
     reviews: number;
     is_active: boolean;
+    has_variants: boolean;
+    variants: any[];
+    accepts_custom_size: boolean;
+    custom_size_price: number | string;
   }>,
 ): Promise<Product> => {
   const updateData: any = { ...data, updated_at: new Date().toISOString() };
@@ -186,14 +232,30 @@ export const deleteProductModel = async (id: string): Promise<void> => {
 export const searchProductsModel = async (
   queryText: string,
   limit: number = 20,
+  userId?: string,
 ): Promise<Product[]> => {
   const snapshot = await db.collection("products")
     .where("is_active", "==", true)
-    .orderBy("created_at", "desc")
     .get();
 
   const lowerQuery = queryText.toLowerCase();
-  const allProducts = snapshot.docs.map(doc => doc.data() as Product);
+  let allProducts = snapshot.docs.map(doc => doc.data() as Product);
+  
+  let sizePreferences: UserSizePreference[] = [];
+  if (userId) {
+    sizePreferences = await getSizePreferencesModel(userId);
+  }
+
+  if (sizePreferences.length > 0) {
+    allProducts = allProducts.filter(p => applySizeFilter(p, sizePreferences));
+  }
+
+  // Sort locally by created_at descending
+  allProducts.sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return dateB - dateA;
+  });
   
   const filtered = allProducts.filter(p => 
     (p.product_name && p.product_name.toLowerCase().includes(lowerQuery)) ||
@@ -212,4 +274,83 @@ export const searchProductsModel = async (
   }));
 
   return productsWithDetails;
+};
+
+export const getRecommendedProductsModel = async (options: {
+  page: number;
+  limit: number;
+  userId?: string;
+  search?: string;
+}): Promise<{ products: Product[]; total: number }> => {
+  // Simple deterministic recommendation: recent matching sizes
+  return getProductsModel({
+    page: options.page,
+    limit: options.limit,
+    search: options.search,
+    userId: options.userId
+  });
+};
+
+export const getNewArrivalsModel = async (options: {
+  daysAgo: number;
+  page: number;
+  limit: number;
+  userId?: string;
+}): Promise<{ products: Product[]; total: number }> => {
+  const { daysAgo, page, limit, userId } = options;
+  
+  const snapshot = await db.collection("products").where("is_active", "==", true).get();
+  let allProducts = snapshot.docs.map(doc => doc.data() as Product);
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+  const cutoffTime = cutoffDate.getTime();
+
+  allProducts = allProducts.filter(p => {
+    if (!p.created_at) return false;
+    return new Date(p.created_at).getTime() >= cutoffTime;
+  });
+
+  let sizePreferences: UserSizePreference[] = [];
+  if (userId) {
+    sizePreferences = await getSizePreferencesModel(userId);
+  }
+
+  if (sizePreferences.length > 0) {
+    allProducts = allProducts.filter(p => applySizeFilter(p, sizePreferences));
+  }
+
+  allProducts.sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  const total = allProducts.length;
+  const offset = (page - 1) * limit;
+  const paginatedProducts = allProducts.slice(offset, offset + limit);
+
+  const productsWithDetails = await Promise.all(paginatedProducts.map(async (p) => {
+    let category_name = undefined;
+    if (p.category_id) {
+      const catDoc = await db.collection("categories").doc(p.category_id).get();
+      if (catDoc.exists) {
+        category_name = catDoc.data()?.category_name;
+      }
+    }
+    
+    let is_favorited = false;
+    if (userId) {
+      const favSnapshot = await db.collection("favorites")
+        .where("user_id", "==", userId)
+        .where("product_id", "==", p.id)
+        .limit(1)
+        .get();
+      is_favorited = !favSnapshot.empty;
+    }
+
+    return { ...p, category_name, is_favorited };
+  }));
+
+  return { products: productsWithDetails, total };
 };

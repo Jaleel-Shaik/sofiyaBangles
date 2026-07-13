@@ -29,14 +29,43 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface BusinessProfile {
+  store_name: string;
+  description: string;
+  business_hours: string;
+  address: string;
+  whatsapp_number: string;
+  email: string;
+  phone_number: string;
+  updated_at: string;
+}
+
 export interface Category {
   id: string;
   category_name: string;
   image_url: string | null;
   display_order: number;
   is_active: boolean;
+  model_type_id?: string | null;
+  size_type?: 'none' | 'standard' | 'custom' | 'both';
+  standard_sizes?: string[];
+  custom_measurement_fields?: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface ModelType {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  size: string;
+  price: number | string;
+  quantity: number;
 }
 
 export interface Product {
@@ -53,6 +82,10 @@ export interface Product {
   rating: number;
   reviews: number;
   is_active: boolean;
+  has_variants?: boolean;
+  variants?: ProductVariant[];
+  accepts_custom_size?: boolean;
+  custom_size_price?: number | string;
   created_at: string;
   updated_at: string;
   // Joined fields
@@ -65,6 +98,18 @@ export interface Favorite {
   user_id: string;
   product_id: string;
   created_at: string;
+}
+
+export interface UserSizePreference {
+  id: string;
+  user_id: string;
+  category_id: string;
+  profile_name: string;
+  is_custom: boolean;
+  standard_size?: string;
+  custom_measurements?: Record<string, number | string>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Notification {

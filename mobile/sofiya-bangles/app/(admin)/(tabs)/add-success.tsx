@@ -25,11 +25,11 @@ export default function AddProductSuccess() {
         <Button 
           title="Back to Dashboard" 
           onPress={() => router.replace('/(admin)/(tabs)/dashboard' as any)} 
-          className="bg-[#FF1F4B]"
+          className="bg-[#C1275A]"
         />
         <Button 
           title="Add Another Product" 
-          onPress={() => router.replace('/(admin)/add-product' as any)} 
+          onPress={() => router.replace('/(admin)/(tabs)/add' as any)} 
           variant="outline"
           className="mt-4"
         />

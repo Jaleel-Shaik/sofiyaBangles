@@ -25,3 +25,14 @@ export const getQuery = (req: Request, name: string): string | undefined => {
   }
   return undefined;
 };
+
+/**
+ * Safely extracts and bounds pagination parameters (page >= 1, 1 <= limit <= 100).
+ */
+export const getPagination = (req: Request): { page: number; limit: number } => {
+  const rawPage = Number(getQuery(req, "page"));
+  const rawLimit = Number(getQuery(req, "limit"));
+  const page = !isNaN(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+  const limit = !isNaN(rawLimit) && rawLimit > 0 ? Math.min(100, Math.floor(rawLimit)) : 20;
+  return { page, limit };
+};

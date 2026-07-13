@@ -1,42 +1,55 @@
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments, Href, useRootNavigationState } from "expo-router";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { useAuthStore } from "../src/store/authStore";
+import { useSizeStore } from "../src/store/sizeStore";
 import "../global.css";
 
 export default function RootLayout() {
   const { isLoading, token, restoreToken, user } = useAuthStore();
+  const { fetchPreferences } = useSizeStore();
   const segments = useSegments();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
     restoreToken();
   }, []);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (token && user) {
+      fetchPreferences();
+    }
+  }, [token, user]);
 
-    const inAuthGroup = segments[0] === "(auth)";
-    const onSplashScreen = !segments || segments[0] === undefined;
+  useEffect(() => {
+    if (isLoading || !rootNavigationState?.key) return;
+
+    const inAuthGroup = segments?.[0] === "(auth)";
+    const onSplashScreen = !segments?.[0];
     
-    if (!token && !inAuthGroup) {
-      // Not logged in, redirect to login
-      const delay = onSplashScreen ? 2000 : 0;
-      setTimeout(() => {
-        router.replace("/(auth)/login");
-      }, delay);
-    } else if (token && (inAuthGroup || onSplashScreen)) {
-      // Logged in, redirect to home or admin dashboard based on role
-      const delay = onSplashScreen ? 2000 : 0;
-      setTimeout(() => {
-        if (user?.role === 'admin') {
-          router.replace("/(admin)/(tabs)/dashboard" as any);
+    // Root layout handles initial splash screen routing and redirecting away from auth when logged in.
+    // Strict layout guards in (tabs) and (admin) handle unauthorized access prevention.
+    if (onSplashScreen) {
+      const timer = setTimeout(() => {
+        if (!token) {
+          router.replace("/(auth)/login");
+        } else if (user?.role === 'admin') {
+          router.replace("/(admin)/(tabs)/dashboard");
         } else {
           router.replace("/(tabs)/home");
         }
-      }, delay);
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else if (inAuthGroup && token) {
+      // If user is on login page but already logged in, redirect them out immediately
+      if (user?.role === 'admin') {
+        router.replace("/(admin)/(tabs)/dashboard");
+      } else {
+        router.replace("/(tabs)/home");
+      }
     }
-  }, [token, segments, isLoading, user]);
+  }, [token, segments, isLoading, user, rootNavigationState?.key]);
 
   return (
     <>

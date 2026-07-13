@@ -12,6 +12,20 @@ export const createCategorySchema = z.object({
     .transform((val) => Number(val))
     .pipe(z.number().int().min(0))
     .default(0),
+  model_type_id: z.string().optional(),
+  size_type: z.enum(["none", "standard", "custom", "both"]).optional(),
+  standard_sizes: z.preprocess((val) => {
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch (e) { return []; }
+    }
+    return val;
+  }, z.array(z.string()).optional()),
+  custom_measurement_fields: z.preprocess((val) => {
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch (e) { return []; }
+    }
+    return val;
+  }, z.array(z.string()).optional()),
 });
 
 export const updateCategorySchema = createCategorySchema.partial();

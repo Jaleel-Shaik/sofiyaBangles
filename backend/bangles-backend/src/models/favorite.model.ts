@@ -6,6 +6,11 @@ export const addFavoriteModel = async (
   userId: string,
   productId: string,
 ): Promise<Favorite> => {
+  const productDoc = await db.collection("products").doc(productId).get();
+  if (!productDoc.exists || !productDoc.data()?.is_active) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+
   const existingSnapshot = await db.collection("favorites")
     .where("user_id", "==", userId)
     .where("product_id", "==", productId)

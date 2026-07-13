@@ -1,12 +1,12 @@
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithCredential, GoogleAuthProvider } from '@react-native-firebase/auth';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithCredential, GoogleAuthProvider, getIdToken } from '@react-native-firebase/auth';
 import { getFirestore, doc, getDoc, setDoc } from '@react-native-firebase/firestore';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useAuthStore } from '../store/authStore';
 import { apiClient } from './client';
 
-// Configure Google Sign-In (You can call this once in an app initialization file like App.tsx or here)
+// Configure Google Sign-In
 GoogleSignin.configure({
-  webClientId: '158053850417-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com', // Typically needs to be configured based on your google-services.json
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '158053850417-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
 });
 
 export const login = async (email: string, password: string) => {
@@ -21,7 +21,7 @@ export const login = async (email: string, password: string) => {
     if (userDoc.data() != null) {
       const userData = userDoc.data() as any;
       const user = { ...userData, id: userCredential.user.uid };
-      const token = await userCredential.user.getIdToken();
+      const token = await getIdToken(userCredential.user);
       if (user.role === 'admin') {
         return { success: true, user, token, requiresOtp: true };
       }
@@ -57,7 +57,7 @@ export const register = async (email: string, password: string, fullName: string
     const userRef = doc(db, 'profiles', uid);
     await setDoc(userRef, userData);
     
-    const token = await userCredential.user.getIdToken();
+    const token = await getIdToken(userCredential.user);
     
     if (userData.role === 'admin') {
       // Do NOT log them in automatically so they are forced to go through OTP flow
@@ -94,8 +94,11 @@ export const signInWithGoogle = async () => {
 
     // Check if user exists in Firestore
     const db = getFirestore();
+    const userRef = doc(db, 'profiles', uid);
+    const userDoc = await getDoc(userRef);
+
     let userData: any;
-    if (userDoc.data() != null) {
+    if (userDoc.exists()) {
       userData = { ...userDoc.data(), id: uid };
     } else {
       // First time Google login, create profile
@@ -111,7 +114,7 @@ export const signInWithGoogle = async () => {
       await setDoc(userRef, userData);
     }
 
-    const token = await userCredential.user.getIdToken();
+    const token = await getIdToken(userCredential.user);
     await useAuthStore.getState().login(userData, token);
     return { success: true, user: userData };
 

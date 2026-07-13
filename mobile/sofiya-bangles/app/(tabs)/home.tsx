@@ -7,6 +7,7 @@ import ProductCard from '../../src/components/ProductCard';
 import SearchInput from '../../src/components/SearchInput';
 import CategoryItem from '../../src/components/CategoryItem';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -93,10 +94,16 @@ export default function HomeScreen() {
             </Text>
           </View>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
-            <Image 
-              source={{ uri: user?.avatar_url || 'https://i.pravatar.cc/150?img=47' }} 
-              className="w-12 h-12 rounded-full border-2 border-white shadow-sm"
-            />
+            {user?.avatar_url ? (
+              <Image 
+                source={{ uri: user.avatar_url }} 
+                className="w-12 h-12 rounded-full border-2 border-white shadow-sm"
+              />
+            ) : (
+              <View className="w-12 h-12 rounded-full border-2 border-white shadow-sm bg-white items-center justify-center">
+                <Ionicons name="person" size={24} color="#cbd5e1" />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -196,9 +203,10 @@ export default function HomeScreen() {
         keyboardShouldPersistTaps="handled"
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        renderItem={({ item }) => (
-          <ProductCard product={item} />
-        )}
+        renderItem={({ item }) => {
+          const cat = categories.find(c => c.id === item.category_id);
+          return <ProductCard product={item} categoryId={cat?.id} />;
+        }}
         ListEmptyComponent={
           loading ? (
             <View className="py-20 items-center justify-center">

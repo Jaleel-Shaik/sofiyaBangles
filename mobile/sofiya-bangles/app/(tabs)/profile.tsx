@@ -73,15 +73,14 @@ export default function ProfileScreen() {
     { icon: 'person-outline', title: 'Personal Info', route: '/profile/personal-info', iconBg: 'bg-rose-50', iconColor: '#e11d48' },
     { icon: 'location-outline', title: 'My Addresses', route: '/profile/addresses', iconBg: 'bg-rose-50', iconColor: '#e11d48' },
     { icon: 'logo-whatsapp', title: 'WhatsApp Number', route: '/profile/whatsapp', iconBg: 'bg-green-100', iconColor: '#22c55e' },
-    { icon: 'pricetag-outline', title: 'Size Preferences', route: '/profile/size-preferences', iconBg: 'bg-rose-50', iconColor: '#e11d48' },
-    { icon: 'globe-outline', title: 'Language & Region', route: '/profile/language', iconBg: 'bg-rose-50', iconColor: '#e11d48' },
+    { icon: 'pricetag-outline', title: 'Size Preferences', route: '/size-preferences', iconBg: 'bg-rose-50', iconColor: '#e11d48' },
   ];
 
   const supportItems = [
-    { icon: 'help-circle-outline', title: 'Help & FAQ', iconBg: 'bg-rose-50', iconColor: '#e11d48' },
-    { icon: 'star-outline', title: 'Rate the App', iconBg: 'bg-amber-100', iconColor: '#f59e0b' },
-    { icon: 'shield-checkmark-outline', title: 'Privacy Policy', iconBg: 'bg-rose-50', iconColor: '#e11d48' },
-    { icon: 'log-out-outline', title: 'Logout', iconBg: 'bg-rose-50', iconColor: '#e11d48', isLogout: true },
+    { icon: 'chatbubbles-outline', title: 'Contact Support', subtitle: 'Chat with us on WhatsApp', iconBg: 'bg-emerald-50', iconColor: '#10b981', route: '/profile/contact' },
+    { icon: 'storefront-outline', title: 'About Us', subtitle: 'Our story and store location', iconBg: 'bg-indigo-50', iconColor: '#6366f1', route: '/profile/about' },
+    { icon: 'help-buoy-outline', title: 'Help & FAQs', subtitle: 'Shipping, returns & sizing', iconBg: 'bg-amber-50', iconColor: '#f59e0b', route: '/profile/faq' },
+    { icon: 'shield-checkmark-outline', title: 'Privacy Policy', subtitle: 'Terms and data usage', iconBg: 'bg-slate-50', iconColor: '#64748b', route: '/profile/privacy' },
   ];
 
   return (
@@ -94,7 +93,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* User Info */}
+      {/* User Info (Header avatar area) */}
       <View className="items-center mt-6 mb-6">
         <TouchableOpacity 
           onPress={handleAvatarPress}
@@ -109,7 +108,7 @@ export default function ProfileScreen() {
             <Ionicons name="person" size={40} color="#cbd5e1" />
           )}
           <View className="absolute bottom-0 right-0 bg-[#FF1F4B] w-6 h-6 rounded-full items-center justify-center border-2 border-white">
-            <Ionicons name="add" size={14} color="white" />
+            <Ionicons name="camera" size={14} color="white" />
           </View>
         </TouchableOpacity>
         <Text className="text-lg font-bold text-slate-900 font-serif mb-1">
@@ -118,52 +117,134 @@ export default function ProfileScreen() {
         <Text className="text-slate-500 text-xs mb-3">
           {user?.email || ''}
         </Text>
-        <TouchableOpacity onPress={() => router.push('/profile/personal-info')}>
-          <Text className="text-[#FF1F4B] text-xs font-bold">Edit Profile</Text>
-        </TouchableOpacity>
       </View>
 
-
-      {/* Sections Container */}
-      <View className="bg-white rounded-t-3xl pt-6 px-5 pb-20 shadow-sm border border-slate-100 flex-1">
+      {/* Sections Container (Original bottom white sheet) */}
+      <View className="bg-white rounded-t-3xl pt-8 px-5 pb-20 shadow-sm border border-slate-100 flex-1">
         
-        {/* MY ACCOUNT */}
-        <Text className="text-xs font-bold text-slate-500 mb-4 ml-2">MY ACCOUNT</Text>
-        <View className="mb-6">
-          {accountItems.map((item, index) => (
-            <TouchableOpacity 
-              key={item.title} 
-              onPress={() => item.route && router.push(item.route as any)}
-              className={`flex-row items-center py-4 ${index !== accountItems.length - 1 ? 'border-b border-slate-50' : ''}`}
-            >
-              <View className={`w-9 h-9 rounded-full ${item.iconBg} items-center justify-center mr-4`}>
-                <Ionicons name={item.icon as any} size={16} color={item.iconColor} />
+        <Text className="text-xs font-bold text-slate-500 mb-4 ml-1 tracking-wider uppercase">Profile Details</Text>
+        
+        {/* Personal Info Group */}
+        <View className="bg-rose-50 rounded-3xl p-5 mb-4 border border-rose-100 shadow-sm">
+          <View className="flex-row justify-between items-center mb-4">
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-2xl bg-[#FF1F4B] items-center justify-center mr-3 shadow-sm">
+                <Ionicons name="person" size={18} color="white" />
               </View>
-              <Text className="flex-1 text-[13px] font-bold text-slate-800">{item.title}</Text>
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+              <Text className="font-extrabold text-slate-800 text-base">Personal Info</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => router.push('/profile/personal-info' as any)}
+              className="bg-white px-3 py-1.5 rounded-full shadow-sm border border-rose-100"
+            >
+              <Text className="text-[#FF1F4B] text-xs font-extrabold">Edit</Text>
             </TouchableOpacity>
-          ))}
+          </View>
+          <View className="bg-white p-3 rounded-2xl border border-rose-50">
+            <Text className="text-[11px] text-rose-500 font-bold uppercase tracking-wider mb-0.5">Full Name</Text>
+            <Text className="text-sm font-extrabold text-slate-800 mb-3">{user?.full_name || 'Not set'}</Text>
+            <Text className="text-[11px] text-rose-500 font-bold uppercase tracking-wider mb-0.5">Email Address</Text>
+            <Text className="text-sm font-extrabold text-slate-800">{user?.email || 'Not set'}</Text>
+          </View>
+        </View>
+
+        {/* Contact Group */}
+        <View className="bg-emerald-50 rounded-3xl p-5 mb-4 border border-emerald-100 shadow-sm">
+          <View className="flex-row justify-between items-center mb-4">
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-2xl bg-emerald-500 items-center justify-center mr-3 shadow-sm">
+                <Ionicons name="logo-whatsapp" size={20} color="white" />
+              </View>
+              <Text className="font-extrabold text-slate-800 text-base">WhatsApp</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => router.push('/profile/whatsapp' as any)}
+              className="bg-white px-3 py-1.5 rounded-full shadow-sm border border-emerald-100"
+            >
+              <Text className="text-emerald-600 text-xs font-extrabold">Update</Text>
+            </TouchableOpacity>
+          </View>
+          <View className="bg-white p-3 rounded-2xl border border-emerald-50">
+            <Text className="text-[11px] text-emerald-600 font-bold uppercase tracking-wider mb-0.5">Phone Number</Text>
+            <Text className="text-sm font-extrabold text-slate-800">
+              {user?.phone ? user.phone : 'No number added yet'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Addresses Group */}
+        <View className="bg-indigo-50 rounded-3xl p-5 mb-4 border border-indigo-100 shadow-sm">
+          <View className="flex-row justify-between items-center mb-2">
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-2xl bg-indigo-500 items-center justify-center mr-3 shadow-sm">
+                <Ionicons name="location" size={18} color="white" />
+              </View>
+              <Text className="font-extrabold text-slate-800 text-base">My Addresses</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => router.push('/profile/addresses' as any)}
+              className="bg-white px-3 py-1.5 rounded-full shadow-sm border border-indigo-100"
+            >
+              <Text className="text-indigo-600 text-xs font-extrabold">Manage</Text>
+            </TouchableOpacity>
+          </View>
+          <Text className="text-xs text-indigo-500 font-medium ml-1 mt-1 leading-5">Manage your shipping and billing locations for future orders.</Text>
+        </View>
+
+        {/* Size Preferences Group */}
+        <View className="bg-amber-50 rounded-3xl p-5 mb-8 border border-amber-100 shadow-sm">
+          <View className="flex-row justify-between items-center mb-2">
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-2xl bg-amber-500 items-center justify-center mr-3 shadow-sm">
+                <Ionicons name="pricetag" size={18} color="white" />
+              </View>
+              <Text className="font-extrabold text-slate-800 text-base">Sizing</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => router.push('/size-preferences' as any)}
+              className="bg-white px-3 py-1.5 rounded-full shadow-sm border border-amber-100"
+            >
+              <Text className="text-amber-600 text-xs font-extrabold">View Sizes</Text>
+            </TouchableOpacity>
+          </View>
+          <Text className="text-xs text-amber-600 font-medium ml-1 mt-1 leading-5">View and update your saved bangle sizes across categories.</Text>
         </View>
 
         {/* SUPPORT & MORE */}
-        <Text className="text-xs font-bold text-slate-500 mb-4 ml-2 mt-2">SUPPORT & MORE</Text>
-        <View className="bg-white rounded-2xl shadow-sm border border-slate-50 px-4 mb-10">
+        <Text className="text-xs font-bold text-slate-500 mb-4 ml-1 tracking-wider uppercase">Support & More</Text>
+        <View className="bg-white rounded-3xl border border-slate-100 mb-8 overflow-hidden shadow-sm">
           {supportItems.map((item, index) => (
             <TouchableOpacity 
               key={item.title} 
-              className={`flex-row items-center py-4 ${index !== supportItems.length - 1 ? 'border-b border-slate-50' : ''}`}
-              onPress={item.isLogout ? handleLogout : undefined}
+              onPress={() => item.route ? router.push(item.route as any) : null}
+              className={`flex-row items-center p-4 ${index !== supportItems.length - 1 ? 'border-b border-slate-50' : ''}`}
             >
-              <View className={`w-9 h-9 rounded-full ${item.iconBg} items-center justify-center mr-4`}>
-                <Ionicons name={item.icon as any} size={16} color={item.iconColor} />
+              <View className={`w-12 h-12 rounded-2xl ${item.iconBg} items-center justify-center mr-4 border border-white shadow-sm`}>
+                <Ionicons name={item.icon as any} size={20} color={item.iconColor} />
               </View>
-              <Text className={`flex-1 text-[13px] font-bold ${item.isLogout ? 'text-[#FF1F4B]' : 'text-slate-800'}`}>
-                {item.title}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+              <View className="flex-1">
+                <Text className="text-[15px] font-extrabold text-slate-800 mb-0.5">
+                  {item.title}
+                </Text>
+                <Text className="text-[11px] font-medium text-slate-500">
+                  {item.subtitle}
+                </Text>
+              </View>
+              <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
+                <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+              </View>
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* LOGOUT BUTTON */}
+        <TouchableOpacity 
+          onPress={handleLogout}
+          className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex-row justify-center items-center mb-10 shadow-sm"
+        >
+          <Ionicons name="log-out-outline" size={20} color="#e11d48" className="mr-2" />
+          <Text className="text-[#e11d48] font-extrabold text-base ml-2">Log Out Securely</Text>
+        </TouchableOpacity>
 
       </View>
 

@@ -26,7 +26,7 @@ export const registerService = async (input: RegisterInput) => {
     email: input.email,
     password_hash,
     phone: input.phone,
-    role: input.role,
+    role: "user",
   });
 
   // Generate JWT
