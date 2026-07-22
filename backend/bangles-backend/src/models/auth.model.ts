@@ -44,9 +44,7 @@ export const findProfileByIdModel = async (
   if (!doc.exists) return null;
   
   const data = doc.data() as Profile;
-  // remove password_hash for safety in this query
-  const { password_hash, ...safeData } = data;
-  return safeData as Profile;
+  return data;
 };
 
 export const updateProfileModel = async (

@@ -20,13 +20,14 @@ export const registerService = async (input: RegisterInput) => {
   const salt = await bcrypt.genSalt(12);
   const password_hash = await bcrypt.hash(input.password, salt);
 
-  // Create profile
+  // Create profile with the provided role (user or admin)
+  // super_admin is NOT allowed via public registration - only seeded by backend
   const profile = await createProfileModel({
     full_name: input.full_name,
     email: input.email,
     password_hash,
     phone: input.phone,
-    role: "user",
+    role: input.role || "user",
   });
 
   // Generate JWT
@@ -61,6 +62,9 @@ export const loginService = async (input: LoginInput) => {
   }
 
   // Verify password
+  if (!profile.password_hash) {
+    throw new Error("INVALID_CREDENTIALS");
+  }
   const isValidPassword = await bcrypt.compare(
     input.password,
     profile.password_hash,

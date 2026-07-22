@@ -16,6 +16,10 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET || "sofiya-bangles-jwt-secret-change-me",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
 
+  // TOTP/2FA Encryption
+  TOTP_ENCRYPTION_KEY: process.env.TOTP_ENCRYPTION_KEY || "",
+  TOTP_QR_CODE_EXPIRY_MS: Number(process.env.TOTP_QR_CODE_EXPIRY_MS) || 600000, // 10 minutes
+
   // Firebase
   FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET || "",
 
@@ -31,4 +35,10 @@ export const env = {
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || "",
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || "",
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || "",
+
+  // Session Cleanup Interval in ms (default 1 hour)
+  SESSION_CLEANUP_INTERVAL_MS: Number(process.env.SESSION_CLEANUP_INTERVAL_MS) || 3600000,
+
+  // Maximum allowed active sessions per user
+  MAX_ACTIVE_SESSIONS: Number(process.env.MAX_ACTIVE_SESSIONS) || 5,
 } as const;

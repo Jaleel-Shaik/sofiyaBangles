@@ -37,7 +37,8 @@ export const login = async (email: string, password: string) => {
   }
 };
 
-export const register = async (email: string, password: string, fullName: string, role: string = 'user', phone: string = '') => {
+export const register = async (params: { full_name: string; email: string; password: string; phone?: string; role?: string }) => {
+  const { full_name, email, password, phone, role } = params;
   try {
     const auth = getAuth();
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -46,9 +47,9 @@ export const register = async (email: string, password: string, fullName: string
     const userData = {
       id: uid,
       email,
-      full_name: fullName,
-      phone,
-      role: role,
+      full_name,
+      phone: phone || '',
+      role: role || 'user',
       created_at: new Date().toISOString(),
       is_active: true
     };
@@ -56,6 +57,14 @@ export const register = async (email: string, password: string, fullName: string
     const db = getFirestore();
     const userRef = doc(db, 'profiles', uid);
     await setDoc(userRef, userData);
+    
+    // Store the bcrypt password hash on the backend so backend login can verify passwords
+    try {
+      await apiClient.post('/auth/set-password', { email, password });
+    } catch (hashErr) {
+      console.error('Failed to store password hash on backend:', hashErr);
+      // Non-critical - Firebase Auth still works for mobile login
+    }
     
     const token = await getIdToken(userCredential.user);
     
@@ -66,6 +75,7 @@ export const register = async (email: string, password: string, fullName: string
       return { success: true, message: "Registered successfully. Please log in to verify OTP.", user: userData };
     }
 
+    // For non-admin roles, log in automatically
     await useAuthStore.getState().login(userData, token);
     
     return { success: true, user: userData };
@@ -141,6 +151,66 @@ export const verifyOtp = async (email: string, otp: string) => {
     throw new Error(error.response?.data?.message || 'Failed to verify OTP');
   }
 };
+
+export const verify2FAOtp = async (otpPendingToken: string, otpCode: string) => {
+  try {
+    const res = await apiClient.post('/auth/verify-2fa', {
+      otp_pending_token: otpPendingToken,
+      otp_code: otpCode,
+    }, {
+      headers: {
+        'x-client-type': 'mobile',
+      },
+    });
+    
+    if (res.data?.success && res.data?.data) {
+      const { user, access_token } = res.data.data;
+      await useAuthStore.getState().login(user, access_token);
+    }
+    
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || 'Google Authenticator OTP verification failed');
+  }
+};
+
+export const loginWith2FA = async (email: string, password: string) => {
+  try {
+    const res = await apiClient.post('/auth/login', { email, password }, {
+      headers: {
+        'x-client-type': 'mobile',
+      },
+    });
+    
+    // Do NOT auto-login here - the login screen handles the full 2FA flow
+    // This allows the screen to check for require_otp, setup_required, etc.
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || 'Login failed');
+  }
+};
+
+/**
+ * Login using Firebase Auth ID token.
+ * The mobile app signs in via Firebase Auth SDK first, then sends the verified
+ * ID token to the backend. This bypasses the need for password_hash in Firestore
+ * for users registered via mobile (Firebase Auth).
+ */
+export const firebaseLoginWithToken = async (firebaseToken: string) => {
+  try {
+    const res = await apiClient.post('/auth/firebase-login', { 
+      firebase_token: firebaseToken 
+    }, {
+      headers: {
+        'x-client-type': 'mobile',
+      },
+    });
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || 'Login failed');
+  }
+};
+
 
 export const updateUserProfile = async (uid: string, data: any) => {
   try {

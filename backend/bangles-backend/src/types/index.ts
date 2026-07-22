@@ -25,8 +25,47 @@ export interface Profile {
   password_hash: string;
   expo_push_token: string | null;
   is_active: boolean;
+  is_2fa_enabled?: boolean;
+  two_fa_secret?: string | null; // Encrypted secret
   created_at: string;
   updated_at: string;
+}
+
+export interface DeviceInformation {
+  device_id?: string;
+  client_type?: "web" | "mobile" | "unknown";
+  browser?: string;
+  os?: string;
+  ip_address?: string;
+  user_agent?: string;
+}
+
+export interface LoginSession {
+  id: string;
+  user_id: string;
+  refresh_token_id: string;
+  device_info: DeviceInformation;
+  is_active: boolean;
+  login_at: string;
+  last_active_at: string;
+  expires_at: string;
+}
+
+export interface RefreshToken {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  is_revoked: boolean;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface OtpStatus {
+  user_id: string;
+  failed_attempts: number;
+  locked_until: string | null;
+  last_failed_at: string | null;
+  used_tokens: string[]; // Replay attack prevention store
 }
 
 export interface BusinessProfile {

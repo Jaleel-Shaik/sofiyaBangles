@@ -12,7 +12,14 @@ export default function AdminTabsLayout() {
   if (isLoading) return null;
   
   if (!token) return <Redirect href="/(auth)/login" />;
+  
+  // Only admin (not super_admin) can access mobile admin panel
+  // super_admin must use the web portal exclusively
   if (user?.role !== 'admin') {
+    if (user?.role === 'super_admin') {
+      // Super Admin redirected to login - web portal only
+      return <Redirect href="/(auth)/login" />;
+    }
     if (user?.role === 'user') return <Redirect href="/(tabs)/home" />;
     return <Redirect href="/(auth)/login" />;
   }

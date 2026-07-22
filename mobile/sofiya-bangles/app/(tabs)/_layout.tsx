@@ -25,8 +25,12 @@ export default function TabLayout() {
   if (isLoading) return null;
   
   if (!token) return <Redirect href="/(auth)/login" />;
+  
+  // Only regular 'user' role can access the user tabs
+  // admin/super_admin must use their respective dashboards or web portal
   if (user?.role !== 'user') {
     if (user?.role === 'admin') return <Redirect href="/(admin)/(tabs)/dashboard" />;
+    if (user?.role === 'super_admin') return <Redirect href="/(auth)/login" />;
     return <Redirect href="/(auth)/login" />;
   }
 

@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #FFF0F3;
+  --color-primary-100: #FFD6DE;
+  --color-primary-200: #FFB3C2;
+  --color-primary-300: #FF8099;
+  --color-primary-400: #FF4D70;
+  --color-primary-500: #E8436E;
+  --color-primary-600: #CC3366;
+  --color-primary-700: #B3245A;
+  --color-primary-800: #991A4D;
+  --color-primary-900: #7A0D3C;
+  --color-secondary-50: #F0F7FF;
+  --color-secondary-100: #DBECFF;
+  --color-secondary-200: #B8D6FF;
+  --color-secondary-300: #85B8FF;
+  --color-secondary-400: #4D94FF;
+  --color-secondary-500: #2563EB;
+  --color-secondary-600: #1D4ED8;
+  --color-secondary-700: #1E40AF;
+  --color-secondary-800: #1E3A8A;
+  --color-secondary-900: #172554;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    box-shadow: 0 0 0 30px white inset !important;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .glass-morphism {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, #E8436E 0%, #CC3366 50%, #B3245A 100%);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #E8436E 0%, #FF8099 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a3a3a3;
+}
+
+/* OTP input styles */
+.otp-input {
+  width: 48px !important;
+  height: 56px !important;
+  text-align: center !important;
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  border: 2px solid #e5e5e5 !important;
+  outline: none !important;
+  transition: all 0.2s ease !important;
+}
+
+.otp-input:focus {
+  border-color: #E8436E !important;
+  box-shadow: 0 0 0 3px rgba(232, 67, 110, 0.15) !important;
+}
+
+.otp-input.filled {
+  border-color: #E8436E !important;
+  background: #FFF0F3 !important;
+}
+
+/* QR Code card styles */
+.qr-container {
+  position: relative;
+  display: inline-block;
+}
+
+.qr-container::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #E8436E, #FF8099, #FFB3C2, #E8436E);
+  background-size: 300% 300%;
+  animation: gradientRotate 4s ease infinite;
+  z-index: -1;
+}
+
+@keyframes gradientRotate {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}

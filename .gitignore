@@ -11,3 +11,16 @@ coverage/
 .DS_Store
 Thumbs.db
 service-account.json
+
+# Next.js
+web/.next/
+
+# Node
+node_modules/
+
+# logs
+*.log
+
+# env
+.env
+.env.local

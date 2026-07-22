@@ -34,6 +34,9 @@ export default function RootLayout() {
       const timer = setTimeout(() => {
         if (!token) {
           router.replace("/(auth)/login");
+        } else if (user?.role === 'super_admin') {
+          // Super Admin must use the web portal - show message screen
+          router.replace("/(auth)/login");
         } else if (user?.role === 'admin') {
           router.replace("/(admin)/(tabs)/dashboard");
         } else {
@@ -43,7 +46,9 @@ export default function RootLayout() {
       return () => clearTimeout(timer);
     } else if (inAuthGroup && token) {
       // If user is on login page but already logged in, redirect them out immediately
-      if (user?.role === 'admin') {
+      if (user?.role === 'super_admin') {
+        // Stay on login - web portal required message will show
+      } else if (user?.role === 'admin') {
         router.replace("/(admin)/(tabs)/dashboard");
       } else {
         router.replace("/(tabs)/home");
