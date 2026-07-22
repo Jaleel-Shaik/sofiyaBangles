@@ -163,11 +163,8 @@ export const verify2FAOtp = async (otpPendingToken: string, otpCode: string) => 
       },
     });
     
-    if (res.data?.success && res.data?.data) {
-      const { user, access_token } = res.data.data;
-      await useAuthStore.getState().login(user, access_token);
-    }
-    
+    // Note: LoginScreen handles calling useAuthStore.login() with the returned data
+    // including refresh_token. The API layer should not modify store state.
     return res.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || 'Google Authenticator OTP verification failed');

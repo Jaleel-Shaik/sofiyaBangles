@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { Toaster } from "react-hot-toast";
-import { AuthProvider } from "@/src/lib/auth-context";
+import { AuthProvider } from "@/features/auth/lib/auth-context";
 import "./globals.css";
 
 const inter = Inter({

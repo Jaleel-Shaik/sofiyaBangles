@@ -19,7 +19,7 @@ export default function TextInputField({
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <View className={`mb-5 ${className}`}>
+    <View className={`mb-4 ${className}`}>
       <Text className="text-slate-700 font-bold mb-2 text-base">{label}</Text>
       <View className="relative justify-center">
         <TextInput

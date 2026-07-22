@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/src/lib/auth-context";
+import { useAuth } from "@/features/auth/lib/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,

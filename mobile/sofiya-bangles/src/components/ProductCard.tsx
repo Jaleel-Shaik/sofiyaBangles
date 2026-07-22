@@ -27,7 +27,7 @@ export default function ProductCard({ product, categoryId, isFavorite: propIsFav
 
   return (
     <TouchableOpacity 
-      className="bg-white rounded-3xl p-4 mb-5 shadow-sm border border-slate-100"
+      className="bg-white rounded-3xl p-4 mb-4 shadow-sm border border-slate-100"
       style={{ width: '48%' }}
       onPress={() => router.push({ pathname: '/products/[id]', params: { id: product.id } } as any)}
       activeOpacity={0.8}

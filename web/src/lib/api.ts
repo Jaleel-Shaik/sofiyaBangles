@@ -366,10 +366,11 @@ export const authApi = {
   getSessions: () =>
     apiClient.get<{ data: Session[] }>("/auth/sessions").then((r) => r.data.data),
 
-  regenerateQR: () =>
+  regenerateQR: (otpPendingToken: string) =>
     apiClient
       .post<{ success: boolean; data: { qr_code_url: string; secret: string; otp_pending_token: string } }>(
-        "/auth/regenerate-qr"
+        "/auth/regenerate-qr",
+        { otp_pending_token: otpPendingToken }
       )
       .then((r) => r.data.data),
 

@@ -2,7 +2,7 @@ import { Tabs, useRouter, Redirect, Href } from "expo-router";
 import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuthStore } from "../../../src/store/authStore";
+import { useAuthStore } from "@/src/store/authStore";
 
 export default function AdminTabsLayout() {
   const insets = useSafeAreaInsets();

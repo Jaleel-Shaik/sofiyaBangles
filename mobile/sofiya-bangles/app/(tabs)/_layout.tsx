@@ -3,9 +3,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
-import { useFavoriteStore } from '../../src/store/favoriteStore';
-import { useNotificationStore } from '../../src/store/notificationStore';
-import { useAuthStore } from '../../src/store/authStore';
+import { useFavoriteStore } from "@/src/store/favoriteStore";
+import { useNotificationStore } from "@/src/store/notificationStore";
+import { useAuthStore } from "@/src/store/authStore";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();

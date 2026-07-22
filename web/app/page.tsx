@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/src/lib/auth-context";
+import { useAuth } from "@/features/auth/lib/auth-context";
 import { Loader2 } from "lucide-react";
-import LoginScreen from "@/src/components/LoginScreen";
-import Verify2FAScreen from "@/src/components/Verify2FAScreen";
-import Setup2FAScreen from "@/src/components/Setup2FAScreen";
+import LoginScreen from "@/features/auth/components/LoginScreen";
+import Verify2FAScreen from "@/features/auth/components/Verify2FAScreen";
+import Setup2FAScreen from "@/features/auth/components/Setup2FAScreen";
 
 export default function HomePage() {
   const {

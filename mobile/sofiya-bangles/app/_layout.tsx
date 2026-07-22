@@ -1,60 +1,28 @@
-import { Stack, useRouter, useSegments, Href, useRootNavigationState } from "expo-router";
+import { Stack, useRouter, useSegments, useRootNavigationState } from "expo-router";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
-import { useAuthStore } from "../src/store/authStore";
-import { useSizeStore } from "../src/store/sizeStore";
+import { useAuthStore } from "@/src/store/authStore";
 import "../global.css";
 
 export default function RootLayout() {
-  const { isLoading, token, restoreToken, user } = useAuthStore();
-  const { fetchPreferences } = useSizeStore();
+  const { token } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
 
+  // Only handles redirecting from auth screens when already logged in
+  // SplashScreen handles restoreToken and its own navigation
+  // SplashScreen handles its own navigation after animation completes
   useEffect(() => {
-    restoreToken();
-  }, []);
-
-  useEffect(() => {
-    if (token && user) {
-      fetchPreferences();
-    }
-  }, [token, user]);
-
-  useEffect(() => {
-    if (isLoading || !rootNavigationState?.key) return;
+    if (!token || !rootNavigationState?.key) return;
 
     const inAuthGroup = segments?.[0] === "(auth)";
-    const onSplashScreen = !segments?.[0];
     
-    // Root layout handles initial splash screen routing and redirecting away from auth when logged in.
-    // Strict layout guards in (tabs) and (admin) handle unauthorized access prevention.
-    if (onSplashScreen) {
-      const timer = setTimeout(() => {
-        if (!token) {
-          router.replace("/(auth)/login");
-        } else if (user?.role === 'super_admin') {
-          // Super Admin must use the web portal - show message screen
-          router.replace("/(auth)/login");
-        } else if (user?.role === 'admin') {
-          router.replace("/(admin)/(tabs)/dashboard");
-        } else {
-          router.replace("/(tabs)/home");
-        }
-      }, 2000);
-      return () => clearTimeout(timer);
-    } else if (inAuthGroup && token) {
-      // If user is on login page but already logged in, redirect them out immediately
-      if (user?.role === 'super_admin') {
-        // Stay on login - web portal required message will show
-      } else if (user?.role === 'admin') {
-        router.replace("/(admin)/(tabs)/dashboard");
-      } else {
-        router.replace("/(tabs)/home");
-      }
+    if (inAuthGroup) {
+      // If user is on login page but already logged in, redirect them out
+      router.replace("/(tabs)/home");
     }
-  }, [token, segments, isLoading, user, rootNavigationState?.key]);
+  }, [token, segments, rootNavigationState?.key]);
 
   return (
     <>

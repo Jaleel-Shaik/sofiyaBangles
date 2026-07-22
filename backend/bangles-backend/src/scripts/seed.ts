@@ -1,5 +1,5 @@
-import { createCategoryModel } from '../models/category.model';
-import { createProductModel } from '../models/product.model';
+import { createCategoryModel } from '../features/category/models/category.model';
+import { createProductModel } from '../features/product/models/product.model';
 
 const seedData = async () => {
   try {
