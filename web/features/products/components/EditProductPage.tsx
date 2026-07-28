@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { adminApi, type Product, type Category } from "@/src/lib/api";
+import { adminApi, apiClient, type Product, type Category } from "@/src/lib/api";
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -18,6 +18,27 @@ export default function EditProductPage() {
   const [form, setForm] = useState({
     product_name: "", description: "", price: "", quantity: "", category_id: "", unique_code: "",
   });
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      newFiles.push(files[i]);
+      newPreviews.push(URL.createObjectURL(files[i]));
+    }
+    setNewImageFiles(prev => [...prev, ...newFiles]);
+    setNewImagePreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   useEffect(() => {
     Promise.all([
@@ -33,6 +54,11 @@ export default function EditProductPage() {
           category_id: product.category_id || "",
           unique_code: product.unique_code || "",
         });
+        if (product.images && product.images.length > 0) {
+          setExistingImages(product.images);
+        } else if (product.image_url) {
+          setExistingImages([product.image_url]);
+        }
       }
       setCategories(cats);
     }).catch(() => toast.error("Failed to load product")).finally(() => setLoading(false));
@@ -42,10 +68,21 @@ export default function EditProductPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await adminApi.updateProduct(id, {
-        ...form,
-        price: parseFloat(form.price) || 0,
-        quantity: parseInt(form.quantity) || 0,
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== "") {
+          if (key === "price") formData.append(key, String(parseFloat(form.price)));
+          else if (key === "quantity") formData.append(key, String(parseInt(form.quantity) || 0));
+          else formData.append(key, String(val));
+        }
+      });
+      existingImages.forEach(url => formData.append('existing_images', url));
+      if (existingImages.length === 0) {
+        formData.append('existing_images', '');
+      }
+      newImageFiles.forEach(file => formData.append('images', file));
+      await apiClient.put(`/products/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       toast.success("Product updated");
       router.push("/dashboard/products");
@@ -94,6 +131,33 @@ export default function EditProductPage() {
             </select>
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#525252] mb-1">Product Images</label>
+          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
+          <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-[#E5E5E5] rounded-xl p-8 text-center hover:border-[#E8436E] transition-colors cursor-pointer">
+            <Upload className="w-8 h-8 mx-auto mb-2 text-[#A3A3A3]" />
+            <p className="text-sm text-[#A3A3A3]">Drop new images here or click to upload</p>
+          </div>
+          {(existingImages.length > 0 || newImagePreviews.length > 0) && (
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {existingImages.map((url, i) => (
+                <div key={`existing-${i}`} className="w-16 h-16 rounded-lg overflow-hidden border border-[#E5E5E5] relative group">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => removeExistingImage(i)} className="absolute top-0 right-0 bg-black/50 rounded-bl-lg p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                </div>
+              ))}
+              {newImagePreviews.map((img, i) => (
+                <div key={`new-${i}`} className="w-16 h-16 rounded-lg overflow-hidden border border-[#E5E5E5]">
+                  <img src={img} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-end gap-3 pt-2">
           <Link href="/dashboard/products" className="px-5 py-2.5 text-sm font-medium text-[#525252] border border-[#E5E5E5] rounded-xl hover:bg-[#F5F5F5]">Cancel</Link>
           <button type="submit" disabled={saving} className="gradient-primary text-white font-semibold py-2.5 px-6 rounded-xl">

@@ -18,12 +18,20 @@ export interface User {
 
 export interface LoginResponse {
   message: string;
+  /** Backend field indicating 2FA is required for this user */
+  require_otp?: boolean;
   otp_pending_token?: string;
-  is_2fa_enabled: boolean;
-  setup_required: boolean;
+  is_2fa_enabled?: boolean;
+  setup_required?: boolean;
   qr_code_url?: string;
   secret?: string;
   otpauth_url?: string;
+  
+  // Direct login response (non-admin users)
+  access_token?: string;
+  refresh_token?: string;
+  session_id?: string;
+  expires_in?: string;
   user?: User;
 }
 
@@ -53,7 +61,7 @@ export interface Session {
 
 // --- API Client with Interceptors ---
 
-const apiClient = axios.create({
+export const apiClient = axios.create({
   baseURL: API_URL,
   headers: { "Content-Type": "application/json" },
   timeout: 15000,
@@ -215,6 +223,8 @@ export interface AnalyticsOverview {
   totalFavorites: number;
   totalCategories: number;
   activeProducts: number;
+  totalOrders: number;
+  totalStock: number;
 }
 
 export interface UserProfile {

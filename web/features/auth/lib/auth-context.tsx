@@ -134,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await authApi.login(email, password);
 
       if (result.setup_required) {
-        // First login: need to set up 2FA
+        // First login: need to set up 2FA (admin/super_admin)
         setState((prev) => ({
           ...prev,
           is2FAPending: true,
@@ -146,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isLoading: false,
         }));
       } else if (result.otp_pending_token) {
-        // 2FA is enabled, need OTP verification
+        // 2FA is enabled, need OTP verification (admin/super_admin)
         setState((prev) => ({
           ...prev,
           is2FAPending: true,
@@ -157,6 +157,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           loginStep: "password_verified",
           isLoading: false,
         }));
+      } else if (result.access_token && result.user) {
+        // Direct token response (regular users bypass 2FA)
+        localStorage.setItem("access_token", result.access_token);
+        localStorage.setItem("refresh_token", result.refresh_token || "");
+        localStorage.setItem("user", JSON.stringify(result.user));
+
+        setState((prev) => ({
+          ...prev,
+          user: result.user!,
+          accessToken: result.access_token!,
+          refreshTokenValue: result.refresh_token || null,
+          isAuthenticated: true,
+          is2FAPending: false,
+          otpPendingToken: null,
+          setupRequired: false,
+          qrCodeUrl: null,
+          manualSecret: null,
+          loginStep: "complete",
+          isLoading: false,
+        }));
+      } else {
+        // Unexpected response shape
+        setState((prev) => ({ ...prev, isLoading: false }));
+        console.error("Unexpected login response:", result);
+        throw new Error("Unexpected server response during login.");
       }
 
       return result;
