@@ -76,6 +76,8 @@ export default function ProfileScreen() {
     { icon: "storefront-outline", title: "About Us", subtitle: "Our story", route: "/profile/about" },
     { icon: "help-buoy-outline", title: "Help & FAQs", subtitle: "Shipping & returns", route: "/profile/faq" },
     { icon: "shield-checkmark-outline", title: "Privacy Policy", route: "/profile/privacy" },
+    { icon: "bug-outline", title: "Error Center", subtitle: "See what went wrong & how to fix it", route: "/error-center" },
+    { icon: "server-outline", title: "Server Connection", subtitle: "Troubleshoot API / network issues", route: "/server-settings" },
   ];
 
   return (

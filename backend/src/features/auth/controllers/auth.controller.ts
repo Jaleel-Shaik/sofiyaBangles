@@ -70,6 +70,7 @@ export const login = async (req: AuthRequest, res: Response) => {
   try {
     const deviceInfo = extractDeviceInfo(req);
     const result = await initiateLoginService(req.body.email, req.body.password, deviceInfo);
+    console.log("Login result:", result);
 
     res.json({
       success: true,
@@ -156,6 +157,65 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     });
   }
 };
+
+export const uploadAvatar = async (req: AuthRequest, res: Response) => {
+  try {
+    const file = req.file as Express.Multer.File;
+    if (!file) {
+      res.status(400).json({
+        success: false,
+        message: "No image file provided.",
+      });
+      return;
+    }
+
+    const avatarUrl = await uploadToCloudinaryProfile(file);
+
+    const user = await updateProfileService(req.user!.userId, { avatar_url: avatarUrl });
+
+    res.json({
+      success: true,
+      data: user,
+      message: "Avatar uploaded successfully.",
+    });
+  } catch (error: any) {
+    console.error("UploadAvatar error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to upload avatar.",
+    });
+  }
+};
+
+async function uploadToCloudinaryProfile(file: Express.Multer.File): Promise<string> {
+  const { v2: cloudinary } = require("cloudinary");
+  const streamifier = require("streamifier");
+  const { env } = require("../../../shared/config/env");
+
+  cloudinary.config({
+    cloud_name: env.CLOUD_NAME,
+    api_key: env.CLOUD_API_KEY,
+    api_secret: env.CLOUD_API_SECRET,
+  });
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "sofiya_bangles/avatars",
+        transformation: [{ width: 300, height: 300, crop: "fill", gravity: "face" }],
+      },
+      (error: any, result: any) => {
+        if (result) {
+          resolve(result.secure_url);
+        } else {
+          reject(error);
+        }
+      }
+    );
+
+    streamifier.createReadStream(file.buffer).pipe(stream);
+  });
+}
 
 // In-memory fallback for local dev without service account
 const memoryOtps = new Map<string, { otp: string, expiresAt: string }>();

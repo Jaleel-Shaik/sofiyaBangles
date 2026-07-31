@@ -8,7 +8,8 @@ import {
   RefreshControl,
   FlatList,
 } from "react-native";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import { useAuthStore } from "@/src/store/authStore";
 import { getRecommendedProducts, Product } from "@/src/api/products";
 import { getCategories, Category } from "@/src/api/categories";
@@ -75,24 +76,28 @@ export default function HomeScreen() {
     }
   };
 
-  useEffect(() => {
-    const loadPurchasedProducts = async () => {
-      try {
-        const orders = await getUserOrders();
-        setPurchasedProductIds(orders.map((order) => order.product_id));
-      } catch (error) {
-        console.error("Failed to load purchased products", error);
-      }
-    };
-    loadPurchasedProducts();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const loadPurchasedProducts = async () => {
+        try {
+          const orders = await getUserOrders();
+          setPurchasedProductIds(orders.map((order) => order.product_id));
+        } catch (error) {
+          console.error("Failed to load purchased products", error);
+        }
+      };
+      loadPurchasedProducts();
+    }, [])
+  );
 
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchInitialData();
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  useFocusEffect(
+    useCallback(() => {
+      const delayDebounceFn = setTimeout(() => {
+        fetchInitialData();
+      }, 500);
+      return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

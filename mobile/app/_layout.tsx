@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { useAuthStore } from "@/src/store/authStore";
 import { getDashboardHref } from "@/src/utils/navigation";
+import NetworkErrorModal from "@/src/components/NetworkErrorModal";
 import "../global.css";
 
 export default function RootLayout() {
@@ -41,7 +42,10 @@ export default function RootLayout() {
         <Stack.Screen name="new-arrivals/index" />
         <Stack.Screen name="products/[id]" />
         <Stack.Screen name="category/[id]" />
+        <Stack.Screen name="server-settings" />
+        <Stack.Screen name="error-center" />
       </Stack>
+      <NetworkErrorModal />
     </>
   );
 }

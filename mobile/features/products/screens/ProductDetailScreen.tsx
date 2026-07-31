@@ -267,10 +267,40 @@ export default function ProductDetailScreen() {
     );
   };
 
-  if (loading || !product) {
+  if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" color="#e11d48" />
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white px-6">
+        <View className="items-center">
+          <View className="w-20 h-20 bg-rose-50 rounded-full items-center justify-center mb-5">
+            <Ionicons name="cube-outline" size={40} color="#e11d48" />
+          </View>
+          <Text className="text-xl font-bold text-text-primary mb-2">Product Not Available</Text>
+          <Text className="text-text-secondary text-center text-sm leading-5 mb-6">
+            This product has been removed or is no longer available.{"\n"}It may have been deleted by the store admin.
+          </Text>
+          <View className="flex-row gap-3">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="bg-primary px-6 py-3 rounded-full"
+            >
+              <Text className="text-white font-bold">Go Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/(tabs)/home" as any)}
+              className="bg-surface px-6 py-3 rounded-full border border-divider"
+            >
+              <Text className="text-text-primary font-bold">Browse Products</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   }

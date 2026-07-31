@@ -8,6 +8,9 @@ export interface BusinessProfile {
   whatsapp_number: string;
   email: string;
   phone_number: string;
+  logo_url?: string | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
   updated_at?: string;
 }
 

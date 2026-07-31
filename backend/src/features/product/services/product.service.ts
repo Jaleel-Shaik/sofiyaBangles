@@ -6,12 +6,19 @@ import {
   getProductByIdModel,
   updateProductModel,
   deleteProductModel,
+  restoreProductModel,
+  deleteProductsByCategoryModel,
+  deleteFavoritesByProductModel,
+  deleteFavoritesByProductsModel,
+  deleteReviewsByProductModel,
+  nullifyNotificationProductRef,
   searchProductsModel,
   getRecommendedProductsModel,
   getNewArrivalsModel
 } from "../models/product.model";
 import { createAuditLogModel } from "../../../shared/models/audit.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.validation";
+import { v2 as cloudinary } from "cloudinary";
 
 export const createProductService = async (
   input: CreateProductInput,
@@ -79,6 +86,46 @@ export const getProductByIdService = async (id: string, userId?: string) => {
   return product;
 };
 
+/**
+ * Extract Cloudinary public IDs from secure URLs so we can delete them.
+ * Cloudinary URLs look like: https://res.cloudinary.com/.../v1234/sofiya_bangles/products/abc123.jpg
+ */
+const extractCloudinaryPublicIds = (imageUrls: string[]): string[] => {
+  const publicIds: string[] = [];
+  for (const url of imageUrls) {
+    try {
+      const parts = url.split("/");
+      const filename = parts[parts.length - 1];
+      const versionIndex = parts.findIndex((p) => /^v\d+$/.test(p));
+      const folderParts = parts.slice(versionIndex + 1, parts.length - 1);
+      const folder = folderParts.join("/");
+      const publicId = filename.includes(".")
+        ? `${folder}/${filename.substring(0, filename.lastIndexOf("."))}`
+        : `${folder}/${filename}`;
+      publicIds.push(publicId);
+    } catch (e) {
+      console.warn("Could not extract Cloudinary public ID from URL:", url);
+    }
+  }
+  return publicIds;
+};
+
+/**
+ * Delete images from Cloudinary. Non-blocking — logs errors instead of throwing.
+ */
+const cleanupCloudinaryImages = async (imageUrls: string[]) => {
+  if (!imageUrls || imageUrls.length === 0) return;
+  const publicIds = extractCloudinaryPublicIds(imageUrls);
+  if (publicIds.length === 0) return;
+
+  try {
+    const result = await cloudinary.api.delete_resources(publicIds);
+    console.log(`Cleaned up ${publicIds.length} Cloudinary image(s):`, result);
+  } catch (error) {
+    console.error("Failed to clean up Cloudinary images (non-fatal):", error);
+  }
+};
+
 export const updateProductService = async (
   id: string,
   input: UpdateProductInput & { existing_images?: string | string[] },
@@ -120,6 +167,18 @@ export const updateProductService = async (
     image_url: mergedImages.length > 0 ? mergedImages[0] : undefined,
   });
 
+  // Identify old images that were replaced (non-blocking cleanup)
+  if (existing.images && existing.images.length > 0) {
+    const removedImages = existing.images.filter(
+      (img) => !mergedImages.includes(img)
+    );
+    if (removedImages.length > 0) {
+      cleanupCloudinaryImages(removedImages).catch((err) =>
+        console.error("Cloudinary cleanup failed (non-fatal):", err)
+      );
+    }
+  }
+
   // Audit log
   await createAuditLogModel({
     actor_id: actorId,
@@ -158,13 +217,70 @@ export const updateStockService = async (
   return product;
 };
 
+export const sellProductService = async (
+  id: string,
+  quantity: number,
+  actorId: string,
+) => {
+  const existing = await getProductByIdModel(id);
+  if (!existing) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+  if (existing.quantity < quantity) {
+    throw new Error("INSUFFICIENT_STOCK");
+  }
+  const newQuantity = existing.quantity - quantity;
+  const product = await updateProductModel(id, { quantity: newQuantity });
+
+  await createAuditLogModel({
+    actor_id: actorId,
+    action: "PRODUCT_SOLD",
+    table_name: "products",
+    record_id: id,
+    old_data: { quantity: existing.quantity },
+    new_data: { quantity: newQuantity },
+  });
+
+  return product;
+};
+
 export const deleteProductService = async (id: string, actorId: string) => {
   const existing = await getProductByIdModel(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  await deleteProductModel(id);
+  // Hard-delete the product document
+  const deletedProduct = await deleteProductModel(id);
+  if (!deletedProduct) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+
+  // Cascade: delete orphaned favorite records
+  deleteFavoritesByProductModel(id).catch((err) =>
+    console.error("Failed to cleanup favorites (non-fatal):", err)
+  );
+
+  // Cascade: delete product reviews
+  deleteReviewsByProductModel(id).catch((err) =>
+    console.error("Failed to cleanup reviews (non-fatal):", err)
+  );
+
+  // Cascade: nullify notification references to this product
+  nullifyNotificationProductRef(id).catch((err) =>
+    console.error("Failed to cleanup notification refs (non-fatal):", err)
+  );
+
+  // Clean up Cloudinary images (non-blocking)
+  const allImageUrls = [
+    ...(existing.images || []),
+    ...(existing.image_url ? [existing.image_url] : []),
+  ];
+  if (allImageUrls.length > 0) {
+    cleanupCloudinaryImages(allImageUrls).catch((err) =>
+      console.error("Cloudinary cleanup failed (non-fatal):", err)
+    );
+  }
 
   // Audit log
   await createAuditLogModel({
@@ -174,6 +290,68 @@ export const deleteProductService = async (id: string, actorId: string) => {
     record_id: id,
     old_data: { product_name: existing.product_name },
   });
+};
+
+export const restoreProductService = async (id: string, actorId: string) => {
+  const existing = await getProductByIdModel(id);
+  if (!existing) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+
+  if (existing.is_active) {
+    // Already active — idempotent
+    return existing;
+  }
+
+  const product = await restoreProductModel(id);
+
+  await createAuditLogModel({
+    actor_id: actorId,
+    action: "PRODUCT_RESTORED",
+    table_name: "products",
+    record_id: id,
+    new_data: { product_name: product.product_name },
+  });
+
+  return product;
+};
+
+/**
+ * Hard-delete all products linked to a given category.
+ * Called when a category is deleted (cascade).
+ * Also cleans up Cloudinary images for the deleted products.
+ * Returns the count of products that were cascade-deleted.
+ */
+export const deleteProductsByCategoryService = async (
+  categoryId: string,
+  actorId: string,
+): Promise<number> => {
+  const deletedProducts = await deleteProductsByCategoryModel(categoryId);
+
+  if (deletedProducts.length > 0) {
+    // Clean up Cloudinary images (non-blocking)
+    const allImageUrls: string[] = [];
+    for (const product of deletedProducts) {
+      if (product.image_url) allImageUrls.push(product.image_url);
+      if (product.images) allImageUrls.push(...product.images);
+    }
+    if (allImageUrls.length > 0) {
+      cleanupCloudinaryImages(allImageUrls).catch((err) =>
+        console.error("Cloudinary cleanup failed for cascade-deleted products (non-fatal):", err)
+      );
+    }
+
+    // Audit log for batch deletion
+    await createAuditLogModel({
+      actor_id: actorId,
+      action: "PRODUCTS_CASCADE_DELETED",
+      table_name: "products",
+      record_id: `category:${categoryId}`,
+      old_data: { category_id: categoryId, count: deletedProducts.length },
+    });
+  }
+
+  return deletedProducts.length;
 };
 
 export const searchProductsService = async (query: string, limit?: number, userId?: string) => {

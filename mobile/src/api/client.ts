@@ -1,29 +1,16 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { AppState, AppStateStatus, Platform } from 'react-native';
+import {
+  initApiClientConfig,
+  getCachedApiBaseUrl,
+  getCachedApiSource,
+} from './config';
+import { useApiErrorBus, registerRetryHandler } from './errorBus';
 
-const resolveApiBaseUrl = () => {
-  const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-  const candidates = [
-    configuredUrl,
-    Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://127.0.0.1:5000/api',
-    'http://localhost:5000/api',
-    'http://192.168.29.241:5000/api',
-  ].filter((value): value is string => Boolean(value));
-
-  for (const candidate of candidates) {
-    const normalized = candidate.replace(/\/$/, '');
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return 'http://10.0.2.2:5000/api';
-};
-
-const API_URL = resolveApiBaseUrl();
-
-console.log('Using API URL:', API_URL);
+// Resolve the API URL (cached sync value). This follows your current network
+// automatically — see config.ts for the priority order.
+let API_URL = getCachedApiBaseUrl();
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -32,6 +19,31 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Resolve the "correct" URL at startup and point the client at it.
+// On Android emulators this becomes 10.0.2.2, on physical devices it becomes
+// the dev machine's current LAN IP (re-detected every app start).
+initApiClientConfig()
+  .then((url) => {
+    API_URL = url;
+    apiClient.defaults.baseURL = url;
+    console.log('Using API URL:', url, `(source: ${getCachedApiSource()})`);
+  })
+  .catch((error) => {
+    console.error('Failed to resolve API base URL:', error);
+  });
+
+console.log('Platform:', Platform.OS);
+
+// ─── Health Check ─────────────────────────────────────────
+export const checkServerConnection = async (): Promise<boolean> => {
+  try {
+    await apiClient.get('/products', { timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 // ─── Token Refresh State ─────────────────────────────────
 let isRefreshing = false;
@@ -102,9 +114,35 @@ apiClient.interceptors.request.use(
     } catch (error) {
       console.error('Error fetching token from SecureStore:', error);
     }
+    const method = config.method?.toUpperCase() || 'GET';
+    const url = config.url || '';
+    console.log(`[API] ${method} ${url}`);
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// ─── Response Interceptor: Logging + Global Error Popup ───
+apiClient.interceptors.response.use(
+  (response) => {
+    const method = response.config?.method?.toUpperCase() || 'GET';
+    const url = response.config?.url || '';
+    const status = response.status;
+    console.log(`[API] ${method} ${url} → ${status}`);
+    return response;
+  },
+  (error) => {
+    const method = error.config?.method?.toUpperCase() || 'GET';
+    const url = error.config?.url || '';
+    const status = error.response?.status || 'NETWORK_ERROR';
+    const msg = error.response?.data?.message || error.message || 'Unknown error';
+    console.error(`[API] ${method} ${url} → ${status}: ${msg}`);
+
+    // Surface connectivity / server failures to the global popup
+    // (timeouts, network unreachable, 5xx).
+    useApiErrorBus.getState().reportError(error);
     return Promise.reject(error);
   }
 );
@@ -117,9 +155,9 @@ apiClient.interceptors.response.use(
     const url = originalRequest?.url || '';
 
     // Skip refresh for auth endpoints to avoid loops
-    const isAuthRoute = url.includes('/auth/login') || 
-      url.includes('/auth/register') || 
-      url.includes('/auth/send-otp') || 
+    const isAuthRoute = url.includes('/auth/login') ||
+      url.includes('/auth/register') ||
+      url.includes('/auth/send-otp') ||
       url.includes('/auth/verify-otp') ||
       url.includes('/auth/verify-2fa') ||
       url.includes('/auth/refresh-token');
@@ -155,14 +193,14 @@ apiClient.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        const response = await axios.post(`${API_URL}/auth/refresh-token`, {
+        const response = await axios.post(`${getCachedApiBaseUrl()}/auth/refresh-token`, {
           refresh_token: refreshToken,
         });
 
         const { access_token, refresh_token: newRefreshToken } = response.data.data;
-        
+
         await setTokens(access_token, newRefreshToken);
-        
+
         // Also update the auth store with the new tokens
         try {
           const { useAuthStore } = await import('../store/authStore');
@@ -170,7 +208,7 @@ apiClient.interceptors.response.use(
         } catch (e) {
           console.warn('Could not update auth store with new tokens:', e);
         }
-        
+
         processQueue(null, access_token);
 
         // Retry the original request with new token
@@ -181,16 +219,16 @@ apiClient.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${access_token}`;
           }
         }
-        
+
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        
+
         // Refresh token failed - force logout
         await clearTokens();
         const { useAuthStore } = await import('../store/authStore');
         useAuthStore.getState().forceLogout();
-        
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -213,14 +251,14 @@ const refreshTokenSilently = async () => {
   try {
     const refreshToken = await getRefreshToken();
     if (!refreshToken) return;
-    
-    const response = await axios.post(`${API_URL}/auth/refresh-token`, {
+
+    const response = await axios.post(`${getCachedApiBaseUrl()}/auth/refresh-token`, {
       refresh_token: refreshToken,
     });
-    
+
     const { access_token, refresh_token: newRefreshToken } = response.data.data;
     await setTokens(access_token, newRefreshToken);
-    
+
     const { useAuthStore } = await import('../store/authStore');
     useAuthStore.getState().setTokens(access_token, newRefreshToken);
   } catch {
@@ -230,7 +268,7 @@ const refreshTokenSilently = async () => {
 
 export const startAppStateListener = () => {
   if (appStateSubscription) return;
-  
+
   appStateSubscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
     if (nextAppState === 'active') {
       // App came to foreground — proactively refresh expired token
@@ -245,3 +283,11 @@ export const stopAppStateListener = () => {
     appStateSubscription = null;
   }
 };
+
+// ─── Retry handler for the NetworkErrorModal ──────────────
+registerRetryHandler((config: any) => {
+  const cloned = { ...config };
+  // Drop the stale base URL so the request uses the currently resolved one.
+  cloned.baseURL = undefined;
+  return apiClient(cloned);
+});

@@ -1,6 +1,6 @@
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, TextInput, Image, Dimensions } from 'react-native';
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'expo-router';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, TextInput, Image, Dimensions, RefreshControl } from 'react-native';
+import { useState, useMemo, useCallback } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/src/store/authStore';
 import { useSizeStore } from '@/src/store/sizeStore';
@@ -15,6 +15,7 @@ export default function SizePreferencesScreen() {
   
   const [categories, setCategories] = useState<Category[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
   // Modal State
   const [isModalVisible, setModalVisible] = useState(false);
@@ -22,23 +23,26 @@ export default function SizePreferencesScreen() {
   const [standardSize, setStandardSize] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setInitialLoading(true);
+  const loadData = async (isRefresh = false) => {
+    if (!isRefresh) setInitialLoading(true);
     await fetchPreferences();
     try {
       const cats = (await getCategories()) as Category[];
       if (Array.isArray(cats)) {
-        setCategories(cats); // removed filter so all categories are visible
+        setCategories(cats);
       }
     } catch (e) {
       console.error(e);
     }
     setInitialLoading(false);
+    setRefreshing(false);
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const configuredCategories = useMemo(() => {
     return categories.filter(cat => preferences.some(p => p.category_id === cat.id));
@@ -149,7 +153,12 @@ export default function SizePreferencesScreen() {
           <ActivityIndicator size="large" color="#FF1F4B" />
         </View>
       ) : (
-        <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          className="flex-1 px-6 pt-6"
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(true); }} colors={["#FF1F4B"]} />
+          }>
           
           <LinearGradient
             colors={['#FF1F4B', '#FF7E67']}

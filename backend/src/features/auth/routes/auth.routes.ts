@@ -4,6 +4,7 @@ import {
   login,
   getMe,
   updateProfile,
+  uploadAvatar,
   sendOtp,
   verifyOtp,
   verify2FAController,
@@ -17,6 +18,7 @@ import {
 } from "../controllers/auth.controller";
 import { authenticate } from "../../../shared/middlewares/auth.middleware";
 import { validate } from "../../../shared/middlewares/validate.middleware";
+import { upload } from "../../../shared/middlewares/upload.middleware";
 import {
   registerSchema,
   loginSchema,
@@ -47,6 +49,7 @@ router.post("/set-password", setPasswordController);
 router.post("/logout", authenticate, logoutController);
 router.get("/me", authenticate, getMe);
 router.put("/me", authenticate, updateProfile);
+router.post("/me/avatar", authenticate, upload.single("avatar"), uploadAvatar);
 router.post("/regenerate-qr", validate(regenerateQRSchema), regenerateQRController);
 router.post("/disable-2fa", authenticate, disable2FAController);
 router.get("/sessions", authenticate, getSessionsController);

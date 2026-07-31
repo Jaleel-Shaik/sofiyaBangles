@@ -20,6 +20,14 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 
     res.status(201).json({ success: true, data: order });
   } catch (error: any) {
+    if (error.message === "PRODUCT_NOT_FOUND") {
+      res.status(404).json({ success: false, message: "Product not found." });
+      return;
+    }
+    if (error.message === "PRODUCT_NOT_AVAILABLE") {
+      res.status(400).json({ success: false, message: "Product is no longer available." });
+      return;
+    }
     console.error("CreateOrder error", error);
     res
       .status(500)

@@ -6,6 +6,7 @@ interface FavoriteStore {
   initialized: boolean;
   fetchFavorites: () => Promise<void>;
   toggleFavorite: (productId: string) => Promise<void>;
+  removeStaleFavorites: () => Promise<void>;
 }
 
 export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
@@ -14,8 +15,17 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
   fetchFavorites: async () => {
     try {
       const favs = await getFavorites();
-      const ids = favs.map((f: any) => f.product_id);
-      set({ favoriteIds: ids, initialized: true });
+      // Only keep favorites that actually exist (backend filters deleted)
+      const ids = favs
+        .filter((f: any) => f && f.product_id)
+        .map((f: any) => f.product_id);
+      const currentIds = get().favoriteIds;
+      // Only update if changed to avoid unnecessary re-renders
+      if (JSON.stringify(currentIds.sort()) !== JSON.stringify([...ids].sort())) {
+        set({ favoriteIds: ids, initialized: true });
+      } else {
+        set({ initialized: true });
+      }
     } catch (error) {
       console.error('Failed to fetch favorites for store', error);
     }
@@ -24,13 +34,11 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
     const { favoriteIds } = get();
     const isFav = favoriteIds.includes(productId);
     
-    // Optimistic UI update
     if (isFav) {
       set({ favoriteIds: favoriteIds.filter(id => id !== productId) });
       try {
         await removeFavorite(productId);
       } catch (error) {
-        // Revert on error
         set({ favoriteIds: [...favoriteIds] });
       }
     } else {
@@ -38,9 +46,25 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
       try {
         await addFavorite(productId);
       } catch (error) {
-        // Revert on error
         set({ favoriteIds: favoriteIds.filter(id => id !== productId) });
       }
+    }
+  },
+  removeStaleFavorites: async () => {
+    try {
+      const favs = await getFavorites();
+      const validIds = new Set(
+        favs
+          .filter((f: any) => f && f.product_id)
+          .map((f: any) => f.product_id)
+      );
+      const { favoriteIds } = get();
+      const staleIds = favoriteIds.filter(id => !validIds.has(id));
+      if (staleIds.length > 0) {
+        set({ favoriteIds: Array.from(validIds) });
+      }
+    } catch (error) {
+      console.error('Failed to remove stale favorites', error);
     }
   }
 }));

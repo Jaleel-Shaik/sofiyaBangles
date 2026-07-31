@@ -25,6 +25,7 @@ export default function AddProductScreen() {
   const [selectedModelType, setSelectedModelType] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [isActive, setIsActive] = useState(true);
   
   // Sizing State
   const [hasVariants, setHasVariants] = useState(false);
@@ -114,6 +115,7 @@ export default function AddProductScreen() {
         category_id: selectedCategory,
         categoryName: catName,
         quantity: parseInt(quantity, 10) || 0,
+        is_active: isActive,
         has_variants: hasVariants,
         variants: JSON.stringify(parsedVariants),
         accepts_custom_size: acceptsCustomSize,
@@ -369,12 +371,26 @@ export default function AddProductScreen() {
           )}
         </View>
 
-        <View className="h-28" />
+        {/* Publish Toggle */}
+        <View className="flex-row items-center justify-between bg-surface p-4 rounded-2xl border border-divider mb-4">
+          <View className="flex-row items-center">
+            <Ionicons name={isActive ? "globe" : "eye-off-outline"} size={18} color={isActive ? "#22c55e" : "#94a3b8"} />
+            <Text className="text-text-primary font-bold ml-2">{isActive ? 'Published' : 'Draft'}</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setIsActive(!isActive)}
+            className={`w-14 h-7 rounded-full px-0.5 flex-row items-center ${isActive ? 'bg-success justify-end' : 'bg-slate-300 justify-start'}`}
+          >
+            <View className="w-6 h-6 bg-white rounded-full shadow-sm" />
+          </TouchableOpacity>
+        </View>
+
+        <View className="h-32" />
       </ScrollView>
 
-      <View className="absolute bottom-0 left-0 right-0 p-5 bg-surface border-t border-divider" style={{ paddingBottom: Math.max(insets.bottom + 16, 24) }}>
+      <View className="p-5 bg-surface border-t border-divider" style={{ paddingBottom: Math.max(insets.bottom + 16, 24) }}>
         <Button 
-          title="Publish Product" 
+          title={isActive ? "Publish Product" : "Save as Draft"}
           onPress={handleSubmit} 
           loading={loading} 
           className="bg-primary py-4 rounded-full" 

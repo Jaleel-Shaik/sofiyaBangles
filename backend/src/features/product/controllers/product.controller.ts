@@ -9,9 +9,11 @@ import {
   updateProductService,
   updateStockService,
   deleteProductService,
+  restoreProductService,
   searchProductsService,
   getRecommendedProductsService,
-  getNewArrivalsService
+  getNewArrivalsService,
+  sellProductService,
 } from "../services/product.service";
 
 export const createProduct = async (req: AuthRequest, res: Response) => {
@@ -23,6 +25,9 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
     }
     if (typeof parsedBody.accepts_custom_size === 'string') {
       parsedBody.accepts_custom_size = parsedBody.accepts_custom_size === 'true';
+    }
+    if (typeof parsedBody.is_active === 'string') {
+      parsedBody.is_active = parsedBody.is_active === 'true';
     }
     if (typeof parsedBody.variants === 'string') {
       try { parsedBody.variants = JSON.parse(parsedBody.variants); } catch (e) {}
@@ -116,6 +121,16 @@ export const getProductById = async (req: AuthRequest, res: Response) => {
     const id = getParam(req, "id");
     const product = await getProductByIdService(id, req.user?.userId);
 
+    // For non-admin users, return 404 if product is inactive
+    const userRole = req.user?.role;
+    if (product && !product.is_active && userRole !== "admin" && userRole !== "super_admin") {
+      res.status(404).json({
+        success: false,
+        message: "Product not found.",
+      });
+      return;
+    }
+
     res.json({
       success: true,
       data: product,
@@ -146,6 +161,9 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
     }
     if (typeof parsedBody.accepts_custom_size === 'string') {
       parsedBody.accepts_custom_size = parsedBody.accepts_custom_size === 'true';
+    }
+    if (typeof parsedBody.is_active === 'string') {
+      parsedBody.is_active = parsedBody.is_active === 'true';
     }
     if (typeof parsedBody.variants === 'string') {
       try { parsedBody.variants = JSON.parse(parsedBody.variants); } catch (e) {}
@@ -209,6 +227,31 @@ export const updateStock = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const sellProduct = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = getParam(req, "id");
+    const quantity = req.body.quantity ? Number(req.body.quantity) : 1;
+    const product = await sellProductService(id, quantity, req.user!.userId);
+
+    res.json({
+      success: true,
+      data: product,
+      message: "Product sold successfully.",
+    });
+  } catch (error: any) {
+    if (error.message === "PRODUCT_NOT_FOUND") {
+      res.status(404).json({ success: false, message: "Product not found." });
+      return;
+    }
+    if (error.message === "INSUFFICIENT_STOCK") {
+      res.status(400).json({ success: false, message: "Insufficient stock." });
+      return;
+    }
+    console.error("SellProduct error:", error);
+    res.status(500).json({ success: false, message: "Failed to sell product." });
+  }
+};
+
 export const deleteProduct = async (req: AuthRequest, res: Response) => {
   try {
     const id = getParam(req, "id");
@@ -230,6 +273,32 @@ export const deleteProduct = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to delete product.",
+    });
+  }
+};
+
+export const restoreProduct = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = getParam(req, "id");
+    const product = await restoreProductService(id, req.user!.userId);
+
+    res.json({
+      success: true,
+      data: product,
+      message: "Product restored successfully.",
+    });
+  } catch (error: any) {
+    if (error.message === "PRODUCT_NOT_FOUND") {
+      res.status(404).json({
+        success: false,
+        message: "Product not found.",
+      });
+      return;
+    }
+    console.error("RestoreProduct error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to restore product.",
     });
   }
 };

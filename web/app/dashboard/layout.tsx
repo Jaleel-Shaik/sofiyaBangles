@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,18 +15,20 @@ import {
   ChevronDown,
   User,
   Package,
-  Layers,
+  PlusCircle,
+  AlertTriangle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
+import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const sidebarLinks = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Products", icon: Package, href: "/dashboard/products" },
   { label: "Categories", icon: ShoppingBag, href: "/dashboard/categories" },
-  { label: "Model Types", icon: Layers, href: "/dashboard/model-types" },
+  { label: "Error Logs", icon: AlertTriangle, href: "/dashboard/errors" },
   { label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
 
@@ -148,8 +149,12 @@ export default function DashboardLayout({
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-[#F5F5F5] transition-colors"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#E8436E] to-[#CC3366] rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                    {user?.full_name?.charAt(0)?.toUpperCase() || "A"}
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#E8436E] to-[#CC3366] rounded-full flex items-center justify-center text-white text-sm font-semibold overflow-hidden">
+                    {user?.avatar_url ? (
+                      <Image src={user.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
+                    ) : (
+                      user?.full_name?.charAt(0)?.toUpperCase() || "A"
+                    )}
                   </div>
                   <div className="hidden sm:block text-left">
                     <p className="text-sm font-medium text-[#171717] leading-tight">
@@ -176,27 +181,30 @@ export default function DashboardLayout({
                         </p>
                         <p className="text-xs text-[#A3A3A3]">{user?.email}</p>
                       </div>
-                      <button
+                      <Link
+                        href="/dashboard/settings/profile"
                         onClick={() => setProfileOpen(false)}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#525252] hover:bg-[#F5F5F5] transition-colors"
                       >
                         <User className="w-4 h-4" />
                         Profile
-                      </button>
-                      <button
+                      </Link>
+                      <Link
+                        href="/dashboard/settings/security"
                         onClick={() => setProfileOpen(false)}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#525252] hover:bg-[#F5F5F5] transition-colors"
                       >
                         <Shield className="w-4 h-4" />
                         Security
-                      </button>
-                      <button
+                      </Link>
+                      <Link
+                        href="/dashboard/settings"
                         onClick={() => setProfileOpen(false)}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#525252] hover:bg-[#F5F5F5] transition-colors"
                       >
                         <Settings className="w-4 h-4" />
                         Settings
-                      </button>
+                      </Link>
                       <div className="border-t border-[#E5E5E5] mt-1 pt-1">
                         <button
                           onClick={handleLogout}
@@ -228,7 +236,7 @@ function SidebarContent({
   onLogout,
   loggingOut,
 }: {
-  user: { full_name: string; role: string };
+  user: { full_name: string; role: string; avatar_url?: string };
   onClose: () => void;
   onLogout: () => void;
   loggingOut: boolean;
@@ -262,33 +270,52 @@ function SidebarContent({
         <p className="px-3 text-xs font-semibold text-[#A3A3A3] uppercase tracking-wider mb-2">
           Main Menu
         </p>
-        {sidebarLinks.map((link) => {
-          // Exact match for root-level /dashboard, startsWith for sub-routes
-          const active = pathname === link.href || (link.href !== "/dashboard" && pathname.startsWith(link.href + "/"));
-          return (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                active
-                  ? "bg-[#FFF0F3] text-[#E8436E]"
-                  : "text-[#525252] hover:bg-[#F5F5F5]"
-              }`}
-            >
-              <link.icon
-                className={`w-5 h-5 ${active ? "text-[#E8436E]" : ""}`}
-              />
-              {link.label}
-            </Link>
-          );
-        })}
+        {(() => {
+          const links = [];
+          for (let i = 0; i < sidebarLinks.length; i++) {
+            const link = sidebarLinks[i];
+            const active = pathname === link.href || (link.href !== "/dashboard" && pathname.startsWith(link.href + "/"));
+            links.push(
+              <Link
+                key={link.label}
+                href={link.href}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  active
+                    ? "bg-[#FFF0F3] text-[#E8436E]"
+                    : "text-[#525252] hover:bg-[#F5F5F5]"
+                }`}
+              >
+                <link.icon className={`w-5 h-5 ${active ? "text-[#E8436E]" : ""}`} />
+                {link.label}
+              </Link>
+            );
+            // Insert Add Product after Products (index 1)
+            if (i === 1) {
+              links.push(
+                <Link
+                  key="add-product"
+                  href="/dashboard/products/new"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium bg-[#E8436E] text-white hover:bg-[#CC3366] transition-all"
+                >
+                  <PlusCircle className="w-5 h-5" />
+                  Add Product
+                </Link>
+              );
+            }
+          }
+          return links;
+        })()}
       </nav>
 
       {/* Bottom section */}
       <div className="p-4 border-t border-[#E5E5E5]">
         <div className="flex items-center gap-3 px-3 py-2 mb-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-[#E8436E] to-[#CC3366] rounded-full flex items-center justify-center text-white text-sm font-semibold">
-            {user?.full_name?.charAt(0)?.toUpperCase() || "A"}
+          <div className="w-8 h-8 bg-gradient-to-br from-[#E8436E] to-[#CC3366] rounded-full flex items-center justify-center text-white text-sm font-semibold overflow-hidden">
+            {user?.avatar_url ? (
+              <Image src={user.avatar_url} alt="" width={32} height={32} className="w-full h-full object-cover" />
+            ) : (
+              user?.full_name?.charAt(0)?.toUpperCase() || "A"
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-[#171717] truncate">

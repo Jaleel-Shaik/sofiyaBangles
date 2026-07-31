@@ -54,12 +54,13 @@ export const getUserFavoritesModel = async (
 ): Promise<Product[]> => {
   const favSnapshot = await db.collection("favorites")
     .where("user_id", "==", userId)
-    .orderBy("created_at", "desc")
     .get();
 
   if (favSnapshot.empty) return [];
 
-  const favorites = favSnapshot.docs.map(doc => doc.data() as Favorite);
+  const favorites = favSnapshot.docs
+    .map(doc => doc.data() as Favorite)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const productPromises = favorites.map(async (fav) => {
     const productDoc = await db.collection("products").doc(fav.product_id).get();

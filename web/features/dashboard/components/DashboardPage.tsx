@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   PlusCircle,
   ArrowRight,
+  ShoppingCart,
 } from "lucide-react";
 import { adminApi, type Product, type AnalyticsOverview, type Category } from "@/src/lib/api";
 import Link from "next/link";
@@ -19,20 +20,24 @@ export default function DashboardPage() {
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      setError(null);
       try {
         const [analyticsData, productsData, cats] = await Promise.all([
           adminApi.getOverviewAnalytics(),
-          adminApi.getProducts(1, 5),
+          adminApi.getAdminProducts(1, 5),
           adminApi.getCategories(),
         ]);
         setStats(analyticsData);
         setRecentProducts(productsData.products || []);
         setCategories(cats);
-      } catch (error) {
-        console.error("Failed to fetch dashboard data", error);
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || err?.message || "Failed to connect to server";
+        setError(msg);
+        console.error("Dashboard fetch error:", msg);
       } finally {
         setLoading(false);
       }
@@ -94,18 +99,35 @@ export default function DashboardPage() {
               className="bg-white rounded-2xl border border-[#E5E5E5] p-5 hover:shadow-md transition-shadow"
             >
               <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center mb-3">
-                <Layers className="w-5 h-5 text-amber-500" />
+                <ShoppingCart className="w-5 h-5 text-amber-500" />
               </div>
               <p className="text-2xl font-bold text-[#171717]">
-                {stats?.totalCategories || 0}
+                {stats?.itemsSold || 0}
               </p>
               <p className="text-sm text-[#A3A3A3] font-medium mt-1">
-                Categories
+                Sold Products
               </p>
             </motion.div>
           </div>
         )}
       </div>
+
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3"
+        >
+          <div className="w-8 h-8 bg-rose-100 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+            <span className="text-rose-500 font-bold text-sm">!</span>
+          </div>
+          <div>
+            <p className="font-semibold text-rose-700 text-sm">Connection Error</p>
+            <p className="text-rose-600 text-xs mt-1">{error}</p>
+            <p className="text-rose-500 text-xs mt-1">Make sure the backend server is running on port 5000.</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Quick Actions */}
       <div>
@@ -147,78 +169,78 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Products */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+      <div className="pb-6">
+        <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-[#171717]">Recent Products</h2>
           <Link
             href="/dashboard/products"
-            className="text-sm text-[#E8436E] hover:text-[#CC3366] font-medium transition-colors flex items-center gap-1"
+            className="text-sm text-[#E8436E] hover:text-[#CC3366] font-medium transition-colors flex items-center gap-1.5"
           >
             View All
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
         {loading ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-[#E5E5E5] p-4 animate-pulse flex items-center gap-4">
-                <div className="w-16 h-16 bg-gray-200 rounded-xl flex-shrink-0" />
-                <div className="flex-1">
-                  <div className="h-4 w-32 bg-gray-200 rounded mb-2" />
-                  <div className="h-3 w-20 bg-gray-200 rounded mb-2" />
-                  <div className="h-4 w-16 bg-gray-200 rounded" />
+              <div key={i} className="bg-white rounded-2xl border border-[#E5E5E5] animate-pulse shadow-sm overflow-hidden">
+                <div className="aspect-[4/3] bg-gray-200" />
+                <div className="p-4 space-y-2.5">
+                  <div className="h-5 w-3/4 bg-gray-200 rounded" />
+                  <div className="h-3.5 w-1/2 bg-gray-200 rounded" />
+                  <div className="h-5 w-1/3 bg-gray-200 rounded" />
                 </div>
               </div>
             ))}
           </div>
         ) : recentProducts.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#E5E5E5] p-8 text-center">
-            <Package className="w-12 h-12 text-[#D4D4D4] mx-auto mb-3" />
-            <p className="text-[#A3A3A3] font-medium">No products found</p>
+          <div className="bg-white rounded-2xl border border-[#E5E5E5] p-10 text-center shadow-sm">
+            <Package className="w-14 h-14 text-[#D4D4D4] mx-auto mb-4" />
+            <p className="text-[#A3A3A3] font-medium text-base">No products found</p>
             <Link
               href="/dashboard/products/new"
-              className="inline-flex items-center gap-1.5 mt-3 text-sm text-[#E8436E] hover:text-[#CC3366] font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 mt-4 text-sm text-[#E8436E] hover:text-[#CC3366] font-medium transition-colors bg-rose-50 px-5 py-2.5 rounded-xl"
             >
               <PlusCircle className="w-4 h-4" />
               Add your first product
             </Link>
           </div>
         ) : (
-          <div className="space-y-3">
-            {recentProducts.slice(0, 5).map((product, index) => {
-              const category = categories.find((c) => c.id === product.category_id);
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentProducts.slice(0, 6).map((product, index) => {
               return (
                 <Link
                   key={product.id}
-                  href={`/dashboard/products/${product.id}/edit`}
+                  href={`/dashboard/products/${product.id}`}
                 >
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="bg-white rounded-2xl border border-[#E5E5E5] p-4 flex items-center gap-4 hover:shadow-md hover:border-[#E8436E]/20 transition-all group"
+                    className="bg-white rounded-2xl border border-[#E5E5E5] shadow-sm hover:shadow-lg hover:border-[#E8436E]/20 hover:-translate-y-1 transition-all duration-200 group overflow-hidden"
                   >
-                    <img
-                      src={
-                        product.image_url ||
-                        product.images?.[0] ||
-                        "https://via.placeholder.com/150"
-                      }
-                      alt={product.product_name}
-                      className="w-16 h-16 rounded-xl bg-[#F5F5F5] object-cover flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#171717] text-base truncate">
+                    <div className="aspect-[4/3] bg-[#F5F5F5] overflow-hidden">
+                      <img
+                        src={
+                          product.image_url ||
+                          product.images?.[0] ||
+                          "https://via.placeholder.com/150"
+                        }
+                        alt={product.product_name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="p-4 space-y-2">
+                      <p className="font-semibold text-[#171717] text-sm truncate">
                         {product.product_name}
                       </p>
-                      <p className="text-xs text-[#A3A3A3] mt-0.5 truncate">
-                        {category ? category.category_name : "Uncategorized"}
-                      </p>
-                      <p className="text-[#E8436E] font-bold mt-1">
-                        ₹{product.price}
-                      </p>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-base font-bold text-[#E8436E]">₹{product.price}</span>
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${(product.quantity || 0) > 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                          {(product.quantity || 0) > 0 ? `${product.quantity}` : '0'}
+                        </span>
+                      </div>
                     </div>
-                    <ArrowRight className="w-5 h-5 text-[#A3A3A3] group-hover:text-[#E8436E] transition-colors flex-shrink-0" />
                   </motion.div>
                 </Link>
               );

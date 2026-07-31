@@ -124,6 +124,7 @@ export default function AdminTabsLayout() {
       <Tabs.Screen name="manage-model-types" options={{ href: null }} />
       <Tabs.Screen name="model-products/[id]" options={{ href: null }} />
       <Tabs.Screen name="edit-product/[id]" options={{ href: null }} />
+      <Tabs.Screen name="product-detail/[id]" options={{ href: null }} />
       <Tabs.Screen name="add-success" options={{ href: null }} />
     </Tabs>
   );

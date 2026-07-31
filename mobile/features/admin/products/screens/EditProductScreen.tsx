@@ -24,6 +24,8 @@ export default function EditProductScreen() {
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState('10');
+  const [uniqueCode, setUniqueCode] = useState('');
+  const [isActive, setIsActive] = useState(true);
   const [selectedModelType, setSelectedModelType] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -54,6 +56,8 @@ export default function EditProductScreen() {
             setPrice(productData.price ? productData.price.toString() : '');
             setDescription(productData.description || '');
             setQuantity(productData.quantity ? productData.quantity.toString() : '0');
+            setUniqueCode(productData.unique_code || '');
+            setIsActive(productData.is_active !== false);
             
             const cat = cats.find(c => c.id === productData.category_id);
             if (cat) {
@@ -155,6 +159,8 @@ export default function EditProductScreen() {
         category_id: selectedCategory,
         categoryName: catName,
         quantity: parseInt(quantity, 10) || 0,
+        unique_code: uniqueCode,
+        is_active: isActive,
         has_variants: hasVariants,
         variants: JSON.stringify(parsedVariants),
         accepts_custom_size: acceptsCustomSize,
@@ -195,7 +201,7 @@ export default function EditProductScreen() {
   return (
     <View className="flex-1 bg-surface">
       <View 
-        className="px-6 pb-6 bg-primary/5 rounded-b-[32px] flex-row items-center justify-between z-10 border-b border-divider"
+        className="px-6 pb-6 bg-surface rounded-b-[32px] flex-row items-center justify-between z-10 border-b border-divider"
         style={{ paddingTop: Math.max(insets.top + 16, 40) }}
       >
         <View className="flex-row items-center">
@@ -203,48 +209,84 @@ export default function EditProductScreen() {
             className="w-10 h-10 bg-surface rounded-full items-center justify-center mr-4 border border-divider"
             onPress={() => router.back()}
           >
-            <Ionicons name="close" size={24} color="#e11d48" />
+            <Ionicons name="arrow-back" size={24} color="#e11d48" />
           </TouchableOpacity>
           <View>
-            <Text className="text-[#C25B3E] font-medium text-xs uppercase tracking-wider mb-0.5">Admin Panel</Text>
-            <Text className="text-2xl font-bold text-primary">Edit Product</Text>
+            <Text className="text-primary font-semibold text-xs uppercase tracking-widest mb-1">Admin Space</Text>
+            <Text className="text-2xl font-bold text-text-primary">Edit Product</Text>
           </View>
         </View>
       </View>
 
       <ScrollView className="flex-1 px-4 pt-6" showsVerticalScrollIndicator={false}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
-          {imageUrls.map((uri, idx) => (
-            <View key={idx} className="relative mr-4">
-              <Image source={{ uri }} className="w-40 h-40 rounded-2xl bg-surface" resizeMode="cover" />
-              <TouchableOpacity 
-                className="absolute -top-2 -right-2 bg-error rounded-full w-6 h-6 items-center justify-center border-2 border-surface"
-                onPress={() => removeImage(idx)}
-              >
-                <Ionicons name="close" size={14} color="white" />
-              </TouchableOpacity>
+        {/* Images Section */}
+        <View className="mb-6">
+          <Text className="text-sm font-bold text-text-secondary mb-3 ml-1">Product Images</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-1 py-1">
+            <TouchableOpacity 
+              className="w-40 h-40 bg-surface rounded-2xl border-2 border-dashed border-primary/30 items-center justify-center mr-4"
+              onPress={pickImage}
+              activeOpacity={0.7}
+            >
+              <View className="w-12 h-12 bg-primary/10 rounded-full items-center justify-center mb-2">
+                <Ionicons name="camera" size={24} color="#e11d48" />
+              </View>
+              <Text className="text-primary font-semibold text-xs">Add Photos</Text>
+            </TouchableOpacity>
+            {imageUrls.map((uri, idx) => (
+              <View key={idx} className="relative mr-4">
+                <Image source={{ uri }} className="w-40 h-40 rounded-2xl bg-surface" resizeMode="cover" />
+                <TouchableOpacity 
+                  className="absolute -top-2 -right-2 bg-text-primary rounded-full w-8 h-8 items-center justify-center border-2 border-surface"
+                  onPress={() => removeImage(idx)}
+                >
+                  <Ionicons name="close" size={16} color="white" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Basic Info Card */}
+        <View className="bg-surface p-5 rounded-2xl mb-6 border border-divider">
+          <View className="flex-row items-center mb-4">
+            <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
+              <Ionicons name="document-text" size={16} color="#e11d48" />
             </View>
-          ))}
-          <TouchableOpacity 
-            className="w-40 h-40 bg-surface rounded-2xl border-2 border-dashed border-divider items-center justify-center mr-4"
-            onPress={pickImage}
-          >
-            <Ionicons name="camera-outline" size={32} color="#cbd5e1" />
-            <Text className="text-text-hint font-medium mt-1 text-xs">Add Photo</Text>
-          </TouchableOpacity>
-        </ScrollView>
+            <Text className="text-lg font-bold text-text-primary">Basic Details</Text>
+          </View>
+          <TextInputField label="Product Name *" placeholder="e.g. Ruby Gold Bangle" value={name} onChangeText={setName} />
+          <TextInputField label="Base Price (₹) *" placeholder="e.g. 2500" keyboardType="numeric" value={price} onChangeText={(val) => {
+            setPrice(val);
+            setCustomSizePrice(val);
+          }} />
+          <TextInputField label="Description" placeholder="Product details..." value={description} onChangeText={setDescription} multiline numberOfLines={3} style={{ height: 80, textAlignVertical: 'top' }} />
+          <TextInputField label="Unique Code" placeholder="Auto-generated if empty" value={uniqueCode} onChangeText={setUniqueCode} />
 
-        <Text className="text-lg font-bold text-text-primary mb-4">Basic Information</Text>
-        <TextInputField label="Product Name *" placeholder="e.g. Ruby Gold Bangle" value={name} onChangeText={setName} />
-        
-        <TextInputField label="Base Price (₹) *" placeholder="e.g. 2500" keyboardType="numeric" value={price} onChangeText={(val) => {
-          setPrice(val);
-          setCustomSizePrice(val);
-        }} />
-        
-        <TextInputField label="Description" placeholder="Product details..." value={description} onChangeText={setDescription} multiline numberOfLines={3} style={{ height: 80, textAlignVertical: 'top' }} />
+          {/* Active Toggle */}
+          <View className="flex-row items-center justify-between bg-primary/5 p-4 rounded-2xl border border-primary/20 mt-2">
+            <View className="flex-row items-center">
+              <Ionicons name={isActive ? "globe" : "eye-off-outline"} size={18} color={isActive ? "#22c55e" : "#94a3b8"} />
+              <Text className="text-text-primary font-bold ml-2">{isActive ? 'Published' : 'Draft'}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setIsActive(!isActive)}
+              className={`w-14 h-7 rounded-full px-0.5 flex-row items-center ${isActive ? 'bg-success justify-end' : 'bg-slate-300 justify-start'}`}
+            >
+              <View className="w-6 h-6 bg-white rounded-full shadow-sm" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <Text className="text-sm font-bold text-text-secondary mb-2 ml-1">Model Type *</Text>
+        {/* Categorization Card */}
+        <View className="bg-surface p-5 rounded-2xl mb-6 border border-divider">
+          <View className="flex-row items-center mb-4">
+            <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
+              <Ionicons name="grid" size={16} color="#e11d48" />
+            </View>
+            <Text className="text-lg font-bold text-text-primary">Categorization</Text>
+          </View>
+          <Text className="text-sm font-bold text-text-secondary mb-3 ml-1">Model Type *</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
           {modelTypes.map((mt) => (
             <TouchableOpacity 
@@ -321,9 +363,16 @@ export default function EditProductScreen() {
             </View>
           </>
         ) : null}
-        
+        </View>
 
-        <Text className="text-lg font-bold text-text-primary mb-4 mt-2">Sizing & Inventory</Text>
+        {/* Inventory & Sizing Card */}
+        <View className="bg-surface p-5 rounded-2xl mb-6 border border-divider">
+          <View className="flex-row items-center mb-4">
+            <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
+              <Ionicons name="layers" size={16} color="#e11d48" />
+            </View>
+            <Text className="text-lg font-bold text-text-primary">Inventory & Sizing</Text>
+          </View>
         
         {selectedCategory && currentCategory && currentCategory.size_type && (() => {
           const cat = currentCategory;
@@ -395,12 +444,13 @@ export default function EditProductScreen() {
             <TextInputField label="Custom Size Price (₹)" placeholder="e.g. 3000" keyboardType="numeric" value={customSizePrice} onChangeText={setCustomSizePrice} />
           </View>
         )}
+        </View>
 
-        <View className="h-20" />
+        <View className="h-32" />
       </ScrollView>
 
-      <View className="p-4 bg-surface border-t border-divider">
-        <Button title="Save Product" onPress={handleSubmit} loading={loading} className="bg-primary" />
+      <View className="p-5 bg-surface border-t border-divider" style={{ paddingBottom: Math.max(insets.bottom + 16, 24) }}>
+        <Button title={isActive ? "Save Product" : "Save as Draft"} onPress={handleSubmit} loading={loading} className="bg-primary py-4 rounded-full" />
       </View>
     </View>
   );

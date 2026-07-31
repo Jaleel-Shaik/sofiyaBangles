@@ -144,28 +144,35 @@ export default function CategoriesPage() {
           <p className="text-lg font-medium">No categories yet</p>
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {categories.map((cat, i) => {
             const mt = modelTypes.find(m => m.id === cat.model_type_id);
             return (
               <motion.div key={cat.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                className="bg-white rounded-2xl border border-[#E5E5E5] p-4 flex items-center gap-4 hover:shadow-md transition-shadow"
+                className="bg-white rounded-2xl border border-[#E5E5E5] overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-200 group"
               >
-                <div className="w-14 h-14 rounded-xl bg-[#F5F5F5] overflow-hidden flex-shrink-0">
-                  {cat.image_url ? <img src={cat.image_url} alt="" className="w-full h-full object-cover" /> : (
-                    <div className="w-full h-full flex items-center justify-center"><FolderOpen className="w-6 h-6 text-[#CBD5E1]" /></div>
+                <div className="aspect-[4/3] bg-[#F5F5F5] overflow-hidden">
+                  {cat.image_url ? (
+                    <img src={cat.image_url} alt={cat.category_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <FolderOpen className="w-12 h-12 text-[#CBD5E1]" />
+                    </div>
                   )}
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-[#171717]">{cat.category_name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
+                <div className="p-4">
+                  <p className="font-semibold text-[#171717] text-sm truncate">{cat.category_name}</p>
+                  <div className="flex items-center gap-2 mt-1">
                     {mt && <span className="text-xs flex items-center gap-1 text-[#64748B]"><Layers className="w-3 h-3" />{mt.name}</span>}
                     {cat.standard_sizes && <span className="text-xs text-[#94A3B8]">Sizes: {cat.standard_sizes.join(", ")}</span>}
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleEdit(cat)} className="p-2 rounded-xl bg-[#F5F5F5] hover:bg-[#E5E5E5]"><Edit className="w-4 h-4 text-[#525252]" /></button>
-                  <button onClick={() => handleDelete(cat.id)} className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#E5E5E5]">
+                    <span className="text-xs text-[#A3A3A3]">Category</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleEdit(cat)} className="p-1.5 rounded-lg bg-[#F5F5F5] hover:bg-[#E5E5E5] transition-colors"><Edit className="w-3.5 h-3.5 text-[#525252]" /></button>
+                      <button onClick={() => handleDelete(cat.id)} className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 transition-colors"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             );

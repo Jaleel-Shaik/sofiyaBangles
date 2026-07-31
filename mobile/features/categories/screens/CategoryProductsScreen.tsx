@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useState, useCallback } from 'react';
 import { getProducts, Product } from '@/src/api/products';
 import ProductCard from '@/src/components/ProductCard';
 import Header from '@/src/components/Header';
@@ -20,13 +20,15 @@ export default function CategoryScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
 
-  useEffect(() => {
-    if (!categoryId) return;
-    const delayDebounceFn = setTimeout(() => {
-      fetchInitialProducts();
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-  }, [categoryId, searchQuery]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!categoryId) return;
+      const delayDebounceFn = setTimeout(() => {
+        fetchInitialProducts();
+      }, 500);
+      return () => clearTimeout(delayDebounceFn);
+    }, [categoryId, searchQuery])
+  );
 
   const fetchInitialProducts = async () => {
     setLoading(true);
@@ -43,7 +45,7 @@ export default function CategoryScreen() {
   };
 
   const loadMore = async () => {
-    if (!hasMore || isFetchingMore || loading) return;
+    if (!hasMore || isFetchingMore) return;
     setIsFetchingMore(true);
     const nextPage = page + 1;
     try {

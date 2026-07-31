@@ -1,6 +1,6 @@
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, RefreshControl } from 'react-native';
+import { useState, useCallback } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,6 +12,7 @@ export default function ManageModelTypesScreen() {
   const insets = useSafeAreaInsets();
   const [modelTypes, setModelTypes] = useState<ModelType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Form State
   const [isAdding, setIsAdding] = useState(false);
@@ -23,8 +24,8 @@ export default function ManageModelTypesScreen() {
   const [editName, setEditName] = useState('');
   const [updating, setUpdating] = useState(false);
 
-  const fetchModelTypes = async () => {
-    setLoading(true);
+  const fetchModelTypes = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
     try {
       const data = await getModelTypes();
       setModelTypes(data);
@@ -32,12 +33,15 @@ export default function ManageModelTypesScreen() {
       console.error(e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchModelTypes();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchModelTypes();
+    }, [])
+  );
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -133,7 +137,12 @@ export default function ManageModelTypesScreen() {
           <ActivityIndicator size="large" color="#e11d48" />
         </View>
       ) : (
-        <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          className="flex-1 px-6 pt-6"
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchModelTypes(true); }} colors={["#e11d48"]} />
+          }>
           {isAdding && (
             <View className="bg-surface p-5 rounded-2xl mb-6 border border-divider">
               <Text className="text-lg font-bold text-text-primary mb-4">Create Model Type</Text>

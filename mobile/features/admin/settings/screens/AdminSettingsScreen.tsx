@@ -1,13 +1,54 @@
-import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Image, Modal } from 'react-native';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/src/store/authStore';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { updateUserProfile } from '@/src/api/auth';
+import { useState } from 'react';
 
 export default function AdminSettings() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateUser } = useAuthStore();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+
+  const handleUpload = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission Required", "Permission to access camera roll is required!");
+      return;
+    }
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.2,
+      base64: true,
+    });
+    if (!pickerResult.canceled && pickerResult.assets[0].base64) {
+      try {
+        const base64Uri = `data:image/jpeg;base64,${pickerResult.assets[0].base64}`;
+        await updateUserProfile(user!.id, { avatar_url: base64Uri });
+        await updateUser({ avatar_url: base64Uri });
+      } catch (error) {
+        Alert.alert("Error", "Failed to update profile picture");
+      }
+    }
+  };
+
+  const handleAvatarPress = () => {
+    Alert.alert("Profile Picture", "What would you like to do?", [
+      {
+        text: "View Picture",
+        onPress: () => {
+          if (user?.avatar_url) setIsImageViewerVisible(true);
+          else Alert.alert("No Picture", "No profile picture yet.");
+        },
+      },
+      { text: "Upload New", onPress: handleUpload },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -26,45 +67,59 @@ export default function AdminSettings() {
     );
   };
 
-  const businessItems = [
-    { icon: 'storefront-outline', title: 'Store Profile', subtitle: 'Edit business details', iconBg: 'bg-indigo-50', iconColor: '#6366f1', route: '/(admin)/settings/store-profile' as const },
-    { icon: 'location-outline', title: 'Store Location', subtitle: 'Update physical address', iconBg: 'bg-rose-50', iconColor: '#e11d48', route: '/(admin)/settings/store-location' as const },
-    { icon: 'chatbubbles-outline', title: 'Support Contacts', subtitle: 'Manage WhatsApp & Email', iconBg: 'bg-emerald-50', iconColor: '#10b981', route: '/(admin)/settings/support-contacts' as const },
+  const profileItems = [
+    { icon: 'person-outline', title: 'My Profile', subtitle: 'Manage personal info & photo', route: '/(admin)/settings/profile' as const },
   ];
 
-  const adminItems = [
-    { icon: 'notifications-outline', title: 'Order Alerts', subtitle: 'Push notifications for new orders', iconBg: 'bg-amber-50', iconColor: '#f59e0b', route: '/(admin)/settings/order-alerts' as const },
-    { icon: 'people-outline', title: 'Team Management', subtitle: 'Add or remove admin access', iconBg: 'bg-blue-50', iconColor: '#3b82f6', route: '/(admin)/settings/team-management' as const },
-    { icon: 'shield-checkmark-outline', title: 'Security Settings', subtitle: 'Password and 2FA', iconBg: 'bg-slate-50', iconColor: '#64748b', route: '/(admin)/settings/security-settings' as const },
+  const businessItems = [
+    { icon: 'storefront-outline', title: 'Store Profile', subtitle: 'Edit name, description, location & hours', route: '/(admin)/settings/store-profile' as const },
   ];
 
   return (
     <View className="flex-1 bg-[#FAFAFA]">
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
         <View
-          className="pb-6 bg-primary px-5"
+          className="px-5 pb-5 bg-primary/5"
           style={{ paddingTop: Math.max(insets.top + 16, 40) }}
         >
-          <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-white text-xl font-bold">Admin Center</Text>
-            <TouchableOpacity
-              className="w-10 h-10 bg-white/20 rounded-full items-center justify-center"
-              onPress={() => router.push('/(tabs)/profile')}
-            >
-              <Ionicons name="eye-outline" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
-
-          <View className="items-center">
-            <View className="w-16 h-16 bg-white/20 rounded-full items-center justify-center mb-3">
-              <Ionicons name="briefcase" size={32} color="white" />
-            </View>
-            <Text className="text-white font-bold text-lg mb-1">{user?.full_name || 'Admin User'}</Text>
-            <Text className="text-white/60 text-xs font-medium">{user?.email}</Text>
-          </View>
+          <Text className="text-xl font-bold text-text-primary">Admin Settings</Text>
         </View>
 
-        <View className="px-5">
+        <View className="items-center -mt-10 mb-4">
+          <TouchableOpacity
+            onPress={handleAvatarPress}
+            className="w-20 h-20 rounded-full border-2 border-surface shadow-sm mb-3 bg-white items-center justify-center relative"
+          >
+            {user?.avatar_url ? (
+              <Image source={{ uri: user.avatar_url }} className="w-full h-full rounded-full" />
+            ) : (
+              <Ionicons name="person" size={40} color="#cbd5e1" />
+            )}
+            <View className="absolute bottom-0 right-0 bg-primary w-6 h-6 rounded-full items-center justify-center border-2 border-white">
+              <Ionicons name="camera" size={14} color="white" />
+            </View>
+          </TouchableOpacity>
+          <Text className="text-lg font-bold text-text-primary mb-1">{user?.full_name || 'Admin User'}</Text>
+          <Text className="text-text-secondary text-xs mb-3">{user?.email || ''}</Text>
+        </View>
+
+        <View className="bg-surface rounded-t-3xl pt-6 px-5 pb-20">
+          <Text className="text-xs font-bold text-text-hint mb-3 ml-1 uppercase tracking-wider">Profile</Text>
+          <View className="bg-surface rounded-2xl border border-divider mb-6 overflow-hidden">
+            {profileItems.map((item, index) => (
+              <SettingCard
+                key={item.title}
+                item={item}
+                isLast={index === profileItems.length - 1}
+                router={router}
+              />
+            ))}
+          </View>
+
           <Text className="text-xs font-bold text-text-hint mb-3 ml-1 uppercase tracking-wider">Business</Text>
           <View className="bg-surface rounded-2xl border border-divider mb-6 overflow-hidden">
             {businessItems.map((item, index) => (
@@ -77,39 +132,40 @@ export default function AdminSettings() {
             ))}
           </View>
 
-          <Text className="text-xs font-bold text-text-hint mb-3 ml-1 uppercase tracking-wider">Admin</Text>
-          <View className="bg-surface rounded-2xl border border-divider mb-6 overflow-hidden">
-            {adminItems.map((item, index) => (
-              <SettingCard
-                key={item.title}
-                item={item}
-                isLast={index === adminItems.length - 1}
-                router={router}
-              />
-            ))}
-          </View>
-
           <TouchableOpacity
-            className="flex-row items-center justify-center bg-primary/10 p-4 rounded-2xl border border-primary/20 mb-12"
+            className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex-row justify-center items-center mb-6"
             onPress={handleLogout}
           >
             <Ionicons name="log-out-outline" size={20} color="#e11d48" />
-            <Text className="font-bold text-primary text-base ml-2">Logout</Text>
+            <Text className="text-primary font-bold text-base ml-2">Logout</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal visible={isImageViewerVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/90 justify-center items-center">
+          <SafeAreaView className="absolute top-0 right-0 w-full z-10 flex-row justify-end p-4">
+            <TouchableOpacity onPress={() => setIsImageViewerVisible(false)} className="bg-black/50 p-2 rounded-full">
+              <Ionicons name="close" size={28} color="white" />
+            </TouchableOpacity>
+          </SafeAreaView>
+          {user?.avatar_url && (
+            <Image source={{ uri: user.avatar_url }} className="w-full h-96" resizeMode="contain" />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
 
-function SettingCard({ item, isLast, router }: { item: { icon: string; title: string; subtitle: string; iconBg: string; iconColor: string; route: any }, isLast: boolean, router: any }) {
+function SettingCard({ item, isLast, router }: { item: { icon: string; title: string; subtitle: string; route: any }, isLast: boolean, router: any }) {
   return (
     <TouchableOpacity
       className={`flex-row items-center p-4 ${!isLast ? 'border-b border-divider' : ''}`}
       onPress={() => item.route && router.push(item.route)}
     >
-      <View className={`w-11 h-11 rounded-2xl ${item.iconBg} items-center justify-center mr-4`}>
-        <Ionicons name={item.icon as any} size={20} color={item.iconColor} />
+      <View className="w-10 h-10 rounded-2xl bg-primary/10 items-center justify-center mr-4">
+        <Ionicons name={item.icon as any} size={20} color="#e11d48" />
       </View>
       <View className="flex-1">
         <Text className="text-sm font-bold text-text-primary mb-0.5">{item.title}</Text>

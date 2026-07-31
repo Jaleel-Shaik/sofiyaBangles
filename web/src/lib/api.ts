@@ -4,6 +4,8 @@ import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
 } from "axios";
+import { logError } from "@/features/errors/lib/error-log";
+import { classifyApiError } from "@/features/errors/lib/classify";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
@@ -11,6 +13,7 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
+  phone?: string;
   role: string;
   is_2fa_enabled: boolean;
   avatar_url?: string;
@@ -103,6 +106,19 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    // Record every failed request in the Error Logs page.
+    const classified = classifyApiError(error);
+    logError({
+      type: classified.type,
+      statusCode: classified.statusCode,
+      title: classified.title,
+      message: classified.message,
+      technical: classified.technical,
+      retriable: classified.retriable,
+      systemic: classified.systemic,
+      url: error.config?.url ?? "",
+    });
+
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };
@@ -214,6 +230,9 @@ export interface BusinessProfile {
   whatsapp_number: string;
   email: string;
   phone_number: string;
+  logo_url?: string | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
   updated_at?: string;
 }
 
@@ -225,6 +244,7 @@ export interface AnalyticsOverview {
   activeProducts: number;
   totalOrders: number;
   totalStock: number;
+  itemsSold: number;
 }
 
 export interface UserProfile {
@@ -253,6 +273,11 @@ export const adminApi = {
       total: r.data?.pagination?.total || 0,
     }));
   },
+  getAdminProducts: (page = 1, limit = 10) =>
+    apiClient.get(`/products/admin?page=${page}&limit=${limit}`).then((r) => ({
+      products: extractData<Product[]>(r),
+      total: r.data?.pagination?.total || 0,
+    })),
   getProductById: (id: string) =>
     apiClient.get(`/products/${id}`).then((r) => extractData<Product>(r)),
   createProduct: async (productData: any, imageUris: string[] = []) => {
@@ -292,6 +317,8 @@ export const adminApi = {
   },
   deleteProduct: (id: string) =>
     apiClient.delete(`/products/${id}`).then(r => r.data),
+  sellProduct: (id: string, quantity = 1) =>
+    apiClient.patch(`/products/${id}/sell`, { quantity }).then(r => r.data.data),
 
   // Categories
   getCategories: () =>
@@ -332,6 +359,15 @@ export const adminApi = {
     apiClient.get('/settings/business-profile').then(r => extractData<BusinessProfile>(r)),
   updateBusinessProfile: (data: Partial<BusinessProfile>) =>
     apiClient.put('/settings/business-profile', data).then(r => r.data.data),
+  uploadBusinessLogo: (file: File) => {
+    const formData = new FormData();
+    formData.append("logo", file);
+    return apiClient
+      .post<{ success: boolean; data: BusinessProfile; message: string }>("/settings/business-profile/logo", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data.data);
+  },
 
   // Analytics
   getOverviewAnalytics: () =>
@@ -386,4 +422,17 @@ export const authApi = {
 
   disable2FA: (password: string) =>
     apiClient.post("/auth/disable-2fa", { password }),
+
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return apiClient
+      .post<{ success: boolean; data: User; message: string }>("/auth/me/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data.data);
+  },
+
+  updateProfile: (data: { full_name?: string; phone?: string }) =>
+    apiClient.put<{ success: boolean; data: User; message: string }>("/auth/me", data).then((r) => r.data.data),
 };

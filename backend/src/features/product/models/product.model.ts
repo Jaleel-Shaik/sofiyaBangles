@@ -46,6 +46,7 @@ export const createProductModel = async (payload: {
   likes?: number;
   rating?: number;
   reviews?: number;
+  is_active?: boolean;
   has_variants?: boolean;
   variants?: any[]; // ProductVariant[]
   accepts_custom_size?: boolean;
@@ -96,7 +97,7 @@ export const createProductModel = async (payload: {
     likes: payload.likes || 0,
     rating: payload.rating || 0,
     reviews: payload.reviews || 0,
-    is_active: true,
+    is_active: payload.is_active !== undefined ? payload.is_active : true,
     has_variants: payload.has_variants || false,
     variants: payload.variants || [],
     accepts_custom_size: payload.accepts_custom_size || false,
@@ -201,12 +202,15 @@ export const getAdminProductsModel = async (options: {
 
   let query: FirebaseFirestore.Query = db.collection("products").orderBy("created_at", "desc");
 
-  const countSnapshot = await query.count().get();
-  const total = countSnapshot.data().count;
+  const allSnapshot = await query.get();
+  let allProducts = allSnapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as Product));
 
+  // Filter in-memory to avoid requiring a composite Firestore index
+  allProducts = allProducts.filter((p) => p.is_active !== false);
+
+  const total = allProducts.length;
   const offset = (page - 1) * limit;
-  const snapshot = await query.offset(offset).limit(limit).get();
-  const products = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as Product));
+  const products = allProducts.slice(offset, offset + limit);
 
   return { products, total };
 };
@@ -277,11 +281,176 @@ export const updateProductModel = async (
   return doc.data() as Product;
 };
 
-export const deleteProductModel = async (id: string): Promise<void> => {
+/**
+ * Delete orphaned favorite records for a given product.
+ * Used to clean up favorites when a product is soft-deleted.
+ */
+export const deleteFavoritesByProductModel = async (productId: string): Promise<number> => {
+  const snapshot = await db
+    .collection("favorites")
+    .where("product_id", "==", productId)
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+
+  return snapshot.size;
+};
+
+/**
+ * Hard-delete a product document from Firestore.
+ * Also cascades to clean up favorites, reviews, and notification references.
+ * Returns the product data that was deleted (for cleanup operations).
+ */
+export const deleteProductModel = async (id: string): Promise<Product | null> => {
+  const doc = await db.collection("products").doc(id).get();
+  if (!doc.exists) return null;
+
+  const product = doc.data() as Product;
+
+  await db.collection("products").doc(id).delete();
+
+  return product;
+};
+
+/**
+ * Restore a soft-deleted product by setting is_active = true.
+ */
+export const restoreProductModel = async (id: string): Promise<Product> => {
   await db.collection("products").doc(id).update({
-    is_active: false,
+    is_active: true,
     updated_at: new Date().toISOString(),
   });
+
+  const doc = await db.collection("products").doc(id).get();
+  return doc.data() as Product;
+};
+
+/**
+ * Hard-delete all products belonging to a given category.
+ * Used for cascade deletion when a category is deleted.
+ * Also cleans up orphaned favorites, reviews, and notification references.
+ * Returns the array of deleted product data (for Cloudinary cleanup).
+ */
+export const deleteProductsByCategoryModel = async (categoryId: string): Promise<Product[]> => {
+  const snapshot = await db
+    .collection("products")
+    .where("category_id", "==", categoryId)
+    .where("is_active", "==", true)
+    .get();
+
+  if (snapshot.empty) return [];
+
+  const deletedProducts: Product[] = [];
+  const batch = db.batch();
+  const productIds: string[] = [];
+
+  snapshot.docs.forEach((doc) => {
+    const product = { ...doc.data(), id: doc.id } as Product;
+    deletedProducts.push(product);
+    productIds.push(doc.id);
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+
+  // Clean up favorites for cascade-deleted products (fire-and-forget)
+  deleteFavoritesByProductsModel(productIds).catch((err) =>
+    console.error("Failed to cleanup favorites for cascade-deleted products:", err)
+  );
+
+  // Clean up reviews for cascade-deleted products (fire-and-forget)
+  deleteReviewsByProductsModel(productIds).catch((err) =>
+    console.error("Failed to cleanup reviews for cascade-deleted products:", err)
+  );
+
+  // Nullify notification references (fire-and-forget)
+  nullifyNotificationsByProductsModel(productIds).catch((err) =>
+    console.error("Failed to cleanup notifications for cascade-deleted products:", err)
+  );
+
+  return deletedProducts;
+};
+
+/**
+ * Batch delete reviews for multiple products.
+ */
+export const deleteReviewsByProductsModel = async (productIds: string[]): Promise<number> => {
+  let totalDeleted = 0;
+  for (const productId of productIds) {
+    const count = await deleteReviewsByProductModel(productId);
+    totalDeleted += count;
+  }
+  return totalDeleted;
+};
+
+/**
+ * Batch nullify notification references for multiple products.
+ */
+export const nullifyNotificationsByProductsModel = async (productIds: string[]): Promise<number> => {
+  let totalUpdated = 0;
+  for (const productId of productIds) {
+    const count = await nullifyNotificationProductRef(productId);
+    totalUpdated += count;
+  }
+  return totalUpdated;
+};
+
+/**
+ * Batch delete favorites for multiple products.
+ */
+export const deleteFavoritesByProductsModel = async (productIds: string[]): Promise<number> => {
+  let totalDeleted = 0;
+  for (const productId of productIds) {
+    const count = await deleteFavoritesByProductModel(productId);
+    totalDeleted += count;
+  }
+  return totalDeleted;
+};
+
+/**
+ * Delete all product reviews for a given product.
+ */
+export const deleteReviewsByProductModel = async (productId: string): Promise<number> => {
+  const snapshot = await db
+    .collection("product_reviews")
+    .where("product_id", "==", productId)
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+
+  return snapshot.size;
+};
+
+/**
+ * Nullify notification references to a deleted product.
+ * Notifications are kept (for history) but the product_id reference is removed.
+ */
+export const nullifyNotificationProductRef = async (productId: string): Promise<number> => {
+  const snapshot = await db
+    .collection("notifications")
+    .where("product_id", "==", productId)
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.update(doc.ref, { product_id: null });
+  });
+  await batch.commit();
+
+  return snapshot.size;
 };
 
 export const searchProductsModel = async (

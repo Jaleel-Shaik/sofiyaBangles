@@ -17,13 +17,15 @@ export const getAllUsersModel = async (options: {
   // Firestore doesn't support native ILIKE search easily without external tools like Algolia.
   // We'll fetch all matching the role, then filter manually if search is present.
   // This is a naive implementation suitable for small to medium datasets.
-  const snapshot = await query.orderBy("created_at", "desc").get();
+  const snapshot = await query.get();
   
-  let allUsers = snapshot.docs.map(doc => {
-    const data = doc.data() as Profile;
-    const { password_hash, ...safeData } = data;
-    return safeData as Omit<Profile, "password_hash">;
-  });
+  let allUsers = snapshot.docs
+    .map(doc => {
+      const data = doc.data() as Profile;
+      const { password_hash, ...safeData } = data;
+      return safeData as Omit<Profile, "password_hash">;
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   if (search) {
     const lowerSearch = search.toLowerCase();

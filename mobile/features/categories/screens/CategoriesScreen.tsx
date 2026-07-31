@@ -1,7 +1,7 @@
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useState, useEffect } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
+import { useState, useCallback } from 'react';
 import { getCategories, Category } from '@/src/api/categories';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '@/src/components/Header';
 import SearchInput from '@/src/components/SearchInput';
@@ -11,24 +11,28 @@ export default function CategoriesScreen() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
 
-  useEffect(() => {
-    const fetchCats = async () => {
-      const data = await getCategories();
-      setCategories(data);
-      setLoading(false);
-    };
-    fetchCats();
-  }, []);
+  const fetchCats = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    const data = await getCategories();
+    setCategories(data);
+    setLoading(false);
+    setRefreshing(false);
+  };
 
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      setActiveSearch(searchQuery.trim().toLowerCase());
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchCats();
+    }, [])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchCats(true);
+  }, []);
 
   const filteredCategories = categories.filter(cat =>
     cat.category_name.toLowerCase().includes(activeSearch)
@@ -54,6 +58,9 @@ export default function CategoriesScreen() {
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#e11d48"]} />
+        }
       >
         <View className="bg-surface rounded-b-3xl shadow-sm border-b border-divider">
           <Header

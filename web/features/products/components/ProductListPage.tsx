@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Edit, Trash2, Package, Loader2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { adminApi, type Product, type Category } from "@/src/lib/api";
@@ -14,19 +14,18 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const fetchData = async (overrides?: { catFilter?: string; searchTerm?: string }) => {
+  const fetchData = async () => {
     setLoading(true);
-    const cat = overrides?.catFilter ?? categoryFilter;
-    const s = overrides?.searchTerm ?? search;
     try {
       const [prodRes, cats] = await Promise.all([
-        adminApi.getProducts(1, 100, cat || undefined, s || undefined),
+        adminApi.getAdminProducts(1, 100),
         adminApi.getCategories(),
       ]);
       setProducts(prodRes.products);
       setCategories(cats);
-    } catch {
-      toast.error("Failed to load products");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to load products";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -45,9 +44,11 @@ export default function ProductsPage() {
     }
   };
 
-  const filtered = products.filter(p =>
-    p.product_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = products.filter(p => {
+    const matchesSearch = p.product_name.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = !categoryFilter || p.category_id === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="space-y-6">
@@ -77,7 +78,7 @@ export default function ProductsPage() {
         </div>
         <select
           value={categoryFilter}
-          onChange={e => { const val = e.target.value; setCategoryFilter(val); fetchData({ catFilter: val }); }}
+          onChange={e => setCategoryFilter(e.target.value)}
           className="px-4 py-2.5 bg-white border border-[#E5E5E5] rounded-xl outline-none focus:border-[#E8436E] text-sm"
         >
           <option value="">All Categories</option>
@@ -88,8 +89,17 @@ export default function ProductsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-[#E8436E]" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-[#E5E5E5] animate-pulse shadow-sm overflow-hidden">
+              <div className="aspect-[4/3] bg-gray-200" />
+              <div className="p-4 space-y-2.5">
+                <div className="h-4 w-3/4 bg-gray-200 rounded" />
+                <div className="h-3 w-1/2 bg-gray-200 rounded" />
+                <div className="h-4 w-1/3 bg-gray-200 rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20 text-[#A3A3A3]">
@@ -100,45 +110,62 @@ export default function ProductsPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {filtered.map((product, i) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.03 }}
-              className="bg-white rounded-2xl border border-[#E5E5E5] p-4 flex items-center gap-4 hover:shadow-md transition-shadow"
-            >
-              <div className="w-16 h-16 rounded-xl bg-[#F5F5F5] overflow-hidden flex-shrink-0">
-                {product.image_url ? (
-                  <img src={product.image_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Package className="w-6 h-6 text-[#CBD5E1]" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map((product, i) => {
+            return (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03 }}
+                className="bg-white rounded-2xl border border-[#E5E5E5] shadow-sm hover:shadow-lg hover:border-[#E8436E]/20 hover:-translate-y-1 transition-all duration-200 group overflow-hidden"
+              >
+                <Link href={`/dashboard/products/${product.id}`} className="block">
+                  <div className="aspect-[4/3] bg-[#F5F5F5] overflow-hidden relative">
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.product_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-10 h-10 text-[#CBD5E1]" />
+                      </div>
+                    )}
+                    {!product.is_active && (
+                      <span className="absolute top-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">DRAFT</span>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[#171717] truncate">{product.product_name}</p>
-                <p className="text-xs text-[#A3A3A3]">Code: {product.unique_code}</p>
-                <p className="text-sm font-bold text-[#E8436E] mt-0.5">₹{product.price}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/dashboard/products/${product.id}/edit`}
-                  className="p-2.5 rounded-xl bg-[#F5F5F5] hover:bg-[#E5E5E5] transition-colors"
-                >
-                  <Edit className="w-4 h-4 text-[#525252]" />
+                  <div className="p-4 space-y-1.5">
+                    <p className="font-semibold text-[#171717] text-sm truncate group-hover:text-[#E8436E] transition-colors">
+                      {product.product_name}
+                    </p>
+                    <p className="text-xs text-[#A3A3A3]">Code: {product.unique_code}</p>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-base font-bold text-[#E8436E]">₹{product.price}</span>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${(product.quantity || 0) > 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                        {(product.quantity || 0) > 0 ? `${product.quantity}` : '0'}
+                      </span>
+                    </div>
+                  </div>
                 </Link>
-                <button
-                  onClick={() => handleDelete(product.id, product.product_name)}
-                  className="p-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </button>
-              </div>
-            </motion.div>
-          ))}
+                <div className="flex border-t border-[#E5E5E5]">
+                  <Link
+                    href={`/dashboard/products/${product.id}/edit`}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-[#525252] hover:bg-[#F5F5F5] transition-colors"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    Edit
+                  </Link>
+                  <div className="w-px bg-[#E5E5E5]" />
+                  <button
+                    onClick={() => handleDelete(product.id, product.product_name)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm text-red-500 hover:bg-rose-50 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@ import {
 import { createAuditLogModel } from "../../../shared/models/audit.model";
 import { CreateCategoryInput, UpdateCategoryInput } from "../validations/category.validation";
 import { uploadToCloudinary } from "../../../shared/utils/cloudinary-upload";
+import { deleteProductsByCategoryService } from "../../product/services/product.service";
 
 export const getCategoriesService = async () => {
   return getCategoriesModel();
@@ -87,6 +88,10 @@ export const deleteCategoryService = async (id: string, actorId: string) => {
     throw new Error("CATEGORY_NOT_FOUND");
   }
 
+  // Cascade soft-delete all products belonging to this category first
+  const cascadeDeletedCount = await deleteProductsByCategoryService(id, actorId);
+
+  // Then soft-delete the category itself
   await deleteCategoryModel(id);
 
   await createAuditLogModel({
@@ -96,4 +101,8 @@ export const deleteCategoryService = async (id: string, actorId: string) => {
     record_id: id,
     old_data: { category_name: existing.category_name },
   });
+
+  console.log(
+    `Category "${existing.category_name}" (${id}) deleted. Cascade-deleted ${cascadeDeletedCount} product(s).`
+  );
 };

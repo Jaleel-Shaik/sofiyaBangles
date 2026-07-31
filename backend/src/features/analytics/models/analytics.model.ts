@@ -19,14 +19,29 @@ export const getOverviewAnalyticsModel = async (): Promise<OverviewAnalytics> =>
   ]);
 
   let totalStock = 0;
+  let itemsSold = 0;
   try {
-    const productsSnapshot = await db.collection("products").get();
+    const productsSnapshot = await db.collection("products").where("is_active", "==", true).get();
     productsSnapshot.forEach(doc => {
       const data = doc.data();
       totalStock += data.quantity || 0;
     });
   } catch (e) {
     console.error("Failed to calculate total stock", e);
+  }
+
+  try {
+    const auditSnapshot = await db.collection("audit_logs")
+      .where("action", "==", "PRODUCT_SOLD")
+      .get();
+    auditSnapshot.forEach(doc => {
+      const data = doc.data();
+      const oldQty = (data.old_data as { quantity?: number })?.quantity ?? 0;
+      const newQty = (data.new_data as { quantity?: number })?.quantity ?? 0;
+      itemsSold += oldQty - newQty;
+    });
+  } catch (e) {
+    console.error("Failed to calculate items sold", e);
   }
 
   return {
@@ -36,7 +51,8 @@ export const getOverviewAnalyticsModel = async (): Promise<OverviewAnalytics> =>
     totalUsers: totalUsers.data().count,
     totalFavorites: totalFavorites.data().count,
     totalOrders: totalOrders.data().count,
-    totalStock
+    totalStock,
+    itemsSold
   };
 };
 

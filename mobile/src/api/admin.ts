@@ -1,5 +1,3 @@
-import { getFirestore, collection, getCountFromServer, query, where, addDoc } from '@react-native-firebase/firestore';
-import * as SecureStore from 'expo-secure-store';
 import { apiClient } from './client';
 
 export const getAdminProducts = async (page = 1, limit = 10) => {
@@ -26,6 +24,7 @@ export const getOverviewAnalytics = async () => {
       activeProducts: data.activeProducts,
       totalOrders: data.totalOrders || 0,
       totalStock: data.totalStock || 0,
+      itemsSold: data.itemsSold || 0,
     };
   } catch (error) {
     console.error('Error fetching analytics', error);
@@ -36,15 +35,11 @@ export const getOverviewAnalytics = async () => {
 export const createProduct = async (productData: any, imageUris: string[] = []) => {
   try {
     const formData = new FormData();
-
-    // Append product fields
     Object.keys(productData).forEach(key => {
       if (key !== 'categoryName' && productData[key] !== undefined && productData[key] !== null) {
         formData.append(key, String(productData[key]));
       }
     });
-
-    // Append images
     if (imageUris && imageUris.length > 0) {
       imageUris.forEach((uri, index) => {
         const extension = uri.split('.').pop() || 'jpg';
@@ -55,51 +50,27 @@ export const createProduct = async (productData: any, imageUris: string[] = []) 
         } as any);
       });
     }
-
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/products`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
+    const res = await apiClient.post('/products', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to create product');
-    }
-
     return {
       success: true,
-      id: responseData.data.id,
-      unique_code: responseData.data.unique_code,
+      id: res.data.data.id,
+      unique_code: res.data.data.unique_code,
     };
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to create product');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to create product');
   }
 };
 
 export const updateProduct = async (id: string, productData: any, imageUris: string[] = []) => {
   try {
     const formData = new FormData();
-
-    // Append product fields
     Object.keys(productData).forEach(key => {
       if (key !== 'categoryName' && productData[key] !== undefined && productData[key] !== null) {
         formData.append(key, String(productData[key]));
       }
     });
-
-    // Append images (only local URIs need to be uploaded, URLs are already on server, but typically backend expects all or handles diff. We will send all non-http ones as files, and maybe a separate list of retained existing ones if backend supports it. For now, send new ones.)
     if (imageUris && imageUris.length > 0) {
       imageUris.forEach((uri, index) => {
         if (!uri.startsWith('http')) {
@@ -110,77 +81,41 @@ export const updateProduct = async (id: string, productData: any, imageUris: str
             name: `image_${index}.${extension}`,
           } as any);
         } else {
-          // If the backend accepts existing_images array:
           formData.append('existing_images', uri);
         }
       });
     } else {
-      // If no images at all, maybe send empty array or backend will handle it
-      formData.append('existing_images', '[]'); // Depending on backend
+      formData.append('existing_images', '');
     }
-
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/products/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
+    const res = await apiClient.put(`/products/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to update product');
-    }
-
-    return {
-      success: true,
-      id: responseData.data.id,
-    };
+    return { success: true, id: res.data.data.id };
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to update product');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to update product');
+  }
+};
+
+export const sellProduct = async (id: string, quantity = 1) => {
+  try {
+    const res = await apiClient.patch(`/products/${id}/sell`, { quantity });
+    return res.data.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to sell product');
   }
 };
 
 export const deleteProduct = async (id: string) => {
   try {
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/products/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to delete product');
-    }
-
-    return responseData.success;
+    const res = await apiClient.delete(`/products/${id}`);
+    return res.data.success;
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to delete product');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to delete product');
   }
 };
 
 export const createCategoryWithImage = async (
-  categoryName: string, 
+  categoryName: string,
   imageUri?: string,
   modelTypeId?: string,
   size_type?: string,
@@ -190,7 +125,6 @@ export const createCategoryWithImage = async (
   try {
     const formData = new FormData();
     formData.append('category_name', categoryName);
-
     if (modelTypeId) formData.append('model_type_id', modelTypeId);
     if (size_type) formData.append('size_type', size_type);
     if (standard_sizes && standard_sizes.length > 0) {
@@ -199,7 +133,6 @@ export const createCategoryWithImage = async (
     if (custom_measurement_fields && custom_measurement_fields.length > 0) {
       formData.append('custom_measurement_fields', JSON.stringify(custom_measurement_fields));
     }
-
     if (imageUri) {
       const extension = imageUri.split('.').pop() || 'jpg';
       formData.append('image', {
@@ -208,38 +141,18 @@ export const createCategoryWithImage = async (
         name: `category_image.${extension}`,
       } as any);
     }
-
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/categories`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
+    const res = await apiClient.post('/categories', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to create category');
-    }
-
-    return responseData.data; // Should return the created category object
+    return res.data.data;
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to create category');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to create category');
   }
 };
 
 export const updateCategoryWithImage = async (
   categoryId: string,
-  categoryName: string, 
+  categoryName: string,
   imageUri?: string,
   modelTypeId?: string,
   size_type?: string,
@@ -249,7 +162,6 @@ export const updateCategoryWithImage = async (
   try {
     const formData = new FormData();
     formData.append('category_name', categoryName);
-
     if (modelTypeId) formData.append('model_type_id', modelTypeId);
     if (size_type) formData.append('size_type', size_type);
     if (standard_sizes && standard_sizes.length > 0) {
@@ -258,7 +170,6 @@ export const updateCategoryWithImage = async (
     if (custom_measurement_fields && custom_measurement_fields.length > 0) {
       formData.append('custom_measurement_fields', JSON.stringify(custom_measurement_fields));
     }
-
     if (imageUri && !imageUri.startsWith('http')) {
       const extension = imageUri.split('.').pop() || 'jpg';
       formData.append('image', {
@@ -267,167 +178,56 @@ export const updateCategoryWithImage = async (
         name: `category_image.${extension}`,
       } as any);
     }
-
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/categories/${categoryId}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
+    const res = await apiClient.put(`/categories/${categoryId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to update category');
-    }
-
-    return responseData.data;
+    return res.data.data;
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to update category');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to update category');
   }
 };
 
 export const deleteCategory = async (categoryId: string) => {
   try {
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/categories/${categoryId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to delete category');
-    }
-
-    return responseData.success;
+    const res = await apiClient.delete(`/categories/${categoryId}`);
+    return res.data.success;
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to delete category');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to delete category');
   }
 };
 
-// ... other admin methods can be ported similarly, left out for brevity if unused currently
 export const broadcastNotification = async (notificationData: any) => {
-  // Add to global notifications collection
-  const db = getFirestore();
-  const notifRef = collection(db, 'notifications');
-  await addDoc(notifRef, {
-    ...notificationData,
-    created_at: new Date().toISOString()
-  });
-  return { success: true };
-};
-
-export const createModelType = async (modelTypeData: {
-  name: string;
-}) => {
   try {
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/model-types`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(modelTypeData),
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to create model type');
-    }
-
-    return responseData.data;
+    const res = await apiClient.post('/notifications', notificationData);
+    return res.data;
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to create model type');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to send notification');
   }
 };
 
-export const updateModelType = async (id: string, modelTypeData: {
-  name: string;
-}) => {
+export const createModelType = async (modelTypeData: { name: string }) => {
   try {
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/model-types/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(modelTypeData),
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to update model type');
-    }
-
-    return responseData.data;
+    const res = await apiClient.post('/model-types', modelTypeData);
+    return res.data.data;
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to update model type');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to create model type');
+  }
+};
+
+export const updateModelType = async (id: string, modelTypeData: { name: string }) => {
+  try {
+    const res = await apiClient.put(`/model-types/${id}`, modelTypeData);
+    return res.data.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to update model type');
   }
 };
 
 export const deleteModelType = async (id: string) => {
   try {
-    const token = await SecureStore.getItemAsync('auth_token');
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.29.241:5000/api';
-
-    const response = await fetch(`${API_URL}/model-types/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        import('../store/authStore').then(({ useAuthStore }) => {
-          useAuthStore.getState().logout();
-        });
-      }
-      throw new Error(responseData.message || 'Failed to delete model type');
-    }
-
-    return responseData.data;
+    const res = await apiClient.delete(`/model-types/${id}`);
+    return res.data.data;
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to delete model type');
+    throw new Error(error?.response?.data?.message || error.message || 'Failed to delete model type');
   }
 };

@@ -1,48 +1,13 @@
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useState, useCallback } from 'react';
-import { getFirestore, collection, getDocs, query, orderBy, limit } from '@react-native-firebase/firestore';
-import { getOverviewAnalytics } from '@/src/api/admin';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useState, useCallback } from 'react';
+import { getOverviewAnalytics, getAdminProducts } from '@/src/api/admin';
+import { getCategories, Category } from '@/src/api/categories';
+import { Product } from '@/src/api/products';
 import { useAuthStore } from '@/src/store/authStore';
-
-interface DashboardProduct {
-  id: string;
-  product_name: string;
-  price: number;
-  image_url?: string;
-  images?: string[];
-  category_id: string;
-  quantity: number;
-  created_at?: string;
-}
-
-interface DashboardCategory {
-  id: string;
-  category_name: string;
-}
-
-const db = getFirestore();
-
-const fetchCategoriesFromFirestore = async (): Promise<DashboardCategory[]> => {
-  try {
-    const snapshot = await getDocs(collection(db, 'categories'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DashboardCategory));
-  } catch {
-    return [];
-  }
-};
-
-const fetchRecentProductsFromFirestore = async (count: number): Promise<DashboardProduct[]> => {
-  try {
-    const q = query(collection(db, 'products'), orderBy('created_at', 'desc'), limit(count));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DashboardProduct));
-  } catch {
-    return [];
-  }
-};
+import { getCachedApiBaseUrl } from '@/src/api/config';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -51,30 +16,35 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [recentProducts, setRecentProducts] = useState<DashboardProduct[]>([]);
-  const [categories, setCategories] = useState<DashboardCategory[]>([]);
+  const [recentProducts, setRecentProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [connectionError, setConnectionError] = useState(false);
 
   const fetchData = async () => {
+    setConnectionError(false);
     try {
       const [data, productsData, cats] = await Promise.all([
         getOverviewAnalytics(),
-        fetchRecentProductsFromFirestore(5),
-        fetchCategoriesFromFirestore()
+        getAdminProducts(1, 5),
+        getCategories()
       ]);
       setStats(data);
-      setRecentProducts(productsData);
+      setRecentProducts(productsData.products);
       setCategories(cats);
     } catch (error) {
       console.error("Failed to fetch dashboard data", error);
+      setConnectionError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -142,6 +112,18 @@ export default function AdminDashboard() {
           </View>
         </View>
 
+        {connectionError && (
+          <View className="mx-4 mt-4 p-4 bg-red-50 border border-red-200 rounded-2xl flex-row items-center">
+            <Ionicons name="cloud-offline-outline" size={24} color="#dc2626" />
+            <View className="ml-3 flex-1">
+              <Text className="text-sm font-semibold text-red-700">Server Unreachable</Text>
+              <Text className="text-xs text-red-600 mt-0.5">
+                Cannot connect to API at {getCachedApiBaseUrl()}. Make sure the backend server is running. Pull down to retry.
+              </Text>
+            </View>
+          </View>
+        )}
+
         <View className="px-4 pt-5">
           {/* Stats */}
           {loading ? (
@@ -157,24 +139,11 @@ export default function AdminDashboard() {
                 color="#3b82f6"
               />
               <StatCard
-                title="Active Products"
-                value={stats?.activeProducts?.toString() || "0"}
-                icon="checkmark-circle-outline"
-                color="#10b981"
-              />
-              <StatCard
-                title="Total Stock"
-                value={stats?.totalStock?.toString() || "0"}
-                icon="layers-outline"
-                color="#e11d48"
-                accent="Remaining"
-              />
-              <StatCard
-                title="Items Sold"
-                value={stats?.totalOrders?.toString() || "0"}
+                title="Sold Products"
+                value={stats?.itemsSold?.toString() || "0"}
                 icon="bag-check-outline"
                 color="#f59e0b"
-                accent="Orders"
+                accent="Sold"
               />
             </View>
           )}
@@ -241,15 +210,13 @@ export default function AdminDashboard() {
           ) : (
             <View className="mb-8">
               {recentProducts.slice(0, 5).map((product) => {
-                const cat = categories.find(c => c.id === product.category_id);
-
                 return (
                   <TouchableOpacity
                     key={product.id}
                     className="bg-surface p-3 rounded-2xl flex-row items-center mb-3 border border-divider"
                     activeOpacity={0.9}
                     onPress={() => {
-                      router.push({ pathname: '/(admin)/(tabs)/edit-product/[id]', params: { id: product.id } } as any);
+                      router.push({ pathname: '/(admin)/(tabs)/product-detail/[id]', params: { id: product.id } } as any);
                     }}
                   >
                     <Image
@@ -258,9 +225,6 @@ export default function AdminDashboard() {
                     />
                     <View className="ml-4 flex-1">
                       <Text className="font-bold text-text-primary text-base mb-1" numberOfLines={1}>{product.product_name}</Text>
-                        <Text className="text-text-secondary text-xs mb-1.5" numberOfLines={1}>
-                          {cat ? cat.category_name : 'Uncategorized'}
-                        </Text>
                       <View className="flex-row items-center justify-between">
                         <Text className="text-[#C25B3E] font-bold">₹{product.price}</Text>
                         <View className={`px-2 py-1 rounded-md ${(product.quantity || 0) > 0 ? 'bg-success/10' : 'bg-error/10'}`}>

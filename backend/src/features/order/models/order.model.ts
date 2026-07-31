@@ -10,6 +10,16 @@ export const createOrderModel = async (input: {
   price: number;
   imageUrl?: string | null;
 }): Promise<Order> => {
+  // Validate the product exists and is active before creating an order
+  const productDoc = await db.collection("products").doc(input.productId).get();
+  if (!productDoc.exists) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+  const productData = productDoc.data();
+  if (!productData || productData.is_active === false) {
+    throw new Error("PRODUCT_NOT_AVAILABLE");
+  }
+
   const existingSnapshot = await db
     .collection("orders")
     .where("user_id", "==", input.userId)

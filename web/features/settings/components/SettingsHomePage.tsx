@@ -1,16 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Store, MapPin, MessageCircle, Users, Shield, Bell, ChevronRight } from "lucide-react";
+import { User, Store, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 const settingsItems = [
-  { icon: Store, label: "Store Profile", desc: "Edit name, description & hours", color: "bg-indigo-50 text-indigo-500", href: "/dashboard/settings/store-profile" },
-  { icon: MapPin, label: "Store Location", desc: "Update physical address", color: "bg-rose-50 text-rose-500", href: "/dashboard/settings/location" },
-  { icon: MessageCircle, label: "Support Contacts", desc: "Manage WhatsApp & Email", color: "bg-emerald-50 text-emerald-500", href: "/dashboard/settings/support" },
-  { icon: Bell, label: "Order Alerts", desc: "Notification preferences", color: "bg-amber-50 text-amber-500", href: "/dashboard/settings/order-alerts" },
-  { icon: Users, label: "Team Management", desc: "Add or remove admin access", color: "bg-blue-50 text-blue-500", href: "/dashboard/settings/team" },
-  { icon: Shield, label: "Security Settings", desc: "Password and 2FA", color: "bg-slate-50 text-slate-500", href: "/dashboard/settings/security" },
+  { icon: User, label: "My Profile", desc: "Manage profile picture & personal info", color: "bg-purple-50 text-purple-500", href: "/dashboard/settings/profile" },
+  { icon: Store, label: "Store Profile", desc: "Edit name, description, location & hours", color: "bg-indigo-50 text-indigo-500", href: "/dashboard/settings/store-profile" },
 ];
 
 export default function SettingsPage() {

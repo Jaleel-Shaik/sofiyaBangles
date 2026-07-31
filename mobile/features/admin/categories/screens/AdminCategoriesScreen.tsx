@@ -78,13 +78,11 @@ export default function ManageCategoriesScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            setLoading(true);
             try {
               await deleteCategory(catId);
-              fetchData();
+              await fetchData();
               Alert.alert('Success', 'Category deleted successfully.');
             } catch (error: any) {
-              setLoading(false);
               Alert.alert('Error', error.message);
             }
           }
@@ -287,53 +285,52 @@ export default function ManageCategoriesScreen() {
             </View>
           )}
 
-          {categories.map(cat => {
-            const mt = modelTypes.find(m => m.id === cat.model_type_id);
-            return (
-              <View key={cat.id} className="bg-surface p-4 rounded-2xl mb-3 border border-divider flex-row items-center">
-                <View className="w-28 h-28 rounded-xl bg-surface mr-4 border border-divider overflow-hidden">
-                  {cat.image_url ? (
-                    <Image source={{ uri: cat.image_url }} className="w-full h-full" resizeMode="cover" />
-                  ) : (
-                    <View className="flex-1 items-center justify-center">
-                      <Ionicons name="folder-outline" size={24} color="#94a3b8" />
-                    </View>
-                  )}
-                </View>
-                <View className="flex-1">
-                  <Text className="text-base font-bold text-text-primary">{cat.category_name}</Text>
-                  {mt && (
-                    <View className="flex-row items-center mt-1">
-                      <Ionicons name="layers-outline" size={14} color="#64748b" />
-                      <Text className="text-text-secondary text-xs font-bold ml-1">{mt.name}</Text>
-                      {cat.size_type && (
-                        <View className="bg-surface px-1.5 py-0.5 rounded ml-2 border border-divider">
-                          <Text className="text-[9px] font-bold uppercase text-text-hint">{cat.size_type}</Text>
+          <View className="flex-row flex-wrap" style={{ margin: -6 }}>
+            {categories.map(cat => {
+              const mt = modelTypes.find(m => m.id === cat.model_type_id);
+              return (
+                <View key={cat.id} className="w-1/2" style={{ padding: 6 }}>
+                  <View className="bg-surface rounded-2xl border border-divider overflow-hidden">
+                    <View className="aspect-[4/3] bg-surface overflow-hidden">
+                      {cat.image_url ? (
+                        <Image source={{ uri: cat.image_url }} className="w-full h-full" resizeMode="cover" />
+                      ) : (
+                        <View className="flex-1 items-center justify-center">
+                          <Ionicons name="folder-outline" size={32} color="#94a3b8" />
                         </View>
                       )}
                     </View>
-                  )}
-                  {cat.standard_sizes && cat.standard_sizes.length > 0 && (
-                    <Text className="text-xs text-text-hint mt-1">Sizes: {cat.standard_sizes.join(', ')}</Text>
-                  )}
+                    <View className="p-3">
+                      <Text className="font-bold text-text-primary text-sm" numberOfLines={1}>{cat.category_name}</Text>
+                      {mt && (
+                        <View className="flex-row items-center mt-1">
+                          <Ionicons name="layers-outline" size={12} color="#64748b" />
+                          <Text className="text-text-secondary text-[10px] font-bold ml-1" numberOfLines={1}>{mt.name}</Text>
+                        </View>
+                      )}
+                      <View className="flex-row items-center justify-between mt-2 pt-2 border-t border-divider">
+                        <Text className="text-[10px] text-text-hint">Category</Text>
+                        <View className="flex-row items-center gap-1">
+                          <TouchableOpacity
+                            onPress={() => handleEditCategory(cat)}
+                            className="w-7 h-7 bg-surface rounded-full items-center justify-center border border-divider"
+                          >
+                            <Ionicons name="pencil" size={14} color="#e11d48" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleDeleteCategory(cat.id)}
+                            className="w-7 h-7 bg-error/10 rounded-full items-center justify-center"
+                          >
+                            <Ionicons name="trash" size={14} color="#e11d48" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
                 </View>
-                <View className="flex-row items-center">
-                  <TouchableOpacity
-                    onPress={() => handleEditCategory(cat)}
-                    className="w-10 h-10 bg-surface rounded-full items-center justify-center mr-2 border border-divider"
-                  >
-                    <Ionicons name="pencil" size={20} color="#e11d48" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDeleteCategory(cat.id)}
-                    className="w-10 h-10 bg-error/10 rounded-full items-center justify-center"
-                  >
-                    <Ionicons name="trash" size={20} color="#e11d48" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
 
           <View className="h-10" />
         </ScrollView>

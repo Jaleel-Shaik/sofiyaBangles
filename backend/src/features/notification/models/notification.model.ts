@@ -77,10 +77,12 @@ export const getUserNotificationsModel = async (
 
   const offset = (page - 1) * limit;
 
-  const snapshot = await query.orderBy("created_at", "desc").get();
+  const snapshot = await query.get();
   
   // Apply pagination in memory since we need offset
-  const allDocs = snapshot.docs.map(doc => doc.data() as Notification);
+  const allDocs = snapshot.docs
+    .map(doc => doc.data() as Notification)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const paginated = allDocs.slice(offset, offset + limit);
 
   const notificationsWithProducts = await Promise.all(paginated.map(async (n) => {

@@ -1,5 +1,6 @@
 import { View, Text, FlatList, ActivityIndicator, ScrollView } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useState, useCallback } from 'react';
 import { getNewArrivals, Product } from '@/src/api/products';
 import ProductCard from '@/src/components/ProductCard';
 import Header from '@/src/components/Header';
@@ -14,9 +15,11 @@ export default function NewArrivalsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
 
-  useEffect(() => {
-    fetchInitialProducts();
-  }, [daysAgo]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchInitialProducts();
+    }, [daysAgo])
+  );
 
   const fetchInitialProducts = async () => {
     setLoading(true);

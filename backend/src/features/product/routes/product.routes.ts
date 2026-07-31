@@ -6,7 +6,9 @@ import {
   getProductById,
   updateProduct,
   updateStock,
+  sellProduct,
   deleteProduct,
+  restoreProduct,
   searchProducts,
   getRecommendedProducts,
   getNewArrivals,
@@ -17,14 +19,7 @@ import { upload } from "../../../shared/middlewares/upload.middleware";
 
 const router = Router();
 
-// Customer routes (publicly browsable with optional personalization)
-router.get("/", optionalAuthenticate, getProducts);
-router.get("/search", optionalAuthenticate, searchProducts);
-router.get("/recommended", optionalAuthenticate, getRecommendedProducts);
-router.get("/new-arrivals", optionalAuthenticate, getNewArrivals);
-router.get("/:id", optionalAuthenticate, getProductById);
-
-// Admin routes
+// Admin routes (MUST be before /:id wildcard)
 router.get(
   "/admin",
   authenticate,
@@ -51,11 +46,30 @@ router.patch(
   requireRole("admin", "super_admin"),
   updateStock,
 );
+router.patch(
+  "/:id/sell",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  sellProduct,
+);
+router.patch(
+  "/:id/restore",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  restoreProduct,
+);
 router.delete(
   "/:id",
   authenticate,
   requireRole("admin", "super_admin"),
   deleteProduct,
 );
+
+// Customer routes (publicly browsable with optional personalization)
+router.get("/", optionalAuthenticate, getProducts);
+router.get("/search", optionalAuthenticate, searchProducts);
+router.get("/recommended", optionalAuthenticate, getRecommendedProducts);
+router.get("/new-arrivals", optionalAuthenticate, getNewArrivals);
+router.get("/:id", optionalAuthenticate, getProductById);
 
 export default router;
