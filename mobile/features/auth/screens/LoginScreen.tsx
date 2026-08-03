@@ -830,6 +830,9 @@ const QRSetupStep = ({
 export default function LoginScreen() {
   const { login, set2faPending, clear2faPending, token, user, forceLogout } =
     useAuthStore();
+  const { height: screenHeight } = useWindowDimensions();
+  const isSmallScreen = screenHeight < 600;
+
   const [authStep, setAuthStep] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -982,6 +985,13 @@ export default function LoginScreen() {
       const code = responseData?.code;
       const msg = responseData?.message || err.message || "";
 
+      if (code === "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE" || code === "PLATFORM_ACCESS_DENIED") {
+        await forceLogout();
+        setShowSuperAdminModal(true);
+        setLoading(false);
+        return;
+      }
+
       if (code === "EXPIRED_OR_INVALID_PENDING_TOKEN") {
         Alert.alert(
           "Session Expired",
@@ -1058,6 +1068,13 @@ export default function LoginScreen() {
         responseData?.message ||
         err.message ||
         "Invalid code. Please try again.";
+
+      if (code === "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE" || code === "PLATFORM_ACCESS_DENIED") {
+        await forceLogout();
+        setShowSuperAdminModal(true);
+        setLoading(false);
+        return;
+      }
 
       if (code === "EXPIRED_OR_INVALID_PENDING_TOKEN") {
         Alert.alert(
@@ -1216,10 +1233,6 @@ export default function LoginScreen() {
       } catch (firebaseErr: any) {
         // Firebase Auth failed (user likely registered via web backend without Firebase Auth)
         // Fall through to Strategy 2: Direct backend login
-        console.log(
-          "Firebase Auth unavailable, falling back to backend /auth/login:",
-          firebaseErr.message,
-        );
       }
 
       // Strategy 2: Direct backend /auth/login (for web-registered users or as fallback)
@@ -1233,7 +1246,6 @@ export default function LoginScreen() {
       } catch (backendErr: any) {
         const backendMsg =
           backendErr.response?.data?.message || backendErr.message || "";
-        console.log("Backend /auth/login failed:", backendMsg);
 
         // If Strategy 2 fails because password_hash is missing (not wrong credentials),
         // try setting the password via backend, then retry login.
@@ -1243,11 +1255,7 @@ export default function LoginScreen() {
         if (errorCode === "PASSWORD_NOT_SET") {
           // Strategy 3: Store password_hash via /auth/set-password then retry
           try {
-            console.log(
-              "Password hash missing, attempting to set via backend...",
-            );
             await apiClient.post("/auth/set-password", { email, password });
-            console.log("Password hash stored successfully, retrying login...");
 
             // Retry /auth/login now that password_hash exists
             const retryResult = await loginWith2FA(email, password);
@@ -1257,12 +1265,11 @@ export default function LoginScreen() {
               return;
             }
           } catch (setPwErr: any) {
-            console.log("set-password also failed:", setPwErr.message);
+            // silent fail
           }
 
           // If set-password + retry didn't work, try Firebase Auth once more
           try {
-            console.log("Retrying Firebase Auth as last resort...");
             const fbAuth = getAuth();
             const fbCredential = await signInWithEmailAndPassword(
               fbAuth,
@@ -1277,7 +1284,7 @@ export default function LoginScreen() {
               return;
             }
           } catch (retryErr: any) {
-            console.log("Firebase Auth retry also failed:", retryErr.message);
+            // silent fail
           }
         }
 
@@ -1292,10 +1299,17 @@ export default function LoginScreen() {
       );
     } catch (err: any) {
       const responseData = err.response?.data;
+      const code = responseData?.code;
       const msg =
         responseData?.message ||
         err.message ||
         "Login failed. Please check your credentials.";
+
+      if (code === "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE" || code === "PLATFORM_ACCESS_DENIED") {
+        await forceLogout();
+        setShowSuperAdminModal(true);
+        return;
+      }
 
       if (msg.includes("locked") || msg.includes("15 minutes")) {
         Alert.alert(
@@ -1382,11 +1396,15 @@ export default function LoginScreen() {
         <KeyboardAwareScrollView
           contentContainerStyle={{
             flexGrow: 1,
-            justifyContent: "center",
-            padding: 24,
+            justifyContent: authStep === "register" ? "flex-start" : "center",
+            paddingHorizontal: 24,
+            paddingTop: authStep === "register" ? (isSmallScreen ? 16 : 32) : 24,
+            paddingBottom: 24,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          extraScrollHeight={isSmallScreen ? 40 : 80}
+          enableOnAndroid
         >
           <View className="items-center mb-8 mt-8">
             <View

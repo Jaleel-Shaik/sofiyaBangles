@@ -3,11 +3,20 @@ import { Request } from "express";
 // ─── Roles ───────────────────────────────────────────────
 export type UserRole = "user" | "admin" | "super_admin";
 
+// ─── Platform ────────────────────────────────────────────
+export type Platform = "web" | "mobile";
+
+// ─── Collection Routing ──────────────────────────────────
+// Determines which Firestore collection an account lives in.
+// Regular users → "users", admins & super admins → "admins".
+export type UserType = "user" | "admin";
+
 // ─── Auth ────────────────────────────────────────────────
 export interface JwtPayload {
   userId: string;
   email: string;
   role: UserRole;
+  platform?: Platform;
 }
 
 export interface AuthRequest extends Request {
@@ -43,21 +52,62 @@ export interface DeviceInformation {
 export interface LoginSession {
   id: string;
   user_id: string;
+  user_type: UserType;
   refresh_token_id: string;
   device_info: DeviceInformation;
   is_active: boolean;
   login_at: string;
   last_active_at: string;
+  logout_at: string | null;
   expires_at: string;
 }
 
 export interface RefreshToken {
   id: string;
   user_id: string;
+  user_type: UserType;
   token_hash: string;
   is_revoked: boolean;
   created_at: string;
   expires_at: string;
+  revoked_at: string | null;
+  platform?: Platform;
+}
+
+/**
+ * Temporary record created right after the password is verified and
+ * before the OTP / 2FA step completes. Deleted on success or by cleanup.
+ */
+export interface LoginChallenge {
+  id: string;
+  user_id: string;
+  user_type: UserType;
+  otp_type: "TOTP";
+  otp_hash: string | null;
+  correlation_id?: string;
+  status: "PENDING" | "VERIFIED" | "EXPIRED" | "FAILED";
+  expires_at: string;
+  created_at: string;
+  verified_at: string | null;
+  failed_attempts: number;
+  ip_address: string;
+  device_info: DeviceInformation;
+}
+
+/**
+ * Long-retention security event (brute force, account lock, token rotation,
+ * 2FA changes, suspicious logins...).
+ */
+export interface SecurityEvent {
+  id: string;
+  user_id: string | null;
+  user_type: UserType | null;
+  event_type: string;
+  severity: "info" | "warning" | "critical";
+  ip_address: string;
+  device_info: DeviceInformation;
+  details: string | null;
+  created_at: string;
 }
 
 export interface OtpStatus {
@@ -196,11 +246,19 @@ export interface Notification {
 export interface AuditLog {
   id: string;
   actor_id: string | null;
+  user_type: UserType | null;
   action: string;
   table_name: string | null;
   record_id: string | null;
   old_data: Record<string, unknown> | null;
   new_data: Record<string, unknown> | null;
+  correlation_id?: string | null;
+  session_id?: string | null;
+  ip_address: string;
+  // API problem tracking
+  api_endpoint: string | null;
+  api_error: string | null;
+  status_code: number | null;
   created_at: string;
 }
 

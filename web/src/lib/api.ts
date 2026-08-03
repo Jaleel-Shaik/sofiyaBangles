@@ -66,7 +66,10 @@ export interface Session {
 
 export const apiClient = axios.create({
   baseURL: API_URL,
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    "x-client-type": "web"
+  },
   timeout: 15000,
 });
 
@@ -148,7 +151,8 @@ apiClient.interceptors.response.use(
 
         const { data: refreshResp } = await axios.post<{ success: boolean; data: RefreshTokenResponse }>(
           `${API_URL}/auth/refresh-token`,
-          { refresh_token: refreshToken }
+          { refresh_token: refreshToken },
+          { headers: { "x-client-type": "web" } }
         );
 
         const refreshData = refreshResp.data;

@@ -34,9 +34,8 @@ export const broadcastNotificationModel = async (data: {
   product_id?: string | null;
   sent_by: string;
 }): Promise<number> => {
-  const usersSnapshot = await db.collection("profiles")
+  const usersSnapshot = await db.collection("users")
     .where("is_active", "==", true)
-    .where("role", "==", "user")
     .get();
 
   if (usersSnapshot.empty) return 0;

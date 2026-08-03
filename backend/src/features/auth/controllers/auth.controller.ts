@@ -5,6 +5,8 @@ import jwt from "jsonwebtoken";
 import { db, auth as firebaseAuth } from "../../../shared/config/firebase";
 import { env } from "../../../shared/config/env";
 import { getRoleAuthConfig, requires2FAEnforcement } from "../../../shared/utils/auth-config";
+import { nowISTISO } from "../../../shared/utils/datetime";
+import { assertPlatformAccess, resolvePlatform } from "../../../shared/utils/platform";
 import {
   registerService,
   getMeService,
@@ -20,6 +22,8 @@ import {
   getUserSessionsService,
 } from "../services/totp.service";
 import { findProfileByEmailModel, findProfileByIdModel } from "../models/auth.model";
+import { findIdentityByIdModel } from "../../../shared/models/identity.model";
+import { createAuditLogModel } from "../../../shared/models/audit.model";
 import {
   updateProfile2FA,
   createRefreshTokenModel,
@@ -69,7 +73,8 @@ export const register = async (req: AuthRequest, res: Response) => {
 export const login = async (req: AuthRequest, res: Response) => {
   try {
     const deviceInfo = extractDeviceInfo(req);
-    const result = await initiateLoginService(req.body.email, req.body.password, deviceInfo);
+    const platform = resolvePlatform(req.headers["x-client-type"] as string | undefined);
+    const result = await initiateLoginService(req.body.email, req.body.password, deviceInfo, platform);
     console.log("Login result:", result);
 
     res.json({
@@ -79,6 +84,30 @@ export const login = async (req: AuthRequest, res: Response) => {
     });
 
   } catch (error: any) {
+    if (error.message === "PLATFORM_ACCESS_DENIED_USER_WEB") {
+      res.status(403).json({
+        success: false,
+        code: "PLATFORM_ACCESS_DENIED_USER_WEB",
+        message: "This account does not have access to the web portal.",
+      });
+      return;
+    }
+    if (error.message === "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE") {
+      res.status(403).json({
+        success: false,
+        code: "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE",
+        message: "Super Admin accounts can only access the web portal.",
+      });
+      return;
+    }
+    if (error.message === "PLATFORM_ACCESS_DENIED") {
+      res.status(403).json({
+        success: false,
+        code: "PLATFORM_ACCESS_DENIED",
+        message: "Access denied for this platform.",
+      });
+      return;
+    }
     if (error.message === "INVALID_CREDENTIALS") {
       res.status(401).json({
         success: false,
@@ -243,11 +272,10 @@ export const sendOtp = async (req: AuthRequest, res: Response) => {
 
     let phoneNumber: string | undefined = undefined;
 
-    // Verify user is an admin in Firestore
+    // Verify user is an admin in the admins collection
     try {
-      const snapshot = await db.collection("profiles")
+      const snapshot = await db.collection("admins")
         .where("email", "==", normalizedEmail)
-        .where("role", "==", "admin")
         .limit(1)
         .get();
       if (!snapshot.empty) {
@@ -374,13 +402,12 @@ export const verifyOtp = async (req: AuthRequest, res: Response) => {
       console.log("⚠️ Firestore delete failed, ignored.");
     }
 
-    // Fetch user profile to ensure they are admin
+    // Fetch admin account from the admins collection
     let userData: any = null;
     let uid = email;
     try {
-      const profileSnapshot = await db.collection("profiles")
+      const profileSnapshot = await db.collection("admins")
         .where("email", "==", email)
-        .where("role", "==", "admin")
         .limit(1)
         .get();
       if (!profileSnapshot.empty) {
@@ -419,80 +446,105 @@ export const verifyOtp = async (req: AuthRequest, res: Response) => {
  */
 export const verify2FAController = async (req: AuthRequest, res: Response) => {
   try {
-    const { otp_pending_token, otp_code } = req.body;
+    const { otp_pending_token, otp_code, challenge_id } = req.body;
     const deviceInfo = extractDeviceInfo(req);
-      const result = await verify2FAOtpService(otp_pending_token, otp_code, deviceInfo);
+    const platform = resolvePlatform(req.headers["x-client-type"] as string | undefined);
+    const result = await verify2FAOtpService(otp_pending_token, otp_code, deviceInfo, platform, challenge_id);
 
-      res.json({
-        success: true,
-        data: result,
-        message: "2FA Verification successful. User authenticated.",
-      });
+    res.json({
+      success: true,
+      data: result,
+      message: "2FA Verification successful. User authenticated.",
+    });
 
-    } catch (error: any) {
-      if (error.message === "EXPIRED_OR_INVALID_PENDING_TOKEN") {
-        res.status(401).json({
-          success: false,
-          code: "EXPIRED_OR_INVALID_PENDING_TOKEN",
-          message: "OTP session has expired or is invalid. Please log in again.",
-        });
-        return;
-      }
-      if (error.message === "ACCOUNT_LOCKED_15_MINUTES") {
-        res.status(429).json({
-          success: false,
-          code: "ACCOUNT_LOCKED_15_MINUTES",
-          message: "Account locked due to 5 consecutive failed OTP attempts. Please try again in 15 minutes.",
-        });
-        return;
-      }
-      if (error.message === "OTP_ALREADY_USED") {
-        res.status(400).json({
-          success: false,
-          code: "OTP_ALREADY_USED",
-          message: "This OTP code has already been used. Please wait 30 seconds for the next code.",
-        });
-        return;
-      }
-      if (error.message === "INVALID_OTP") {
-        res.status(400).json({
-          success: false,
-          code: "INVALID_OTP",
-          message: "Invalid Google Authenticator OTP code. Please check your device clock and try again.",
-        });
-        return;
-      }
-      if (error.message === "INVALID_PENDING_TOKEN_TYPE") {
-        res.status(403).json({
-          success: false,
-          code: "INVALID_PENDING_TOKEN_TYPE",
-          message: "Invalid token type for this operation.",
-        });
-        return;
-      }
-      if (error.message === "USER_NOT_FOUND") {
-        res.status(404).json({
-          success: false,
-          code: "USER_NOT_FOUND",
-          message: "User account not found.",
-        });
-        return;
-      }
-      if (error.message === "2FA_SECRET_NOT_FOUND") {
-        res.status(400).json({
-          success: false,
-          code: "2FA_SECRET_NOT_FOUND",
-          message: "2FA secret not found. Please log in again.",
-        });
-        return;
-      }
-      console.error("Verify 2FA controller error:", error);
-      res.status(500).json({
+  } catch (error: any) {
+    if (error.message === "PLATFORM_ACCESS_DENIED_USER_WEB") {
+      res.status(403).json({
         success: false,
-        code: "INTERNAL_ERROR",
-        message: "Failed to verify 2FA OTP.",
+        code: "PLATFORM_ACCESS_DENIED_USER_WEB",
+        message: "This account does not have access to the web portal.",
       });
+      return;
     }
+    if (error.message === "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE") {
+      res.status(403).json({
+        success: false,
+        code: "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE",
+        message: "Super Admin accounts can only access the web portal.",
+      });
+      return;
+    }
+    if (error.message === "PLATFORM_ACCESS_DENIED") {
+      res.status(403).json({
+        success: false,
+        code: "PLATFORM_ACCESS_DENIED",
+        message: "Access denied for this platform.",
+      });
+      return;
+    }
+    if (error.message === "EXPIRED_OR_INVALID_PENDING_TOKEN") {
+      res.status(401).json({
+        success: false,
+        code: "EXPIRED_OR_INVALID_PENDING_TOKEN",
+        message: "OTP session has expired or is invalid. Please log in again.",
+      });
+      return;
+    }
+    if (error.message === "ACCOUNT_LOCKED_15_MINUTES") {
+      res.status(429).json({
+        success: false,
+        code: "ACCOUNT_LOCKED_15_MINUTES",
+        message: "Account locked due to 5 consecutive failed OTP attempts. Please try again in 15 minutes.",
+      });
+      return;
+    }
+    if (error.message === "OTP_ALREADY_USED") {
+      res.status(400).json({
+        success: false,
+        code: "OTP_ALREADY_USED",
+        message: "This OTP code has already been used. Please wait 30 seconds for the next code.",
+      });
+      return;
+    }
+    if (error.message === "INVALID_OTP") {
+      res.status(400).json({
+        success: false,
+        code: "INVALID_OTP",
+        message: "Invalid Google Authenticator OTP code. Please check your device clock and try again.",
+      });
+      return;
+    }
+    if (error.message === "INVALID_PENDING_TOKEN_TYPE") {
+      res.status(403).json({
+        success: false,
+        code: "INVALID_PENDING_TOKEN_TYPE",
+        message: "Invalid token type for this operation.",
+      });
+      return;
+    }
+    if (error.message === "USER_NOT_FOUND") {
+      res.status(404).json({
+        success: false,
+        code: "USER_NOT_FOUND",
+        message: "User account not found.",
+      });
+      return;
+    }
+    if (error.message === "2FA_SECRET_NOT_FOUND") {
+      res.status(400).json({
+        success: false,
+        code: "2FA_SECRET_NOT_FOUND",
+        message: "2FA secret not found. Please log in again.",
+      });
+      return;
+    }
+    console.error("Verify 2FA controller error:", error);
+    res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Failed to verify 2FA OTP.",
+    });
+  }
 };
 
 /**
@@ -502,8 +554,9 @@ export const refreshTokenController = async (req: AuthRequest, res: Response) =>
   try {
     const { refresh_token } = req.body;
     const deviceInfo = extractDeviceInfo(req);
+    const platform = resolvePlatform(req.headers["x-client-type"] as string | undefined);
 
-    const result = await rotateRefreshTokenService(refresh_token, deviceInfo);
+    const result = await rotateRefreshTokenService(refresh_token, platform, deviceInfo);
 
     res.json({
       success: true,
@@ -511,6 +564,18 @@ export const refreshTokenController = async (req: AuthRequest, res: Response) =>
       message: "Tokens rotated successfully.",
     });
   } catch (error: any) {
+    if (
+      error.message === "PLATFORM_ACCESS_DENIED_USER_WEB" ||
+      error.message === "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE" ||
+      error.message === "PLATFORM_ACCESS_DENIED"
+    ) {
+      res.status(403).json({
+        success: false,
+        code: error.message,
+        message: "Access denied for this platform.",
+      });
+      return;
+    }
     res.status(401).json({
       success: false,
       message: "Invalid or expired refresh token. Please login again.",
@@ -525,8 +590,9 @@ export const logoutController = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId || "";
     const { refresh_token, session_id } = req.body;
+    const deviceInfo = extractDeviceInfo(req);
 
-    await logoutService(userId, refresh_token, session_id);
+    await logoutService(userId, refresh_token, session_id, deviceInfo);
 
     res.json({
       success: true,
@@ -574,8 +640,10 @@ export const regenerateQRController = async (req: AuthRequest, res: Response) =>
 
     const userId = decoded.userId;
     const email = decoded.email;
+    const oldChallengeId = decoded.challengeId;
+    const deviceInfo = extractDeviceInfo(req);
 
-    const result = await regenerateQRService(userId, email);
+    const result = await regenerateQRService(userId, email, deviceInfo, oldChallengeId);
 
     res.json({
       success: true,
@@ -704,15 +772,17 @@ export const firebaseLoginController = async (req: AuthRequest, res: Response) =
     const uid = decodedToken.uid;
     const email = decodedToken.email || "";
 
-    // Look up the Firestore profile by uid
-    const profile = await findProfileByIdModel(uid);
-    if (!profile) {
+    // Look up the account in the split users/admins collections
+    const identity = await findIdentityByIdModel(uid);
+    if (!identity) {
       res.status(404).json({
         success: false,
         message: "User profile not found. Please register first.",
       });
       return;
     }
+    const profile = identity.profile;
+    const userType = identity.user_type;
 
     if (!profile.is_active) {
       res.status(403).json({
@@ -723,6 +793,35 @@ export const firebaseLoginController = async (req: AuthRequest, res: Response) =
     }
 
     const deviceInfo = extractDeviceInfo(req);
+    const platform = resolvePlatform(req.headers["x-client-type"] as string | undefined);
+
+    // Verify platform access before proceeding
+    try {
+      assertPlatformAccess(profile.role, platform);
+    } catch (platformErr: any) {
+      if (platformErr.message === "PLATFORM_ACCESS_DENIED_USER_WEB") {
+        res.status(403).json({
+          success: false,
+          code: "PLATFORM_ACCESS_DENIED_USER_WEB",
+          message: "This account does not have access to the web portal.",
+        });
+        return;
+      }
+      if (platformErr.message === "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE") {
+        res.status(403).json({
+          success: false,
+          code: "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE",
+          message: "Super Admin accounts can only access the web portal.",
+        });
+        return;
+      }
+      res.status(403).json({
+        success: false,
+        code: "PLATFORM_ACCESS_DENIED",
+        message: "Access denied for this platform.",
+      });
+      return;
+    }
 
     // Check 2FA requirement
     const has2FAEnabled = profile.is_2fa_enabled && profile.two_fa_secret;
@@ -731,8 +830,10 @@ export const firebaseLoginController = async (req: AuthRequest, res: Response) =
     if (has2FAEnabled) {
       // 2FA already enabled (any role) - prompt for OTP
       const roleConfig = getRoleAuthConfig(profile.role);
+      const { createLoginChallengeModel } = require("../models/totp.model");
+      const challenge = await createLoginChallengeModel({ userId: uid, userType, deviceInfo });
       const otpPendingToken = jwt.sign(
-        { userId: uid, email, role: profile.role, type: "OTP_PENDING" },
+        { userId: uid, email, role: profile.role, userType, type: "OTP_PENDING", challengeId: challenge.id, platform },
         env.JWT_SECRET,
         { expiresIn: roleConfig.otpPendingExpiry } as jwt.SignOptions
       );
@@ -743,6 +844,7 @@ export const firebaseLoginController = async (req: AuthRequest, res: Response) =
           require_otp: true,
           setup_required: false,
           otp_pending_token: otpPendingToken,
+          challenge_id: challenge.id,
         },
         message: "Please enter 6-digit Google Authenticator OTP.",
       });
@@ -754,6 +856,7 @@ export const firebaseLoginController = async (req: AuthRequest, res: Response) =
       const roleConfig = getRoleAuthConfig(profile.role);
       const { generateTotpSecret, generateQrCodeDataUrl } = require("../../../shared/utils/totp.utils");
       const { encryptSecret, decryptSecret } = require("../../../shared/utils/crypto.utils");
+      const { createLoginChallengeModel } = require("../models/totp.model");
 
       let secret: string;
       let qrCodeUrl: string;
@@ -771,8 +874,9 @@ export const firebaseLoginController = async (req: AuthRequest, res: Response) =
         await updateProfile2FA(uid, encryptedSecret, false);
       }
 
+      const challenge = await createLoginChallengeModel({ userId: uid, userType, deviceInfo });
       const setupToken = jwt.sign(
-        { userId: uid, email, role: profile.role, type: "2FA_SETUP" },
+        { userId: uid, email, role: profile.role, userType, type: "2FA_SETUP", challengeId: challenge.id, platform },
         env.JWT_SECRET,
         { expiresIn: roleConfig.qrSetupExpiry } as jwt.SignOptions
       );
@@ -786,31 +890,48 @@ export const firebaseLoginController = async (req: AuthRequest, res: Response) =
           secret,
           otpauth_url: `otpauth://totp/${encodeURIComponent("Sofiya Bangles")}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent("Sofiya Bangles")}&algorithm=SHA1&digits=6&period=30`,
           otp_pending_token: setupToken,
+          challenge_id: challenge.id,
         },
         message: "Scan QR code using Google Authenticator.",
       });
       return;
     }
 
+    const correlationId = "AUTH-" + require("uuid").v4();
+
     // No 2FA requirement - issue JWT directly
     await create2FAAuditLogModel({
       userId: uid,
+      userType,
       action: "PASSWORD_SUCCESS",
       deviceInfo,
       details: "Firebase Auth login",
+      correlationId,
     });
 
     const roleConfig = getRoleAuthConfig(profile.role);
 
     const accessToken = jwt.sign(
-      { userId: uid, email, role: profile.role },
+      { userId: uid, email, role: profile.role, userType, platform },
       env.JWT_SECRET,
       { expiresIn: roleConfig.accessTokenExpiry } as jwt.SignOptions
     );
 
     const rawRefreshToken = require("uuid").v4();
-    const refreshTokenRecord = await createRefreshTokenModel(uid, rawRefreshToken, roleConfig.refreshTokenExpiryDays);
-    const session = await createLoginSessionModel(uid, refreshTokenRecord.id, deviceInfo, roleConfig.sessionExpiryDays);
+    const refreshTokenRecord = await createRefreshTokenModel(uid, userType, rawRefreshToken, roleConfig.refreshTokenExpiryDays, platform);
+    const session = await createLoginSessionModel(uid, userType, refreshTokenRecord.id, deviceInfo, roleConfig.sessionExpiryDays);
+
+    // Permanent audit record with login time + ip so logout can close the session
+    await createAuditLogModel({
+      actor_id: uid,
+      user_type: userType,
+      action: "LOGIN_SUCCESS",
+      table_name: "login_sessions",
+      record_id: session.id,
+      session_id: session.id,
+      correlation_id: correlationId,
+      ip_address: deviceInfo.ip_address || "",
+    });
 
     const { password_hash, two_fa_secret, ...safeUser } = profile;
 
@@ -851,7 +972,7 @@ export const setPasswordController = async (req: AuthRequest, res: Response) => 
       return;
     }
 
-    // Find the existing profile
+    // Find the existing account (users/admins split aware)
     const profile = await findProfileByEmailModel(email.toLowerCase().trim());
     if (!profile) {
       res.status(404).json({
@@ -861,13 +982,14 @@ export const setPasswordController = async (req: AuthRequest, res: Response) => 
       return;
     }
 
-    // Hash the password and store it
+    // Hash the password and store it in the correct collection
     const salt = await bcrypt.genSalt(12);
     const password_hash = await bcrypt.hash(password, salt);
-    
-    await db.collection("profiles").doc(profile.id).update({
+
+    const identity = await findIdentityByIdModel(profile.id);
+    await db.collection(identity?.collection || "users").doc(profile.id).update({
       password_hash,
-      updated_at: new Date().toISOString(),
+      updated_at: nowISTISO(),
     });
 
     res.json({

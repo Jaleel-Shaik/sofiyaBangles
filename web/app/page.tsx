@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import LoginScreen from "@/features/auth/components/LoginScreen";
 import Verify2FAScreen from "@/features/auth/components/Verify2FAScreen";
 import Setup2FAScreen from "@/features/auth/components/Setup2FAScreen";
+import AccessDeniedModal from "@/features/auth/components/AccessDeniedModal";
 
 export default function HomePage() {
   const {
@@ -15,15 +16,18 @@ export default function HomePage() {
     setupRequired,
     loginStep,
     isLoading,
+    accessDenied,
+    accessDeniedMessage,
+    clearAccessDenied,
   } = useAuth();
   const router = useRouter();
 
   // Redirect to dashboard once authenticated
   useEffect(() => {
-    if (isAuthenticated && loginStep === "complete" && !isLoading) {
+    if (isAuthenticated && loginStep === "complete" && !isLoading && !accessDenied) {
       router.push("/dashboard");
     }
-  }, [isAuthenticated, loginStep, isLoading, router]);
+  }, [isAuthenticated, loginStep, isLoading, accessDenied, router]);
 
   if (isLoading) {
     return (
@@ -33,6 +37,15 @@ export default function HomePage() {
           <p className="text-sm text-[#A3A3A3]">Loading...</p>
         </div>
       </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <AccessDeniedModal
+        message={accessDeniedMessage || "This account does not have access to the web portal."}
+        onClose={clearAccessDenied}
+      />
     );
   }
 

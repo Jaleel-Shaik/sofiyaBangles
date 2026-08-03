@@ -29,11 +29,14 @@ export const loginSchema = z.object({
 });
 
 export const verify2faSchema = z.object({
-  otp_pending_token: z.string().min(1, "OTP pending token is required"),
+  otp_pending_token: z.string().optional(),
+  challenge_id: z.string().optional(),
   otp_code: z
     .string()
     .length(6, "Google Authenticator OTP must be exactly 6 digits")
     .regex(/^\d+$/, "OTP must contain only numbers"),
+}).refine((data) => data.otp_pending_token || data.challenge_id, {
+  message: "Either otp_pending_token or challenge_id is required",
 });
 
 export const refreshTokenSchema = z.object({

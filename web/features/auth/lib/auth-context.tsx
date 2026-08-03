@@ -29,6 +29,8 @@ interface AuthState {
   qrCodeUrl: string | null;
   manualSecret: string | null;
   loginStep: "idle" | "password_verified" | "2fa_verified" | "complete";
+  accessDenied: boolean;
+  accessDeniedMessage: string | null;
 }
 
 interface AuthContextType extends AuthState {
@@ -39,6 +41,7 @@ interface AuthContextType extends AuthState {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   getSessions: () => Promise<any[]>;
+  clearAccessDenied: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,6 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     qrCodeUrl: null,
     manualSecret: null,
     loginStep: "idle",
+    accessDenied: false,
+    accessDeniedMessage: null,
   });
 
   // Load persisted auth state on mount
@@ -72,6 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (accessToken && refreshTokenValue && userJson) {
       try {
         const user = JSON.parse(userJson) as User;
+        
+        // Enforce web authorization: regular users cannot log into the web portal
+        if (user.role === "user") {
+          throw new Error("This account does not have access to the web portal.");
+        }
+
         setState((prev) => ({
           ...prev,
           user,
@@ -81,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           loginStep: "complete",
           isLoading: false,
         }));
-      } catch {
+      } catch (err) {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("user");
@@ -125,10 +136,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [state.isAuthenticated]);
 
+  const clearAccessDenied = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      accessDenied: false,
+      accessDeniedMessage: null,
+    }));
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     // Clear any stale session-ended flags from a previous session
     sessionManager.clearEndReason();
-    setState((prev) => ({ ...prev, isLoading: true }));
+    setState((prev) => ({ ...prev, isLoading: true, accessDenied: false, accessDeniedMessage: null }));
 
     try {
       const result = await authApi.login(email, password);
@@ -159,9 +178,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }));
       } else if (result.access_token && result.user) {
         // Direct token response (regular users bypass 2FA)
+        if (result.user.role === "user") {
+          throw new Error("PLATFORM_ACCESS_DENIED_USER_WEB");
+        }
+
         localStorage.setItem("access_token", result.access_token);
         localStorage.setItem("refresh_token", result.refresh_token || "");
         localStorage.setItem("user", JSON.stringify(result.user));
+        if (result.session_id) localStorage.setItem("session_id", result.session_id);
 
         setState((prev) => ({
           ...prev,
@@ -185,8 +209,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return result;
-    } catch (error) {
-      setState((prev) => ({ ...prev, isLoading: false }));
+    } catch (error: any) {
+      const responseData = error?.response?.data;
+      const code = responseData?.code;
+      const message = responseData?.message || error.message || "";
+      
+      if (
+        code === "PLATFORM_ACCESS_DENIED_USER_WEB" || 
+        error.message === "PLATFORM_ACCESS_DENIED_USER_WEB" ||
+        message.includes("does not have access to the web portal")
+      ) {
+        setState((prev) => ({
+          ...prev,
+          accessDenied: true,
+          accessDeniedMessage: "This account does not have access to the web portal.",
+          isLoading: false,
+        }));
+      } else {
+        setState((prev) => ({ ...prev, isLoading: false }));
+      }
       throw error;
     }
   }, []);
@@ -196,15 +237,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("No OTP pending token. Please login again.");
     }
 
-    setState((prev) => ({ ...prev, isLoading: true }));
+    setState((prev) => ({ ...prev, isLoading: true, accessDenied: false, accessDeniedMessage: null }));
 
     try {
       const result = await authApi.verify2FA(state.otpPendingToken, otpCode);
+
+      if (result.user.role === "user") {
+        throw new Error("PLATFORM_ACCESS_DENIED_USER_WEB");
+      }
 
       // Store auth data
       localStorage.setItem("access_token", result.access_token);
       localStorage.setItem("refresh_token", result.refresh_token);
       localStorage.setItem("user", JSON.stringify(result.user));
+      if (result.session_id) localStorage.setItem("session_id", result.session_id);
 
       setState((prev) => ({
         ...prev,
@@ -222,8 +268,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }));
 
       return result;
-    } catch (error) {
-      setState((prev) => ({ ...prev, isLoading: false }));
+    } catch (error: any) {
+      const responseData = error?.response?.data;
+      const code = responseData?.code;
+      const message = responseData?.message || error.message || "";
+      
+      if (
+        code === "PLATFORM_ACCESS_DENIED_USER_WEB" || 
+        error.message === "PLATFORM_ACCESS_DENIED_USER_WEB" ||
+        message.includes("does not have access to the web portal")
+      ) {
+        setState((prev) => ({
+          ...prev,
+          accessDenied: true,
+          accessDeniedMessage: "This account does not have access to the web portal.",
+          isLoading: false,
+        }));
+      } else {
+        setState((prev) => ({ ...prev, isLoading: false }));
+      }
       throw error;
     }
   }, [state.otpPendingToken]);
@@ -233,15 +296,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("No OTP pending token. Please login again.");
     }
 
-    setState((prev) => ({ ...prev, isLoading: true }));
+    setState((prev) => ({ ...prev, isLoading: true, accessDenied: false, accessDeniedMessage: null }));
 
     try {
       const result = await authApi.verify2FA(state.otpPendingToken, otpCode);
+
+      if (result.user.role === "user") {
+        throw new Error("PLATFORM_ACCESS_DENIED_USER_WEB");
+      }
 
       // Store auth data
       localStorage.setItem("access_token", result.access_token);
       localStorage.setItem("refresh_token", result.refresh_token);
       localStorage.setItem("user", JSON.stringify(result.user));
+      if (result.session_id) localStorage.setItem("session_id", result.session_id);
 
       setState((prev) => ({
         ...prev,
@@ -259,8 +327,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }));
 
       return result;
-    } catch (error) {
-      setState((prev) => ({ ...prev, isLoading: false }));
+    } catch (error: any) {
+      const responseData = error?.response?.data;
+      const code = responseData?.code;
+      const message = responseData?.message || error.message || "";
+      
+      if (
+        code === "PLATFORM_ACCESS_DENIED_USER_WEB" || 
+        error.message === "PLATFORM_ACCESS_DENIED_USER_WEB" ||
+        message.includes("does not have access to the web portal")
+      ) {
+        setState((prev) => ({
+          ...prev,
+          accessDenied: true,
+          accessDeniedMessage: "This account does not have access to the web portal.",
+          isLoading: false,
+        }));
+      } else {
+        setState((prev) => ({ ...prev, isLoading: false }));
+      }
       throw error;
     }
   }, [state.otpPendingToken]);
@@ -290,9 +375,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const performLogout = useCallback(async () => {
     const refreshToken = localStorage.getItem("refresh_token");
+    const sessionId = localStorage.getItem("session_id");
     try {
       if (refreshToken) {
-        await authApi.logout(refreshToken);
+        await authApi.logout(refreshToken, sessionId || undefined);
       }
     } catch {
       // Best effort logout
@@ -301,6 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
+    localStorage.removeItem("session_id");
     sessionManager.clearEndReason();
 
     setState({
@@ -315,6 +402,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       qrCodeUrl: null,
       manualSecret: null,
       loginStep: "idle",
+      accessDenied: false,
+      accessDeniedMessage: null,
     });
   }, []);
 
@@ -326,10 +415,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     try {
       const user = await authApi.getMe();
+      if (user.role === "user") {
+        throw new Error("Invalid role for web");
+      }
       localStorage.setItem("user", JSON.stringify(user));
       setState((prev) => ({ ...prev, user }));
     } catch {
-      // Token might be expired
+      // Token might be expired or user role changed/invalid
       await performLogout();
     }
   }, [performLogout]);
@@ -348,6 +440,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     refreshUser,
     getSessions,
+    clearAccessDenied,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

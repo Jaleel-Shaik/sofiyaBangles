@@ -39,6 +39,20 @@ export const env = {
   // Session Cleanup Interval in ms (default 1 hour)
   SESSION_CLEANUP_INTERVAL_MS: Number(process.env.SESSION_CLEANUP_INTERVAL_MS) || 3600000,
 
+  // Login Challenge lifetime in ms (temporary OTP/2FA step, default 5 minutes)
+  LOGIN_CHALLENGE_TTL_MS: Number(process.env.LOGIN_CHALLENGE_TTL_MS) || 300000,
+
+  // How long expired/revoked sessions & tokens are kept before hard deletion.
+  // Temporary records should be deleted permanently as soon as possible,
+  // so we delete at expiry (grace of 0 by default).
+  SESSION_EXPIRY_GRACE_MS: Number(process.env.SESSION_EXPIRY_GRACE_MS) || 0,
+
+  // Permanent audit logs retention (default 90 days)
+  AUDIT_RETENTION_DAYS: Number(process.env.AUDIT_RETENTION_DAYS) || 90,
+
+  // Long-retention security events (default 365 days)
+  SECURITY_EVENT_RETENTION_DAYS: Number(process.env.SECURITY_EVENT_RETENTION_DAYS) || 365,
+
   // Maximum allowed active sessions per user
   MAX_ACTIVE_SESSIONS: Number(process.env.MAX_ACTIVE_SESSIONS) || 5,
 

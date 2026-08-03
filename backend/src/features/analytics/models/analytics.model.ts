@@ -5,7 +5,7 @@ export const getOverviewAnalyticsModel = async (): Promise<OverviewAnalytics> =>
   const activeProductsQuery = db.collection("products").where("is_active", "==", true).count().get();
   const totalProductsQuery = db.collection("products").count().get();
   const totalCategoriesQuery = db.collection("categories").where("is_active", "==", true).count().get();
-  const totalUsersQuery = db.collection("profiles").where("role", "==", "user").count().get();
+  const totalUsersQuery = db.collection("users").count().get();
   const totalFavoritesQuery = db.collection("favorites").count().get();
   const totalOrdersQuery = db.collection("orders").count().get();
 
@@ -90,8 +90,7 @@ export const getRecentSignupsModel = async (
   const dateLimit = new Date();
   dateLimit.setDate(dateLimit.getDate() - days);
 
-  const snapshot = await db.collection("profiles")
-    .where("role", "==", "user")
+  const snapshot = await db.collection("users")
     .where("created_at", ">=", dateLimit.toISOString())
     .get();
 

@@ -45,7 +45,7 @@ export const updateUserRoleService = async (
   await createAuditLogModel({
     actor_id: actorId,
     action: "USER_ROLE_CHANGED",
-    table_name: "profiles",
+    table_name: role === "admin" || role === "super_admin" ? "admins" : "users",
     record_id: id,
     old_data: { role: existing.role },
     new_data: { role },

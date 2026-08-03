@@ -17,6 +17,7 @@ export const apiClient = axios.create({
   timeout: 15000, // 15 seconds timeout
   headers: {
     'Content-Type': 'application/json',
+    'x-client-type': 'mobile',
   },
 });
 
@@ -195,6 +196,8 @@ apiClient.interceptors.response.use(
 
         const response = await axios.post(`${getCachedApiBaseUrl()}/auth/refresh-token`, {
           refresh_token: refreshToken,
+        }, {
+          headers: { 'x-client-type': 'mobile' },
         });
 
         const { access_token, refresh_token: newRefreshToken } = response.data.data;
@@ -254,6 +257,8 @@ const refreshTokenSilently = async () => {
 
     const response = await axios.post(`${getCachedApiBaseUrl()}/auth/refresh-token`, {
       refresh_token: refreshToken,
+    }, {
+      headers: { 'x-client-type': 'mobile' },
     });
 
     const { access_token, refresh_token: newRefreshToken } = response.data.data;

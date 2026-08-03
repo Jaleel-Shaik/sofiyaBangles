@@ -9,17 +9,30 @@ GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '158053850417-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
 });
 
+// Accounts are split across "users" and "admins" collections.
+const accountCollection = (role?: string) =>
+  role === 'admin' || role === 'super_admin' ? 'admins' : 'users';
+
+/** Reads an account from both collections (users first, then admins). */
+const readAccountDoc = async (uid: string) => {
+  const db = getFirestore();
+  for (const coll of ['users', 'admins']) {
+    const ref = doc(db, coll, uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) return { data: snap.data(), id: uid };
+  }
+  return null;
+};
+
 export const login = async (email: string, password: string) => {
   try {
     const auth = getAuth();
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     
-    const db = getFirestore();
-    const userRef = doc(db, 'profiles', userCredential.user.uid);
-    const userDoc = await getDoc(userRef);
+    const account = await readAccountDoc(userCredential.user.uid);
     
-    if (userDoc.data() != null) {
-      const userData = userDoc.data() as any;
+    if (account) {
+      const userData = account.data as any;
       const user = { ...userData, id: userCredential.user.uid };
       const token = await getIdToken(userCredential.user);
       if (user.role === 'admin') {
@@ -55,7 +68,7 @@ export const register = async (params: { full_name: string; email: string; passw
     };
 
     const db = getFirestore();
-    const userRef = doc(db, 'profiles', uid);
+    const userRef = doc(db, accountCollection(role), uid);
     await setDoc(userRef, userData);
     
     // Store the bcrypt password hash on the backend so backend login can verify passwords
@@ -112,16 +125,15 @@ export const signInWithGoogle = async () => {
     const userCredential = await signInWithCredential(auth, googleCredential);
     const uid = userCredential.user.uid;
 
-    // Check if user exists in Firestore
+    // Check if user exists in Firestore (users or admins)
     const db = getFirestore();
-    const userRef = doc(db, 'profiles', uid);
-    const userDoc = await getDoc(userRef);
+    const account = await readAccountDoc(uid);
 
     let userData: any;
-    if (userDoc.exists()) {
-      userData = { ...userDoc.data(), id: uid };
+    if (account) {
+      userData = { ...account.data, id: uid };
     } else {
-      // First time Google login, create profile
+      // First time Google login, create profile in the users collection
       userData = {
         id: uid,
         email: userCredential.user.email || '',
@@ -131,7 +143,7 @@ export const signInWithGoogle = async () => {
         is_active: true,
         avatar_url: userCredential.user.photoURL || null
       };
-      await setDoc(userRef, userData);
+      await setDoc(doc(db, 'users', uid), userData);
     }
 
     const token = await getIdToken(userCredential.user);
@@ -225,7 +237,7 @@ export const firebaseLoginWithToken = async (firebaseToken: string) => {
 export const updateUserProfile = async (uid: string, data: any) => {
   try {
     const db = getFirestore();
-    const userRef = doc(db, 'profiles', uid);
+    const userRef = doc(db, accountCollection(data?.role), uid);
     await setDoc(userRef, data, { merge: true });
     return { success: true };
   } catch (error: any) {

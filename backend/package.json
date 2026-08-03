@@ -9,6 +9,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "delete-products": "npx ts-node src/scripts/delete-all-products.ts",
+    "create-admin": "npx ts-node src/scripts/create-admin.ts",
+    "recover-users": "npx ts-node src/scripts/recover-orphaned-users.ts",
+    "normalize-times": "npx ts-node src/scripts/normalize-ist-timestamps.ts",
     "migrate": "npx ts-node src/migrations/run-migrations.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

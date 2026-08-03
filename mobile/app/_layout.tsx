@@ -20,12 +20,15 @@ export default function RootLayout() {
   useEffect(() => {
     if (!token || !user || !rootNavigationState?.key) return;
 
+    if (user.role === "super_admin") {
+      useAuthStore.getState().forceLogout();
+      router.replace("/login");
+      return;
+    }
+
     const inLoginScreen = segments?.[0] === "login";
 
     if (inLoginScreen) {
-      // super_admin stays on /login — the LoginScreen shows the restriction modal
-      if (user.role === "super_admin") return;
-
       const href = getDashboardHref(user, token);
       router.replace(href);
     }

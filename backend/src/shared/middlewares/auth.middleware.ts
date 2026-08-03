@@ -3,7 +3,8 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { AuthRequest, JwtPayload } from "../types";
 
-import { auth, db } from "../config/firebase";
+import { auth } from "../config/firebase";
+import { findIdentityByIdModel } from "../models/identity.model";
 
 /**
  * Verifies the JWT token from Authorization header.
@@ -41,12 +42,13 @@ export const authenticate = async (
 
     let role = decoded.role;
     let userId = decoded.userId || decoded.uid;
+    let platform = decoded.platform || (isFirebaseToken ? "mobile" : "web");
 
-    // If it's a Firebase token and lacks a role in claims, fetch from Firestore
+    // If it's a Firebase token and lacks a role in claims, fetch from users/admins
     if (isFirebaseToken && !role) {
-      const profileDoc = await db.collection("profiles").doc(userId).get();
-      if (profileDoc.exists) {
-        role = profileDoc.data()?.role || "user";
+      const identity = await findIdentityByIdModel(userId);
+      if (identity) {
+        role = identity.profile.role || "user";
       } else {
         role = "user";
       }
@@ -56,6 +58,7 @@ export const authenticate = async (
       userId,
       email: decoded.email,
       role: role,
+      platform: platform,
     };
 
     next();
@@ -99,12 +102,13 @@ export const optionalAuthenticate = async (
 
     let role = decoded.role;
     let userId = decoded.userId || decoded.uid;
+    let platform = decoded.platform || (isFirebaseToken ? "mobile" : "web");
 
     if (isFirebaseToken && !role) {
       try {
-        const profileDoc = await db.collection("profiles").doc(userId).get();
-        if (profileDoc.exists) {
-          role = profileDoc.data()?.role || "user";
+        const identity = await findIdentityByIdModel(userId);
+        if (identity) {
+          role = identity.profile.role || "user";
         } else {
           role = "user";
         }
@@ -117,6 +121,7 @@ export const optionalAuthenticate = async (
       userId,
       email: decoded.email,
       role: role,
+      platform: platform,
     };
   } catch (error) {
     // Token invalid or expired; leave req.user undefined for optional auth

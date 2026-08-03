@@ -43,12 +43,18 @@ export default function DashboardLayout({
   const [profileOpen, setProfileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated or not authorized
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/");
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push("/");
+      } else if (user && user.role === "user") {
+        logout().finally(() => {
+          router.push("/");
+        });
+      }
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, user, router, logout]);
 
   const handleLogout = async () => {
     setLoggingOut(true);

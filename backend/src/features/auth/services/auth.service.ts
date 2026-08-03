@@ -41,7 +41,7 @@ export const registerService = async (input: RegisterInput) => {
   await createAuditLogModel({
     actor_id: profile.id,
     action: "USER_REGISTERED",
-    table_name: "profiles",
+    table_name: profile.role === "admin" || profile.role === "super_admin" ? "admins" : "users",
     record_id: profile.id,
   });
 
