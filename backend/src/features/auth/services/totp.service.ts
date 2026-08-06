@@ -30,6 +30,7 @@ import {
   cleanupExpiredTokens,
   cleanupOldAuditLogs,
   cleanupOldSecurityEvents,
+  cleanupExpiredUsedOtpTokens,
 } from "../models/totp.model";
 import { createSecurityEventModel } from "../models/security.model";
 import { createAuditLogModel, findAuditLogByRecordModel } from "../../../shared/models/audit.model";
@@ -615,17 +616,33 @@ export const revokeAllUserSessionsService = async (userId: string) => {
  *   - security_events  : long retention, pruned after SECURITY_EVENT_RETENTION_DAYS (365 days)
  */
 export const cleanupExpiredSessionsAndTokens = async () => {
-  const [expiredChallenges, expiredSessions, expiredTokens, oldAuditLogs, oldSecurityEvents] = await Promise.all([
+  const [
+    expiredChallenges,
+    expiredSessions,
+    expiredTokens,
+    oldAuditLogs,
+    oldSecurityEvents,
+    expiredUsedOtpTokens,
+  ] = await Promise.all([
     cleanupExpiredChallenges(),
     cleanupExpiredSessions(),
     cleanupExpiredTokens(),
     cleanupOldAuditLogs(),
     cleanupOldSecurityEvents(),
+    cleanupExpiredUsedOtpTokens(),
   ]);
 
-  if (expiredChallenges + expiredSessions + expiredTokens + oldAuditLogs + oldSecurityEvents > 0) {
+  if (
+    expiredChallenges +
+      expiredSessions +
+      expiredTokens +
+      oldAuditLogs +
+      oldSecurityEvents +
+      expiredUsedOtpTokens >
+    0
+  ) {
     console.log(
-      `🧹 Cleanup: ${expiredChallenges} challenges, ${expiredSessions} sessions, ${expiredTokens} tokens, ${oldAuditLogs} audit logs, ${oldSecurityEvents} security events`
+      `🧹 Cleanup: ${expiredChallenges} challenges, ${expiredSessions} sessions, ${expiredTokens} tokens, ${oldAuditLogs} audit logs, ${oldSecurityEvents} security events, ${expiredUsedOtpTokens} expired used OTP tokens`
     );
   }
 };

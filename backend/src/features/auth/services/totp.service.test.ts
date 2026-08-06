@@ -66,4 +66,28 @@ test('TOTP Utilities Setup and Invalidation Suite', async (t) => {
     const isNewCodeAccepted = verifyTotpCode(setup2.secret, newCode);
     assert.equal(isNewCodeAccepted, true, 'OTP code from the new secret should be accepted');
   });
+
+  await t.test('cleanupExpiredUsedOtpTokens deletes records past their expires_at date', async () => {
+    const { db } = require('../../../shared/config/firebase');
+    const { cleanupExpiredUsedOtpTokens } = require('../models/totp.model');
+
+    const testDocId = 'test_user_expiredToken';
+    const docRef = db.collection('used_otp_tokens').doc(testDocId);
+
+    // Write a mock document that expired 5 minutes ago
+    await docRef.set({
+      user_id: 'test_user',
+      token: 'expiredToken',
+      created_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    });
+
+    // Run the cleanup
+    const deletedCount = await cleanupExpiredUsedOtpTokens();
+    assert.ok(deletedCount >= 1, 'Pruner should have deleted at least the test expired token document');
+
+    // Confirm it is gone
+    const doc = await docRef.get();
+    assert.equal(doc.exists, false, 'Expired token document should be hard-deleted from database');
+  });
 });

@@ -430,3 +430,20 @@ export const create2FAAuditLogModel = async (data: {
     created_at: new Date().toISOString(),
   });
 };
+
+/**
+ * Hard-deletes expired used OTP tokens (replay attack protection).
+ */
+export const cleanupExpiredUsedOtpTokens = async (): Promise<number> => {
+  const now = new Date().toISOString();
+  const snapshot = await db.collection("used_otp_tokens")
+    .where("expires_at", "<", now)
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+  return snapshot.size;
+};
