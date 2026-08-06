@@ -651,6 +651,19 @@ const QRSetupStep = ({
                   <Text className="font-bold">+</Text> → scan code
                 </Text>
               </View>
+
+              {/* WARNING FOR ROTATED CODE */}
+              <View className="flex-row items-start mt-2 gap-2 bg-blue-50 rounded-xl px-3 py-2.5 border border-blue-200/60 w-full">
+                <Ionicons name="information-circle-outline" size={16} color="#2563eb" style={{ marginTop: 1 }} />
+                <View className="flex-1">
+                  <Text className="text-blue-800 text-xs font-bold mb-0.5">
+                    New Setup Generated
+                  </Text>
+                  <Text className="text-blue-700 text-[10px] leading-3.5">
+                    Please remove any old entries for this account from Google Authenticator to avoid confusion. Only the newly scanned entry will work.
+                  </Text>
+                </View>
+              </View>
             </View>
           ) : (
             <View className="py-10 items-center justify-center">

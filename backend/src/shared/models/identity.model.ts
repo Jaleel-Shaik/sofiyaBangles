@@ -120,6 +120,7 @@ export const createIdentityModel = async (data: {
     is_active: data.is_active ?? true,
     is_2fa_enabled: data.is_2fa_enabled ?? false,
     two_fa_secret: data.two_fa_secret ?? null,
+    two_fa_updated_at: null,
     created_at: nowISTISO(),
     updated_at: nowISTISO(),
   };
@@ -143,6 +144,7 @@ export const updateIdentityModel = async (
       | "is_active"
       | "is_2fa_enabled"
       | "two_fa_secret"
+      | "two_fa_updated_at"
       | "role"
     >
   >,

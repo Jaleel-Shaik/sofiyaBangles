@@ -450,7 +450,7 @@ export default function EditProductScreen() {
       </ScrollView>
 
       <View className="p-5 bg-surface border-t border-divider" style={{ paddingBottom: Math.max(insets.bottom + 16, 24) }}>
-        <Button title={isActive ? "Save Product" : "Save as Draft"} onPress={handleSubmit} loading={loading} className="bg-primary py-4 rounded-full" />
+        <Button title="Save Product" onPress={handleSubmit} loading={loading} className="bg-primary py-4 rounded-full" />
       </View>
     </View>
   );

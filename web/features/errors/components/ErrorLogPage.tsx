@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import { apiClient } from "@/src/lib/api";
+import { formatIST } from "@/src/lib/dateUtils";
 import { classifyApiError } from "../lib/classify";
 import {
   getErrors,
@@ -349,7 +350,7 @@ export default function ErrorLogPage() {
                               <p className="text-[11px] text-[#525252]">Endpoint: {err.url}</p>
                             )}
                             <p className="text-[11px] text-[#525252] mt-1">
-                              Time: {new Date(err.ts).toLocaleString()}
+                              Time: {formatIST(new Date(err.ts))}
                             </p>
                           </div>
                         </div>

@@ -371,26 +371,12 @@ export default function AddProductScreen() {
           )}
         </View>
 
-        {/* Publish Toggle */}
-        <View className="flex-row items-center justify-between bg-surface p-4 rounded-2xl border border-divider mb-4">
-          <View className="flex-row items-center">
-            <Ionicons name={isActive ? "globe" : "eye-off-outline"} size={18} color={isActive ? "#22c55e" : "#94a3b8"} />
-            <Text className="text-text-primary font-bold ml-2">{isActive ? 'Published' : 'Draft'}</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setIsActive(!isActive)}
-            className={`w-14 h-7 rounded-full px-0.5 flex-row items-center ${isActive ? 'bg-success justify-end' : 'bg-slate-300 justify-start'}`}
-          >
-            <View className="w-6 h-6 bg-white rounded-full shadow-sm" />
-          </TouchableOpacity>
-        </View>
-
         <View className="h-32" />
       </ScrollView>
 
       <View className="p-5 bg-surface border-t border-divider" style={{ paddingBottom: Math.max(insets.bottom + 16, 24) }}>
         <Button 
-          title={isActive ? "Publish Product" : "Save as Draft"}
+          title="Create Product"
           onPress={handleSubmit} 
           loading={loading} 
           className="bg-primary py-4 rounded-full" 

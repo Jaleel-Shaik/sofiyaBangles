@@ -28,6 +28,7 @@ export const updateProfile2FA = async (
   await updateIdentityModel(userId, identity.user_type, {
     two_fa_secret: twoFaSecret,
     is_2fa_enabled: isEnabled,
+    two_fa_updated_at: twoFaSecret ? nowISTISO() : null,
   });
 };
 

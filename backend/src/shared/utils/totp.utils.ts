@@ -18,15 +18,20 @@ export const generateTotpSecret = (
   email: string
 ): { secret: string; otpauthUrl: string } => {
   const secret = generateSecret();
+  const now = new Date();
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthYear = `${months[now.getMonth()]} ${now.getFullYear()}`;
+  const issuer = `${ISSUER_NAME} (${monthYear})`;
+
   // Build URI manually — otplib's generateURI may omit parameters at default values
   const params = new URLSearchParams({
     secret,
-    issuer: ISSUER_NAME,
+    issuer: issuer,
     algorithm: "SHA1",
     digits: "6",
     period: "30",
   });
-  const otpauthUrl = `otpauth://totp/${uriEncode(ISSUER_NAME)}:${uriEncode(email)}?${params.toString()}`;
+  const otpauthUrl = `otpauth://totp/${uriEncode(issuer)}:${uriEncode(email)}?${params.toString()}`;
   return { secret, otpauthUrl };
 };
 

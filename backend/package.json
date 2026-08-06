@@ -13,7 +13,7 @@
     "recover-users": "npx ts-node src/scripts/recover-orphaned-users.ts",
     "normalize-times": "npx ts-node src/scripts/normalize-ist-timestamps.ts",
     "migrate": "npx ts-node src/migrations/run-migrations.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node -r ts-node/register --test src/**/*.test.ts"
   },
   "keywords": [],
   "author": "",

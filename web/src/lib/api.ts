@@ -41,6 +41,7 @@ export interface LoginResponse {
 export interface Verify2FAResponse {
   access_token: string;
   refresh_token: string;
+  session_id?: string;
   user: User;
 }
 
@@ -126,8 +127,14 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    // If 401 and not a retry, try refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const url = originalRequest.url ?? "";
+    const isAuthRoute =
+      url.includes("/auth/login") ||
+      url.includes("/auth/verify-2fa") ||
+      url.includes("/auth/refresh-token");
+
+    // If 401 and not a retry and not an auth route, try refresh
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
       if (isRefreshing) {
         // Queue this request until refresh completes
         return new Promise((resolve, reject) => {

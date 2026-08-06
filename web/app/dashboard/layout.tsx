@@ -28,7 +28,6 @@ const sidebarLinks = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Products", icon: Package, href: "/dashboard/products" },
   { label: "Categories", icon: ShoppingBag, href: "/dashboard/categories" },
-  { label: "Error Logs", icon: AlertTriangle, href: "/dashboard/errors" },
   { label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
 

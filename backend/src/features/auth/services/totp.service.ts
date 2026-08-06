@@ -132,21 +132,13 @@ export const initiateLoginService = async (
     };
   } else if (roleRequires2FA) {
     // First login: setup 2FA + temporary challenge
-    let secret: string;
-    let qrCodeUrl: string;
+    // Always generate a new TOTP secret to invalidate any previous setup QR codes
+    const result = generateTotpSecret(profile.email);
+    const secret = result.secret;
+    const encryptedSecret = encryptSecret(secret);
+    const qrCodeUrl = await generateQrCodeDataUrl(result.otpauthUrl);
 
-    if (profile.two_fa_secret && !profile.is_2fa_enabled) {
-      secret = decryptSecret(profile.two_fa_secret);
-      const otpauthUrl = `otpauth://totp/${encodeURIComponent("Sofiya Bangles")}:${encodeURIComponent(profile.email)}?secret=${secret}&issuer=${encodeURIComponent("Sofiya Bangles")}&algorithm=SHA1&digits=6&period=30`;
-      qrCodeUrl = await generateQrCodeDataUrl(otpauthUrl);
-    } else {
-      const result = generateTotpSecret(profile.email);
-      secret = result.secret;
-      const encryptedSecret = encryptSecret(secret);
-      qrCodeUrl = await generateQrCodeDataUrl(result.otpauthUrl);
-
-      await updateProfile2FA(profile.id, encryptedSecret, false);
-    }
+    await updateProfile2FA(profile.id, encryptedSecret, false);
 
     const challenge = await createLoginChallengeModel({ userId: profile.id, userType, deviceInfo, correlationId });
 

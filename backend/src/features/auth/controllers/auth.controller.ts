@@ -858,21 +858,12 @@ export const firebaseLoginController = async (req: AuthRequest, res: Response) =
       const { encryptSecret, decryptSecret } = require("../../../shared/utils/crypto.utils");
       const { createLoginChallengeModel } = require("../models/totp.model");
 
-      let secret: string;
-      let qrCodeUrl: string;
-
-      if (profile.two_fa_secret && !profile.is_2fa_enabled) {
-        // Reuse existing temporary secret
-        secret = decryptSecret(profile.two_fa_secret);
-        const otpauthUrl = `otpauth://totp/${encodeURIComponent("Sofiya Bangles")}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent("Sofiya Bangles")}&algorithm=SHA1&digits=6&period=30`;
-        qrCodeUrl = await generateQrCodeDataUrl(otpauthUrl);
-      } else {
-        const result = generateTotpSecret(email);
-        secret = result.secret;
-        const encryptedSecret = encryptSecret(secret);
-        qrCodeUrl = await generateQrCodeDataUrl(result.otpauthUrl);
-        await updateProfile2FA(uid, encryptedSecret, false);
-      }
+      // Always generate a new TOTP secret to invalidate any previous setup QR codes
+      const result = generateTotpSecret(email);
+      const secret = result.secret;
+      const encryptedSecret = encryptSecret(secret);
+      const qrCodeUrl = await generateQrCodeDataUrl(result.otpauthUrl);
+      await updateProfile2FA(uid, encryptedSecret, false);
 
       const challenge = await createLoginChallengeModel({ userId: uid, userType, deviceInfo });
       const setupToken = jwt.sign(

@@ -135,7 +135,7 @@ export default function OrdersScreen() {
                   </View>
                   <Text className="text-xs text-text-hint mt-1">
                     {new Date(order.purchased_at).toLocaleDateString("en-IN", {
-                      day: "numeric", month: "short", year: "numeric",
+                      day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
                     })}
                   </Text>
                 </View>

@@ -36,6 +36,7 @@ export interface Profile {
   is_active: boolean;
   is_2fa_enabled?: boolean;
   two_fa_secret?: string | null; // Encrypted secret
+  two_fa_updated_at?: string | null; // Rotation timestamp
   created_at: string;
   updated_at: string;
 }

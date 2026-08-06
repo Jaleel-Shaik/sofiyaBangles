@@ -14,6 +14,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Info,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -193,6 +194,21 @@ export default function Setup2FAScreen() {
                 <p className="text-[#737373]">
                   Open Google Authenticator and scan this QR code
                 </p>
+              </div>
+
+              {/* Warnings Banner */}
+              <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl p-3.5 mb-6 text-left">
+                <div className="flex gap-2.5">
+                  <Info className="w-5 h-5 text-[#2563EB] flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-sm text-[#1E3A8A] mb-0.5">
+                      New Authenticator Setup
+                    </h4>
+                    <p className="text-xs text-[#1E40AF] leading-relaxed">
+                      A new authenticator setup has been created. Please remove the old entry from your Google Authenticator app to avoid confusion. Only the newly scanned entry will work.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* QR Code */}
