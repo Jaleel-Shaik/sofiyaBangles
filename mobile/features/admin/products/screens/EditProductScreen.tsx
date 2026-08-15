@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, ActivityIndicator, Switch } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, ActivityIndicator, Switch, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +29,8 @@ export default function EditProductScreen() {
   const [selectedModelType, setSelectedModelType] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showModelPicker, setShowModelPicker] = useState(false);
   
   // Sizing State
   const [hasVariants, setHasVariants] = useState(false);
@@ -43,12 +45,10 @@ export default function EditProductScreen() {
       const fetchData = async () => {
         setLoading(true);
         try {
-          const [cats, mts, productData] = await Promise.all([
-            getCategories(), 
+          const [mts, productData] = await Promise.all([
             getModelTypes(),
             id ? getProductById(id as string) : Promise.resolve(null)
           ]);
-          setCategories(cats);
           setModelTypes(mts);
           
           if (productData) {
@@ -59,11 +59,8 @@ export default function EditProductScreen() {
             setUniqueCode(productData.unique_code || '');
             setIsActive(productData.is_active !== false);
             
-            const cat = cats.find(c => c.id === productData.category_id);
-            if (cat) {
-              setSelectedModelType(cat.model_type_id || '');
-              setSelectedCategory(cat.id);
-            }
+            setSelectedModelType(productData.model_type_id || '');
+            setSelectedCategory(productData.category_id || '');
             
             setImageUrls(productData.images || (productData.image_url ? [productData.image_url] : []));
             
@@ -92,10 +89,23 @@ export default function EditProductScreen() {
     }, [id])
   );
 
-  const filteredCategories = useMemo(() => {
-    if (!selectedModelType) return [];
-    return categories.filter(c => c.model_type_id === selectedModelType);
-  }, [categories, selectedModelType]);
+  useEffect(() => {
+    const fetchCats = async () => {
+      if (selectedModelType) {
+        try {
+          const cats = await getCategories(selectedModelType);
+          setCategories(cats);
+        } catch (error) {
+          setCategories([]);
+        }
+      } else {
+        setCategories([]);
+      }
+    };
+    fetchCats();
+  }, [selectedModelType]);
+
+  const filteredCategories = categories;
 
   const currentCategory = useMemo(() => categories.find(c => c.id === selectedCategory), [categories, selectedCategory]);
 
@@ -132,14 +142,21 @@ export default function EditProductScreen() {
 
 
   const handleSubmit = async () => {
-    if (!name || !price || !selectedCategory) {
-      Alert.alert('Validation Error', 'Please fill in all required fields (Name, Price, Category).');
+    const newErrors: Record<string, string> = {};
+    if (!name.trim()) newErrors.name = 'Product name is required';
+    if (!price) newErrors.price = 'Price is required';
+    else if (parseFloat(price) <= 0) newErrors.price = 'Price must be a positive number';
+    if (!selectedModelType) newErrors.model_type_id = 'Model Type is required';
+    if (!selectedCategory) newErrors.category = 'Category is required';
+    if (imageUrls.length === 0) newErrors.images = 'At least one image is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      const firstError = Object.values(newErrors)[0];
+      Alert.alert('Validation Error', firstError);
       return;
     }
-    if (imageUrls.length === 0) {
-      Alert.alert('Validation Error', 'Please select at least one image for the product.');
-      return;
-    }
+    setErrors({});
 
     const catName = categories.find(c => c.id === selectedCategory)?.category_name || 'PRD';
 
@@ -158,6 +175,7 @@ export default function EditProductScreen() {
         description,
         category_id: selectedCategory,
         categoryName: catName,
+        model_type_id: selectedModelType,
         quantity: parseInt(quantity, 10) || 0,
         unique_code: uniqueCode,
         is_active: isActive,
@@ -221,11 +239,19 @@ export default function EditProductScreen() {
       <ScrollView className="flex-1 px-4 pt-6" showsVerticalScrollIndicator={false}>
         {/* Images Section */}
         <View className="mb-6">
-          <Text className="text-sm font-bold text-text-secondary mb-3 ml-1">Product Images</Text>
+          <View className="flex-row justify-between items-center mb-3 ml-1">
+            <Text className="text-sm font-bold text-text-secondary">Product Images</Text>
+            {errors.images && <Text className="text-xs font-bold text-red-500">{errors.images}</Text>}
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-1 py-1">
             <TouchableOpacity 
-              className="w-40 h-40 bg-surface rounded-2xl border-2 border-dashed border-primary/30 items-center justify-center mr-4"
-              onPress={pickImage}
+              className={`w-40 h-40 bg-surface rounded-2xl border-2 border-dashed items-center justify-center mr-4 ${
+                errors.images ? 'border-red-500 bg-red-50/10' : 'border-primary/30'
+              }`}
+              onPress={() => {
+                pickImage();
+                if (errors.images) setErrors(prev => { const copy = { ...prev }; delete copy.images; return copy; });
+              }}
               activeOpacity={0.7}
             >
               <View className="w-12 h-12 bg-primary/10 rounded-full items-center justify-center mb-2">
@@ -255,11 +281,28 @@ export default function EditProductScreen() {
             </View>
             <Text className="text-lg font-bold text-text-primary">Basic Details</Text>
           </View>
-          <TextInputField label="Product Name *" placeholder="e.g. Ruby Gold Bangle" value={name} onChangeText={setName} />
-          <TextInputField label="Base Price (₹) *" placeholder="e.g. 2500" keyboardType="numeric" value={price} onChangeText={(val) => {
-            setPrice(val);
-            setCustomSizePrice(val);
-          }} />
+          <TextInputField 
+            label="Product Name *" 
+            placeholder="e.g. Ruby Gold Bangle" 
+            value={name} 
+            onChangeText={(val) => {
+              setName(val);
+              if (errors.name) setErrors(prev => { const copy = { ...prev }; delete copy.name; return copy; });
+            }} 
+            error={errors.name}
+          />
+          <TextInputField 
+            label="Base Price (₹) *" 
+            placeholder="e.g. 2500" 
+            keyboardType="numeric" 
+            value={price} 
+            onChangeText={(val) => {
+              setPrice(val);
+              setCustomSizePrice(val);
+              if (errors.price) setErrors(prev => { const copy = { ...prev }; delete copy.price; return copy; });
+            }} 
+            error={errors.price}
+          />
           <TextInputField label="Description" placeholder="Product details..." value={description} onChangeText={setDescription} multiline numberOfLines={3} style={{ height: 80, textAlignVertical: 'top' }} />
           <TextInputField label="Unique Code" placeholder="Auto-generated if empty" value={uniqueCode} onChangeText={setUniqueCode} />
 
@@ -286,27 +329,29 @@ export default function EditProductScreen() {
             </View>
             <Text className="text-lg font-bold text-text-primary">Categorization</Text>
           </View>
-          <Text className="text-sm font-bold text-text-secondary mb-3 ml-1">Model Type *</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-          {modelTypes.map((mt) => (
-            <TouchableOpacity 
-              key={mt.id}
-              className={`px-4 py-2 rounded-full border mr-3 ${selectedModelType === mt.id ? 'bg-primary border-primary' : 'bg-surface border-divider'}`}
-              onPress={() => {
-                setSelectedModelType(mt.id);
-                setSelectedCategory('');
-              }}
-            >
-              <Text className={`font-bold ${selectedModelType === mt.id ? 'text-white' : 'text-text-secondary'}`}>
-                {mt.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          <View className="flex-row items-center justify-between mb-3 px-1">
+            <Text className="text-sm font-bold text-text-secondary">Model Type *</Text>
+            {errors.model_type_id && <Text className="text-xs font-bold text-red-500">{errors.model_type_id}</Text>}
+          </View>
+          <TouchableOpacity 
+            className={`flex-row items-center justify-between p-4 rounded-2xl border mb-4 bg-white ${
+              errors.model_type_id ? 'border-red-500 bg-red-50/10' : 'border-divider'
+            }`}
+            onPress={() => setShowModelPicker(true)}
+            activeOpacity={0.8}
+          >
+            <Text className={`text-base ${selectedModelType ? 'text-text-primary font-bold' : 'text-slate-400'}`}>
+              {modelTypes.find(mt => mt.id === selectedModelType)?.name || 'Select Model Type'}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#94a3b8" />
+          </TouchableOpacity>
 
         {selectedModelType ? (
           <>
-            <Text className="text-sm font-bold text-text-secondary mb-2 ml-1">Select Category *</Text>
+            <View className="flex-row items-center mb-2 ml-1">
+              <Text className="text-sm font-bold text-text-secondary mr-2">Select Category *</Text>
+              {errors.category && <Text className="text-xs font-bold text-red-500">{errors.category}</Text>}
+            </View>
             <View className="mb-4">
               {filteredCategories.length > 0 ? (
                 filteredCategories.map((cat) => {
@@ -316,8 +361,18 @@ export default function EditProductScreen() {
                   return (
                     <TouchableOpacity 
                       key={cat.id}
-                      className={`p-4 rounded-2xl mb-3 border flex-row items-center ${isSelected ? 'bg-primary/5 border-primary' : 'bg-surface border-divider'}`}
-                      onPress={() => setSelectedCategory(cat.id)}
+                      className={`p-4 rounded-2xl mb-3 border flex-row items-center ${
+                        isSelected 
+                          ? 'bg-primary/5 border-primary' 
+                          : errors.category 
+                            ? 'bg-red-50/5 border-red-300' 
+                            : 'bg-surface border-divider'
+                      }`}
+                      onPress={() => {
+                        setSelectedCategory(cat.id);
+                        if (errors.category) setErrors(prev => { const copy = { ...prev }; delete copy.category; return copy; });
+                      }}
+                      activeOpacity={0.8}
                     >
                       <View className="w-20 h-20 rounded-2xl bg-surface mr-4 border border-divider overflow-hidden">
                         {cat.image_url ? (
@@ -452,6 +507,51 @@ export default function EditProductScreen() {
       <View className="p-5 bg-surface border-t border-divider" style={{ paddingBottom: Math.max(insets.bottom + 16, 24) }}>
         <Button title="Save Product" onPress={handleSubmit} loading={loading} className="bg-primary py-4 rounded-full" />
       </View>
+
+      {/* Model Type Selector Modal */}
+      <Modal visible={showModelPicker} transparent animationType="slide" onRequestClose={() => setShowModelPicker(false)}>
+        <TouchableOpacity 
+          className="flex-1 bg-black/50 justify-end" 
+          activeOpacity={1} 
+          onPress={() => setShowModelPicker(false)}
+        >
+          <View className="bg-white rounded-t-[32px] p-6 max-h-[70%]">
+            <View className="flex-row items-center justify-between mb-6 pb-2 border-b border-divider">
+              <Text className="text-xl font-bold text-text-primary">Select Model Type</Text>
+              <TouchableOpacity onPress={() => setShowModelPicker(false)}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {modelTypes.map((mt) => {
+                const isSelected = selectedModelType === mt.id;
+                return (
+                  <TouchableOpacity
+                    key={mt.id}
+                    className={`flex-row items-center justify-between p-4 rounded-2xl mb-3 border ${
+                      isSelected ? 'bg-primary/5 border-primary' : 'bg-surface border-divider'
+                    }`}
+                    onPress={() => {
+                      setSelectedModelType(mt.id);
+                      setSelectedCategory('');
+                      setShowModelPicker(false);
+                      if (errors.model_type_id) {
+                        setErrors(prev => { const copy = { ...prev }; delete copy.model_type_id; return copy; });
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text className={`text-base font-bold ${isSelected ? 'text-primary' : 'text-text-primary'}`}>
+                      {mt.name}
+                    </Text>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#e11d48" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

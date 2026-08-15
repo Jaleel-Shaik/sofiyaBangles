@@ -6,15 +6,15 @@ export interface Category {
   image_url: string;
   display_order: number;
   is_active: boolean;
-  model_type_id?: string;
+  model_type_id: string;
   size_type?: 'none' | 'standard' | 'custom' | 'both';
   standard_sizes?: string[];
   custom_measurement_fields?: string[];
 }
 
-export const getCategories = async () => {
+export const getCategories = async (modelTypeId?: string) => {
   try {
-    const res = await apiClient.get('categories');
+    const res = await apiClient.get('categories', { params: { model_type_id: modelTypeId } });
     return res.data.data as Category[];
   } catch (error) {
     console.error('Error fetching categories', error);

@@ -11,13 +11,13 @@ import { useState, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { getUserOrders, OrderItem } from "@/src/api/orders";
+import { getUserOrders, Order, OrderItem } from "@/src/api/orders";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function OrdersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -103,17 +103,17 @@ export default function OrdersScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          orders.map((order) => (
+          orders.flatMap((order) => (order.items || []).map((item) => (
             <TouchableOpacity
-              key={order.id}
-              onPress={() => openOrderProduct(order)}
+              key={item.id}
+              onPress={() => openOrderProduct(item)}
               activeOpacity={0.7}
               className="bg-surface rounded-2xl mb-4 border border-divider overflow-hidden"
             >
               <View className="flex-row p-4">
                 <View className="w-24 h-24 rounded-xl bg-slate-50 overflow-hidden mr-4">
-                  {order.image_url ? (
-                    <Image source={{ uri: order.image_url }} className="w-full h-full" resizeMode="cover" />
+                  {item.image_url ? (
+                    <Image source={{ uri: item.image_url }} className="w-full h-full" resizeMode="cover" />
                   ) : (
                     <View className="w-full h-full items-center justify-center">
                       <Ionicons name="image-outline" size={24} color="#cbd5e1" />
@@ -125,16 +125,16 @@ export default function OrdersScreen() {
                   <View className="flex-row items-start justify-between">
                     <View className="flex-1 pr-2">
                       <Text className="text-base font-bold text-text-primary" numberOfLines={1}>
-                        {order.product_name}
+                        {item.product_name}
                       </Text>
-                      <Text className="text-lg font-bold text-[#C25B3E] mt-0.5">₹{order.price}</Text>
+                      <Text className="text-lg font-bold text-[#C25B3E] mt-0.5">₹{item.price}</Text>
                     </View>
                     <View className="bg-success/10 px-2 py-1 rounded-full">
                       <Text className="text-success text-xs font-bold">Bought</Text>
                     </View>
                   </View>
                   <Text className="text-xs text-text-hint mt-1">
-                    {new Date(order.purchased_at).toLocaleDateString("en-IN", {
+                    {new Date(order.created_at).toLocaleDateString("en-IN", {
                       day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
                     })}
                   </Text>
@@ -142,19 +142,19 @@ export default function OrdersScreen() {
               </View>
 
               <View className="flex-row items-center mx-4 mb-4 px-4 py-3 rounded-2xl bg-slate-50 border border-divider">
-                <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${order.is_reviewed ? "bg-success/20" : "bg-warning/20"}`}>
-                  <Ionicons name={order.is_reviewed ? "star" : "star-outline"} size={16} color={order.is_reviewed ? "#059669" : "#d97706"} />
+                <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${item.is_reviewed ? "bg-success/20" : "bg-warning/20"}`}>
+                  <Ionicons name={item.is_reviewed ? "star" : "star-outline"} size={16} color={item.is_reviewed ? "#059669" : "#d97706"} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-sm font-bold text-text-primary">{order.is_reviewed ? "Reviewed" : "Tap to rate"}</Text>
+                  <Text className="text-sm font-bold text-text-primary">{item.is_reviewed ? "Reviewed" : "Tap to rate"}</Text>
                   <Text className="text-xs text-text-secondary mt-0.5">
-                    {order.is_reviewed ? "Your feedback has been saved" : "Share your experience"}
+                    {item.is_reviewed ? "Your feedback has been saved" : "Share your experience"}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
               </View>
             </TouchableOpacity>
-          ))
+          )))
         )}
       </ScrollView>
     </View>

@@ -37,6 +37,10 @@ export const createModelType = async (req: Request, res: Response) => {
     });
     res.status(201).json({ success: true, data, message: "Model type created successfully" });
   } catch (error: any) {
+    if (error.message === "MODEL_TYPE_ALREADY_EXISTS") {
+      res.status(409).json({ success: false, code: "MODEL_TYPE_ALREADY_EXISTS", message: "A model type with this name already exists." });
+      return;
+    }
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -47,6 +51,10 @@ export const updateModelType = async (req: Request, res: Response) => {
     const data = await updateModelTypeService(id, req.body);
     res.status(200).json({ success: true, data, message: "Model type updated successfully" });
   } catch (error: any) {
+    if (error.message === "MODEL_TYPE_ALREADY_EXISTS") {
+      res.status(409).json({ success: false, code: "MODEL_TYPE_ALREADY_EXISTS", message: "A model type with this name already exists." });
+      return;
+    }
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -57,6 +65,23 @@ export const deleteModelType = async (req: Request, res: Response) => {
     await deleteModelTypeService(id);
     res.status(200).json({ success: true, message: "Model type deleted successfully" });
   } catch (error: any) {
+    if (error.message === "MODEL_TYPE_NOT_FOUND") {
+      res.status(404).json({
+        success: false,
+        message: "Model type not found.",
+      });
+      return;
+    }
+    if (error.message === "MODEL_HAS_DEPENDENCIES") {
+      res.status(409).json({
+        success: false,
+        code: "MODEL_HAS_DEPENDENCIES",
+        message: `Cannot delete "${error.modelName}" because it has ${error.categoryCount} category(ies) and ${error.productCount} product(s). Archive or reassign them first.`,
+        categoryCount: error.categoryCount,
+        productCount: error.productCount,
+      });
+      return;
+    }
     res.status(400).json({ success: false, message: error.message });
   }
 };

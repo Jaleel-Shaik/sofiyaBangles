@@ -16,6 +16,8 @@ import {
 import { authenticate, optionalAuthenticate } from "../../../shared/middlewares/auth.middleware";
 import { requireRole } from "../../../shared/middlewares/role.middleware";
 import { upload } from "../../../shared/middlewares/upload.middleware";
+import { validate } from "../../../shared/middlewares/validate.middleware";
+import { createProductSchema, updateProductSchema } from "../validations/product.validation";
 
 const router = Router();
 
@@ -31,6 +33,7 @@ router.post(
   authenticate,
   requireRole("admin", "super_admin"),
   upload.array("images", 5),
+  validate(createProductSchema),
   createProduct,
 );
 router.put(
@@ -38,6 +41,7 @@ router.put(
   authenticate,
   requireRole("admin", "super_admin"),
   upload.array("images", 5),
+  validate(updateProductSchema),
   updateProduct,
 );
 router.patch(

@@ -68,7 +68,9 @@ export default function ProductDetailScreen() {
   }
 
   const isOutOfStock = product.quantity <= 0;
-  const images = product.images && product.images.length > 0 ? product.images : product.image_url ? [product.image_url] : [];
+  const images = product.images && product.images.length > 0 
+    ? product.images.map((img: any) => typeof img === 'string' ? img : img.image_url) 
+    : product.image_url ? [product.image_url] : [];
 
   return (
     <View className="flex-1 bg-[#FAFAFA]">

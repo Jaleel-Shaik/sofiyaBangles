@@ -220,7 +220,7 @@ export default function AdminDashboard() {
                     }}
                   >
                     <Image
-                      source={{ uri: product.image_url || product.images?.[0] || 'https://via.placeholder.com/150' }}
+                      source={{ uri: product.image_url || (typeof product.images?.[0] === 'string' ? product.images[0] : product.images?.[0]?.image_url) || 'https://via.placeholder.com/150' }}
                       className="w-28 h-28 rounded-xl bg-surface"
                     />
                     <View className="ml-4 flex-1">

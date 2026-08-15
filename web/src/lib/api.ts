@@ -98,7 +98,11 @@ apiClient.interceptors.request.use(
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("access_token");
       if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
+        if (typeof config.headers.set === "function") {
+          config.headers.set("Authorization", `Bearer ${token}`);
+        } else {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
     }
     return config;
@@ -141,7 +145,11 @@ apiClient.interceptors.response.use(
           failedQueue.push({ resolve, reject });
         }).then((token) => {
           if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
+            if (typeof originalRequest.headers.set === "function") {
+              originalRequest.headers.set("Authorization", `Bearer ${token}`);
+            } else {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+            }
           }
           return apiClient(originalRequest);
         });
@@ -170,7 +178,11 @@ apiClient.interceptors.response.use(
         processQueue(null, refreshData.access_token);
 
         if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${refreshData.access_token}`;
+          if (typeof originalRequest.headers.set === "function") {
+            originalRequest.headers.set("Authorization", `Bearer ${refreshData.access_token}`);
+          } else {
+            originalRequest.headers.Authorization = `Bearer ${refreshData.access_token}`;
+          }
         }
         return apiClient(originalRequest);
       } catch (refreshError) {
@@ -201,17 +213,21 @@ export interface Product {
   description: string;
   price: number;
   image_url: string;
-  images?: string[];
+  images?: any[];
   category_id: string;
   quantity: number;
   likes?: number;
   rating?: number;
   reviews?: number;
   is_active: boolean;
+  status?: 'draft' | 'active' | 'out_of_stock' | 'archived';
+  deleted_at?: string | null;
   has_variants?: boolean;
   variants?: any[];
   accepts_custom_size?: boolean;
   custom_size_price?: number | string;
+  model_type_id: string;
+  model_type_name?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -222,7 +238,7 @@ export interface Category {
   image_url: string;
   display_order: number;
   is_active: boolean;
-  model_type_id?: string;
+  model_type_id: string;
   size_type?: 'none' | 'standard' | 'custom' | 'both';
   standard_sizes?: string[];
   custom_measurement_fields?: string[];
@@ -332,22 +348,42 @@ export const adminApi = {
     apiClient.patch(`/products/${id}/sell`, { quantity }).then(r => r.data.data),
 
   // Categories
-  getCategories: () =>
-    apiClient.get('/categories').then(r => extractData<Category[]>(r)),
-  createCategory: async (data: { category_name: string; model_type_id?: string; image?: string; standard_sizes?: string[] }) => {
+  getCategories: async (modelTypeId?: string) => {
+    const res = await apiClient.get('/categories', { params: { model_type_id: modelTypeId } });
+    return res.data.data as Category[];
+  },
+  createCategory: async (data: { category_name: string; model_type_id: string; image?: string; standard_sizes?: string[] }) => {
     const formData = new FormData();
     formData.append('category_name', data.category_name);
-    if (data.model_type_id) formData.append('model_type_id', data.model_type_id);
-    if (data.standard_sizes) formData.append('standard_sizes', JSON.stringify(data.standard_sizes));
+    formData.append('model_type_id', data.model_type_id);
+    if (data.image) {
+      const blob = await fetch(data.image).then(r => r.blob());
+      formData.append('image', blob, 'category.jpg');
+    }
+    if (data.standard_sizes) {
+       formData.append('size_type', 'standard');
+       data.standard_sizes.forEach(s => formData.append('standard_sizes', s));
+    } else {
+       formData.append('size_type', 'none');
+    }
     return apiClient.post('/categories', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': 'multipart/form-data' }
     }).then(r => r.data.data);
   },
   updateCategory: async (id: string, data: { category_name?: string; model_type_id?: string; image?: string; standard_sizes?: string[] }) => {
     const formData = new FormData();
     if (data.category_name) formData.append('category_name', data.category_name);
     if (data.model_type_id) formData.append('model_type_id', data.model_type_id);
-    if (data.standard_sizes) formData.append('standard_sizes', JSON.stringify(data.standard_sizes));
+    if (data.image) {
+      const blob = await fetch(data.image).then(r => r.blob());
+      formData.append('image', blob, 'category.jpg');
+    }
+    if (data.standard_sizes) {
+       formData.append('size_type', 'standard');
+       data.standard_sizes.forEach(s => formData.append('standard_sizes', s));
+    } else if (data.standard_sizes !== undefined) {
+       formData.append('size_type', 'none');
+    }
     return apiClient.put(`/categories/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data.data);

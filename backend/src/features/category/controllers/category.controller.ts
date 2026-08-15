@@ -10,9 +10,11 @@ import {
 } from "../services/category.service";
 import { getProductsService } from "../../product/services/product.service";
 
-export const getCategories = async (_req: AuthRequest, res: Response) => {
+export const getCategories = async (req: AuthRequest, res: Response) => {
   try {
-    const categories = await getCategoriesService();
+    // Support server-side filtering by model_type_id
+    const modelTypeId = getQuery(req, "model_type_id");
+    const categories = await getCategoriesService(modelTypeId);
 
     res.json({
       success: true,
@@ -89,9 +91,18 @@ export const createCategory = async (req: AuthRequest, res: Response) => {
       message: "Category created successfully.",
     });
   } catch (error: any) {
-    if (error.message?.includes("unique") || error.message?.includes("duplicate")) {
+    if (error.message === "MODEL_TYPE_NOT_FOUND") {
+      res.status(400).json({
+        success: false,
+        code: "MODEL_TYPE_NOT_FOUND",
+        message: "The selected model type does not exist.",
+      });
+      return;
+    }
+    if (error.message === "CATEGORY_ALREADY_EXISTS") {
       res.status(409).json({
         success: false,
+        code: "CATEGORY_ALREADY_EXISTS",
         message: "A category with this name already exists.",
       });
       return;
@@ -129,6 +140,22 @@ export const updateCategory = async (req: AuthRequest, res: Response) => {
       });
       return;
     }
+    if (error.message === "MODEL_TYPE_NOT_FOUND") {
+      res.status(400).json({
+        success: false,
+        code: "MODEL_TYPE_NOT_FOUND",
+        message: "The selected model type does not exist.",
+      });
+      return;
+    }
+    if (error.message === "CATEGORY_ALREADY_EXISTS") {
+      res.status(409).json({
+        success: false,
+        code: "CATEGORY_ALREADY_EXISTS",
+        message: "A category with this name already exists.",
+      });
+      return;
+    }
     console.error("UpdateCategory error:", error);
     res.status(500).json({
       success: false,
@@ -151,6 +178,15 @@ export const deleteCategory = async (req: AuthRequest, res: Response) => {
       res.status(404).json({
         success: false,
         message: "Category not found.",
+      });
+      return;
+    }
+    if (error.message === "CATEGORY_HAS_PRODUCTS") {
+      res.status(409).json({
+        success: false,
+        code: "CATEGORY_HAS_PRODUCTS",
+        message: `Cannot delete this category because ${error.productCount} product(s) are assigned to it. Move or archive those products first.`,
+        productCount: error.productCount,
       });
       return;
     }

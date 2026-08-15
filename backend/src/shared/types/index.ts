@@ -139,26 +139,47 @@ export interface Category {
   image_url: string | null;
   display_order: number;
   is_active: boolean;
-  model_type_id?: string | null;
+  model_type_id: string;
   size_type?: "none" | "standard" | "custom" | "both";
   standard_sizes?: string[];
   custom_measurement_fields?: string[];
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface ModelType {
   id: string;
   name: string;
+  is_active: boolean;
+  display_order?: number;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface ProductVariant {
   id: string;
+  product_id: string;
   size: string;
-  price: number | string;
+  sku?: string | null;
+  price: number;
   quantity: number;
+  status: 'active' | 'out_of_stock' | 'archived';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  public_id?: string | null;
+  alt_text?: string | null;
+  display_order: number;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Product {
@@ -168,22 +189,26 @@ export interface Product {
   description: string | null;
   price: number;
   image_url: string | null;
-  images?: string[];
-  category_id: string | null;
+  category_id: string;
+  model_type_id: string;
   quantity: number;
   likes: number;
   rating: number;
   reviews: number;
   is_active: boolean;
+  status?: 'draft' | 'active' | 'out_of_stock' | 'archived';
+  deleted_at?: string | null;
   has_variants?: boolean;
-  variants?: ProductVariant[];
   accepts_custom_size?: boolean;
-  custom_size_price?: number | string;
+  custom_size_price?: number;
   created_at: string;
   updated_at: string;
-  // Joined fields
+  // Joined fields (read-only, populated at query time)
   category_name?: string;
+  model_type_name?: string;
   is_favorited?: boolean;
+  variants?: ProductVariant[];
+  images?: ProductImage[];
 }
 
 export interface Favorite {
@@ -193,18 +218,64 @@ export interface Favorite {
   created_at: string;
 }
 
+export interface Address {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  address_line_1: string;
+  address_line_2?: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Order {
   id: string;
   user_id: string;
+  order_number: string;
+  status: "pending" | "confirmed" | "processing" | "shipped" | "out_for_delivery" | "delivered" | "cancelled" | "return_requested" | "returned";
+  payment_status: "pending" | "paid" | "failed" | "refunded" | "partially_refunded";
+  subtotal: number;
+  discount: number;
+  shipping_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  shipping_address_snapshot?: Address | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
   product_id: string;
-  product_name: string;
-  price: number;
-  image_url: string | null;
-  status: "purchased" | "cancelled";
-  is_reviewed: boolean;
-  review_id: string | null;
-  purchased_at: string;
-  reviewed_at: string | null;
+  variant_id?: string | null;
+  product_name_snapshot: string;
+  sku_snapshot?: string | null;
+  price_snapshot: number;
+  quantity: number;
+  subtotal: number;
+  created_at: string;
+}
+
+export interface Cart {
+  id: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CartItem {
+  id: string;
+  cart_id: string;
+  product_id: string;
+  variant_id?: string | null;
+  quantity: number;
   created_at: string;
   updated_at: string;
 }

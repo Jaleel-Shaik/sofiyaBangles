@@ -3,19 +3,24 @@ import { AuthRequest } from "../../../shared/types";
 import {
   createOrderModel,
   getUserOrdersModel,
+  getOrderItemsModel,
   createReviewModel,
   getProductReviewsModel,
 } from "../models/order.model";
 
 export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
-    const { productId, productName, price, imageUrl } = req.body;
+    const { items, shippingAddressSnapshot } = req.body;
+    
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ success: false, message: "Order must contain at least one item." });
+      return;
+    }
+
     const order = await createOrderModel({
       userId: req.user!.userId,
-      productId,
-      productName,
-      price,
-      imageUrl,
+      items,
+      shippingAddressSnapshot
     });
 
     res.status(201).json({ success: true, data: order });
@@ -38,7 +43,11 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 export const getUserOrders = async (req: AuthRequest, res: Response) => {
   try {
     const orders = await getUserOrdersModel(req.user!.userId);
-    res.json({ success: true, data: orders });
+    const ordersWithItems = await Promise.all(orders.map(async (order) => {
+      const items = await getOrderItemsModel(order.id);
+      return { ...order, items };
+    }));
+    res.json({ success: true, data: ordersWithItems });
   } catch (error: any) {
     console.error("GetUserOrders error", error);
     res.status(500).json({ success: false, message: "Failed to load orders." });

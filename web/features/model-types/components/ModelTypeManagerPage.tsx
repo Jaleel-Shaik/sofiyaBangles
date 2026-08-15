@@ -53,8 +53,8 @@ export default function ModelTypesPage() {
       }
       resetForm();
       fetchData();
-    } catch {
-      toast.error("Failed to save");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || e.message || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -66,8 +66,8 @@ export default function ModelTypesPage() {
       await adminApi.deleteModelType(id);
       toast.success("Deleted");
       fetchData();
-    } catch {
-      toast.error("Failed to delete");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || e.message || "Failed to delete");
     }
   };
 

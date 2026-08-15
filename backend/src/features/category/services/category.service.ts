@@ -4,14 +4,14 @@ import {
   createCategoryModel,
   updateCategoryModel,
   deleteCategoryModel,
+  countProductsByCategoryModel,
 } from "../models/category.model";
 import { createAuditLogModel } from "../../../shared/models/audit.model";
 import { CreateCategoryInput, UpdateCategoryInput } from "../validations/category.validation";
 import { uploadToCloudinary } from "../../../shared/utils/cloudinary-upload";
-import { deleteProductsByCategoryService } from "../../product/services/product.service";
 
-export const getCategoriesService = async () => {
-  return getCategoriesModel();
+export const getCategoriesService = async (modelTypeId?: string) => {
+  return getCategoriesModel(modelTypeId);
 };
 
 export const getCategoryByIdService = async (id: string) => {
@@ -43,7 +43,7 @@ export const createCategoryService = async (
     action: "CATEGORY_CREATED",
     table_name: "categories",
     record_id: category.id,
-    new_data: { category_name: category.category_name },
+    new_data: { category_name: category.category_name, model_type_id: category.model_type_id },
   });
 
   return category;
@@ -82,16 +82,27 @@ export const updateCategoryService = async (
   return category;
 };
 
+/**
+ * Delete a category ONLY if it has no active products.
+ * If products exist, throws CATEGORY_HAS_PRODUCTS with the count.
+ * Otherwise, soft-deletes the category (is_active=false, deleted_at=now).
+ */
 export const deleteCategoryService = async (id: string, actorId: string) => {
   const existing = await getCategoryByIdModel(id);
   if (!existing) {
     throw new Error("CATEGORY_NOT_FOUND");
   }
 
-  // Cascade soft-delete all products belonging to this category first
-  const cascadeDeletedCount = await deleteProductsByCategoryService(id, actorId);
+  // Check for dependent products — REJECT deletion if any exist
+  const productCount = await countProductsByCategoryModel(id);
+  if (productCount > 0) {
+    const error: any = new Error("CATEGORY_HAS_PRODUCTS");
+    error.productCount = productCount;
+    error.categoryName = existing.category_name;
+    throw error;
+  }
 
-  // Then soft-delete the category itself
+  // Safe to soft-delete — no dependent products
   await deleteCategoryModel(id);
 
   await createAuditLogModel({
@@ -103,6 +114,6 @@ export const deleteCategoryService = async (id: string, actorId: string) => {
   });
 
   console.log(
-    `Category "${existing.category_name}" (${id}) deleted. Cascade-deleted ${cascadeDeletedCount} product(s).`
+    `Category "${existing.category_name}" (${id}) soft-deleted successfully.`
   );
 };

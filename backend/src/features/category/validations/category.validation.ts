@@ -12,7 +12,7 @@ export const createCategorySchema = z.object({
     .transform((val) => Number(val))
     .pipe(z.number().int().min(0))
     .default(0),
-  model_type_id: z.string().optional(),
+  model_type_id: z.string().min(1, "Model Type is required"),
   size_type: z.enum(["none", "standard", "custom", "both"]).optional(),
   standard_sizes: z.preprocess((val) => {
     if (typeof val === 'string') {

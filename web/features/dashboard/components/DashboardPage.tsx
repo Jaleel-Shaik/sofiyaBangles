@@ -223,7 +223,7 @@ export default function DashboardPage() {
                       <img
                         src={
                           product.image_url ||
-                          product.images?.[0] ||
+                          (typeof product.images?.[0] === 'string' ? product.images[0] : product.images?.[0]?.image_url) ||
                           "https://via.placeholder.com/150"
                         }
                         alt={product.product_name}

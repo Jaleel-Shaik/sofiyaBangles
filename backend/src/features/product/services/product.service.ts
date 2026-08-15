@@ -31,10 +31,11 @@ export const createProductService = async (
     imageUrls = await uploadMultipleToCloudinary(files);
   }
 
+  const images = imageUrls.map(url => ({ image_url: url }));
+
   const product = await createProductModel({
     ...input,
-    images: imageUrls,
-    image_url: imageUrls.length > 0 ? imageUrls[0] : undefined,
+    images: images,
   });
 
   // Audit log
@@ -147,30 +148,33 @@ export const updateProductService = async (
   // and newly uploaded image URLs.
   // existing_images === '' means admin explicitly cleared all images
   // existing_images === undefined means no explicit change
+  const existingImagesUrls: string[] = (existing.images || []).map((img: any) => typeof img === 'string' ? img : img.image_url);
+
   const existingImages: string[] = input.existing_images !== undefined
     ? (Array.isArray(input.existing_images)
         ? input.existing_images.filter(Boolean)
         : input.existing_images
           ? [input.existing_images]
           : [])
-    : (existing.images || []);
+    : existingImagesUrls;
 
   const mergedImages = imageUrls && imageUrls.length > 0
     ? [...existingImages, ...imageUrls]
     : existingImages;
 
   const { existing_images, ...restInput } = input;
+  
+  const formattedImages = mergedImages.map(url => ({ image_url: url }));
 
   const product = await updateProductModel(id, {
     ...restInput,
-    images: mergedImages,
-    image_url: mergedImages.length > 0 ? mergedImages[0] : undefined,
+    images: formattedImages as any[],
   });
 
   // Identify old images that were replaced (non-blocking cleanup)
-  if (existing.images && existing.images.length > 0) {
-    const removedImages = existing.images.filter(
-      (img) => !mergedImages.includes(img)
+  if (existingImagesUrls.length > 0) {
+    const removedImages = existingImagesUrls.filter(
+      (imgUrl: string) => !mergedImages.includes(imgUrl)
     );
     if (removedImages.length > 0) {
       cleanupCloudinaryImages(removedImages).catch((err) =>
@@ -250,7 +254,7 @@ export const deleteProductService = async (id: string, actorId: string) => {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  // Hard-delete the product document
+  // Soft-delete the product document
   const deletedProduct = await deleteProductModel(id);
   if (!deletedProduct) {
     throw new Error("PRODUCT_NOT_FOUND");
@@ -272,8 +276,9 @@ export const deleteProductService = async (id: string, actorId: string) => {
   );
 
   // Clean up Cloudinary images (non-blocking)
+  const existingImagesUrls = (existing.images || []).map((img: any) => typeof img === 'string' ? img : img.image_url);
   const allImageUrls = [
-    ...(existing.images || []),
+    ...existingImagesUrls,
     ...(existing.image_url ? [existing.image_url] : []),
   ];
   if (allImageUrls.length > 0) {
@@ -333,7 +338,9 @@ export const deleteProductsByCategoryService = async (
     const allImageUrls: string[] = [];
     for (const product of deletedProducts) {
       if (product.image_url) allImageUrls.push(product.image_url);
-      if (product.images) allImageUrls.push(...product.images);
+      if (product.images) {
+        allImageUrls.push(...product.images.map((img: any) => typeof img === 'string' ? img : img.image_url));
+      }
     }
     if (allImageUrls.length > 0) {
       cleanupCloudinaryImages(allImageUrls).catch((err) =>

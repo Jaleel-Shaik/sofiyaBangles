@@ -142,7 +142,7 @@ export default function ProductDetailPage() {
             <div className="grid grid-cols-2 gap-3">
               {(product.images && product.images.length > 0 ? product.images : product.image_url ? [product.image_url] : []).map((img, i) => (
                 <div key={i} className="aspect-square rounded-xl bg-[#F5F5F5] overflow-hidden border border-[#E5E5E5]">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={typeof img === 'string' ? img : img.image_url} alt="" className="w-full h-full object-cover" />
                 </div>
               ))}
               {!product.image_url && (!product.images || product.images.length === 0) && (

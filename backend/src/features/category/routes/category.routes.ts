@@ -41,7 +41,7 @@ router.put(
 router.delete(
   "/:id",
   authenticate,
-  requireRole("super_admin"),
+  requireRole("admin", "super_admin"),
   deleteCategory,
 );
 

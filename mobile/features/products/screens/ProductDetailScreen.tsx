@@ -193,7 +193,7 @@ export default function ProductDetailScreen() {
   const getGalleryImages = () => {
     if (!product) return [];
     return product.images && product.images.length > 0
-      ? product.images
+      ? product.images.map((img: any) => typeof img === 'string' ? img : img.image_url)
       : [product.image_url || "https://images.unsplash.com/photo-1611591437281-460bfbe1220a"];
   };
 
@@ -203,10 +203,14 @@ export default function ProductDetailScreen() {
       setIsOrdering(true);
       const galleryImages = getGalleryImages();
       await createOrder({
-        productId: product.id,
-        productName: product.product_name,
-        price: displayPrice,
-        imageUrl: galleryImages[activeImageIndex] || product.image_url || null,
+        items: [{
+          product_id: product.id,
+          product_name: product.product_name,
+          quantity: selectedQuantity,
+          price: displayPrice,
+          image_url: galleryImages[activeImageIndex] || product.image_url || null,
+          size: useCustomSize ? 'Custom' : (getActiveVariant()?.size || undefined),
+        }]
       });
       Alert.alert("Saved", "This product is now in your orders list.");
       router.push("/orders" as any);

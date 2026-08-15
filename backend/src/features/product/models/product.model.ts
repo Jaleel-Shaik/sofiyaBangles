@@ -1,7 +1,9 @@
 import { db } from "../../../shared/config/firebase";
-import { Product, UserSizePreference } from "../../../shared/types";
+import { Product, UserSizePreference, ProductVariant, ProductImage } from "../../../shared/types";
 import { v4 as uuidv4 } from "uuid";
 import { getSizePreferencesModel } from "../../size-preference/models/sizePreference.model";
+import { getVariantsByProductModel } from "./productVariant.model";
+import { getImagesByProductModel } from "./productImage.model";
 
 export const calculateReviewStats = (reviews: Array<{ rating: number }>) => {
   if (!reviews.length) {
@@ -39,36 +41,53 @@ export const createProductModel = async (payload: {
   product_name: string;
   description?: string;
   price: number;
-  image_url?: string;
-  images?: string[];
-  category_id?: string;
+  category_id: string;
+  model_type_id: string;
   quantity?: number;
   likes?: number;
   rating?: number;
   reviews?: number;
   is_active?: boolean;
+  status?: 'draft' | 'active' | 'out_of_stock' | 'archived';
   has_variants?: boolean;
-  variants?: any[]; // ProductVariant[]
+  variants?: any[]; // Array of size, price, sku, quantity objects
+  images?: any[]; // Array of image_url objects
   accepts_custom_size?: boolean;
   custom_size_price?: number | string;
 }): Promise<Product> => {
+  // ── CENTRAL INTEGRITY RULE ─────────────────────────────────────
+  // 1. Validate model_type exists
+  const mtDoc = await db.collection("model_types").doc(payload.model_type_id).get();
+  if (!mtDoc.exists) {
+    throw new Error("MODEL_TYPE_NOT_FOUND");
+  }
+
+  // 2. Validate category exists and is active
+  const catDoc = await db.collection("categories").doc(payload.category_id).get();
+  if (!catDoc.exists) {
+    throw new Error("CATEGORY_NOT_FOUND");
+  }
+  const catData = catDoc.data();
+  if (catData?.is_active === false) {
+    throw new Error("CATEGORY_NOT_FOUND");
+  }
+
+  // 3. Validate category belongs to the selected model
+  if (catData?.model_type_id !== payload.model_type_id) {
+    throw new Error("INVALID_MODEL_CATEGORY_RELATIONSHIP");
+  }
+  // ────────────────────────────────────────────────────────────────
+
   const newId = uuidv4();
   let generatedCode = payload.unique_code;
 
-  if (!generatedCode && payload.category_id) {
-    const catDoc = await db
-      .collection("categories")
-      .doc(payload.category_id)
-      .get();
-    let catName = "PRD";
-    if (catDoc.exists) {
-      catName = catDoc.data()?.category_name || "PRD";
-    }
-    const prefix = catName.substring(0, 3).toUpperCase();
+  if (!generatedCode) {
+    const mtName = mtDoc.data()?.name || "PRD";
+    const prefix = mtName.substring(0, 3).toUpperCase();
 
     const counterRef = db
       .collection("counters")
-      .doc(`category_${payload.category_id}`);
+      .doc(`model_${payload.model_type_id}`);
 
     generatedCode = await db.runTransaction(async (t) => {
       const doc = await t.get(counterRef);
@@ -84,30 +103,82 @@ export const createProductModel = async (payload: {
     });
   }
 
+  const status = payload.status || (payload.is_active !== false ? "active" : "draft");
+  const is_active = status === "active" || status === "out_of_stock";
+
   const productData: Product = {
     id: newId,
     unique_code: generatedCode || `PRD-${Date.now().toString().slice(-4)}`,
     product_name: payload.product_name,
     description: payload.description || null,
     price: payload.price,
-    image_url: payload.image_url || null,
-    images: payload.images || [],
-    category_id: payload.category_id || null,
+    image_url: payload.images && payload.images.length > 0 ? payload.images[0].image_url : null,
+    category_id: payload.category_id,
+    model_type_id: payload.model_type_id,
     quantity: payload.quantity || 0,
     likes: payload.likes || 0,
     rating: payload.rating || 0,
     reviews: payload.reviews || 0,
-    is_active: payload.is_active !== undefined ? payload.is_active : true,
+    is_active,
+    status,
+    deleted_at: null,
     has_variants: payload.has_variants || false,
-    variants: payload.variants || [],
     accepts_custom_size: payload.accepts_custom_size || false,
-    custom_size_price: payload.custom_size_price || payload.price,
+    custom_size_price: payload.custom_size_price ? Number(payload.custom_size_price) : payload.price,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  await db.collection("products").doc(newId).set(productData);
-  return productData;
+  const batch = db.batch();
+  batch.set(db.collection("products").doc(newId), productData);
+
+  const insertedVariants: ProductVariant[] = [];
+  if (payload.has_variants && payload.variants) {
+    payload.variants.forEach((v) => {
+      const vId = uuidv4();
+      const variant: ProductVariant = {
+        id: vId,
+        product_id: newId,
+        size: v.size,
+        sku: v.sku || null,
+        price: Number(v.price),
+        quantity: Number(v.quantity || 0),
+        status: 'active',
+        created_at: productData.created_at,
+        updated_at: productData.updated_at,
+      };
+      insertedVariants.push(variant);
+      batch.set(db.collection("product_variants").doc(vId), variant);
+    });
+  }
+
+  const insertedImages: ProductImage[] = [];
+  if (payload.images && payload.images.length > 0) {
+    payload.images.forEach((img, idx) => {
+      const iId = uuidv4();
+      const pImage: ProductImage = {
+        id: iId,
+        product_id: newId,
+        image_url: img.image_url,
+        public_id: img.public_id || null,
+        alt_text: img.alt_text || null,
+        display_order: idx,
+        is_primary: idx === 0,
+        created_at: productData.created_at,
+        updated_at: productData.updated_at,
+      };
+      insertedImages.push(pImage);
+      batch.set(db.collection("product_images").doc(iId), pImage);
+    });
+  }
+
+  await batch.commit();
+
+  return {
+    ...productData,
+    variants: insertedVariants,
+    images: insertedImages
+  };
 };
 
 export const getProductsModel = async (options: {
@@ -186,8 +257,11 @@ export const getProductsModel = async (options: {
           .get();
         is_favorited = !favSnapshot.empty;
       }
+      
+      const variants = await getVariantsByProductModel(p.id);
+      const images = await getImagesByProductModel(p.id);
 
-      return { ...p, category_name, is_favorited };
+      return { ...p, category_name, is_favorited, variants, images };
     }),
   );
 
@@ -212,7 +286,15 @@ export const getAdminProductsModel = async (options: {
   const offset = (page - 1) * limit;
   const products = allProducts.slice(offset, offset + limit);
 
-  return { products, total };
+  const productsWithDetails = await Promise.all(
+    products.map(async (p) => {
+      const variants = await getVariantsByProductModel(p.id);
+      const images = await getImagesByProductModel(p.id);
+      return { ...p, variants, images };
+    })
+  );
+
+  return { products: productsWithDetails, total };
 };
 
 export const getProductByIdModel = async (
@@ -225,6 +307,7 @@ export const getProductByIdModel = async (
   const product = doc.data() as Product;
 
   let category_name = undefined;
+  let model_type_id = product.model_type_id;
   if (product.category_id) {
     const catDoc = await db
       .collection("categories")
@@ -232,6 +315,20 @@ export const getProductByIdModel = async (
       .get();
     if (catDoc.exists) {
       category_name = catDoc.data()?.category_name;
+      if (!model_type_id) {
+        model_type_id = catDoc.data()?.model_type_id;
+      }
+    }
+  }
+
+  let model_type_name = undefined;
+  if (model_type_id) {
+    const mtDoc = await db
+      .collection("model_types")
+      .doc(model_type_id)
+      .get();
+    if (mtDoc.exists) {
+      model_type_name = mtDoc.data()?.name;
     }
   }
 
@@ -246,7 +343,10 @@ export const getProductByIdModel = async (
     is_favorited = !favSnapshot.empty;
   }
 
-  return { ...product, category_name, is_favorited };
+  const variants = await getVariantsByProductModel(id);
+  const images = await getImagesByProductModel(id);
+
+  return { ...product, category_name, model_type_id: model_type_id || "", model_type_name, is_favorited, variants, images };
 };
 
 export const updateProductModel = async (
@@ -259,11 +359,14 @@ export const updateProductModel = async (
     image_url: string;
     images: string[];
     category_id: string;
+    model_type_id: string;
     quantity: number;
     likes: number;
     rating: number;
     reviews: number;
     is_active: boolean;
+    status: 'draft' | 'active' | 'out_of_stock' | 'archived';
+    deleted_at: string | null;
     has_variants: boolean;
     variants: any[];
     accepts_custom_size: boolean;
@@ -271,14 +374,107 @@ export const updateProductModel = async (
   }>,
 ): Promise<Product> => {
   const updateData: any = { ...data, updated_at: new Date().toISOString() };
+  if (data.status) {
+    updateData.is_active = data.status === "active" || data.status === "out_of_stock";
+  } else if (data.is_active !== undefined) {
+    updateData.status = data.is_active ? "active" : "draft";
+  }
+
   Object.keys(updateData).forEach(
     (key) => updateData[key] === undefined && delete updateData[key],
   );
 
-  await db.collection("products").doc(id).update(updateData);
+  const { variants, images, image_url, ...productFields } = updateData;
 
-  const doc = await db.collection("products").doc(id).get();
-  return doc.data() as Product;
+  const batch = db.batch();
+
+  // ── CENTRAL INTEGRITY RULE (UPDATE) ──────────────────────────
+  if (productFields.category_id || productFields.model_type_id) {
+    const doc = await db.collection("products").doc(id).get();
+    if (doc.exists) {
+      const existingProduct = doc.data() as Product;
+      const targetCategoryId = productFields.category_id || existingProduct.category_id;
+      const targetModelTypeId = productFields.model_type_id || existingProduct.model_type_id;
+
+      if (targetCategoryId && targetModelTypeId) {
+        const catDoc = await db.collection("categories").doc(targetCategoryId).get();
+        if (!catDoc.exists) {
+           throw new Error("CATEGORY_NOT_FOUND");
+        }
+        const catData = catDoc.data();
+        if (catData?.is_active === false) {
+          throw new Error("CATEGORY_NOT_FOUND");
+        }
+        if (catData?.model_type_id !== targetModelTypeId) {
+          throw new Error("INVALID_MODEL_CATEGORY_RELATIONSHIP");
+        }
+      }
+    }
+  }
+  // ────────────────────────────────────────────────────────────────
+
+  // Set primary image URL correctly based on images if passed
+  if (images && images.length > 0) {
+    productFields.image_url = images[0].image_url;
+  } else if (image_url !== undefined) {
+    productFields.image_url = image_url;
+  }
+
+  batch.update(db.collection("products").doc(id), productFields);
+
+  // Re-sync variants
+  if (variants !== undefined) {
+    const existingVariantsSnap = await db.collection("product_variants").where("product_id", "==", id).get();
+    existingVariantsSnap.docs.forEach(doc => {
+       batch.delete(doc.ref);
+    });
+    
+    if (variants && variants.length > 0) {
+      variants.forEach((v: any) => {
+        const vId = uuidv4();
+        batch.set(db.collection("product_variants").doc(vId), {
+          id: vId,
+          product_id: id,
+          size: v.size,
+          sku: v.sku || null,
+          price: Number(v.price),
+          quantity: Number(v.quantity || 0),
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      });
+    }
+  }
+
+  // Re-sync images
+  if (images !== undefined) {
+    const existingImagesSnap = await db.collection("product_images").where("product_id", "==", id).get();
+    existingImagesSnap.docs.forEach(doc => {
+       batch.delete(doc.ref);
+    });
+
+    if (images && images.length > 0) {
+      images.forEach((img: any, idx: number) => {
+        const iId = uuidv4();
+        batch.set(db.collection("product_images").doc(iId), {
+          id: iId,
+          product_id: id,
+          image_url: img.image_url,
+          public_id: img.public_id || null,
+          alt_text: img.alt_text || null,
+          display_order: idx,
+          is_primary: idx === 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      });
+    }
+  }
+
+  await batch.commit();
+
+  return getProductByIdModel(id) as unknown as Product;
 };
 
 /**
@@ -303,9 +499,9 @@ export const deleteFavoritesByProductModel = async (productId: string): Promise<
 };
 
 /**
- * Hard-delete a product document from Firestore.
- * Also cascades to clean up favorites, reviews, and notification references.
- * Returns the product data that was deleted (for cleanup operations).
+ * Soft-delete a product document in Firestore (marks status as 'archived' and sets deleted_at).
+ * Cascades to clean up favorites, reviews, and notification references.
+ * Returns the product data.
  */
 export const deleteProductModel = async (id: string): Promise<Product | null> => {
   const doc = await db.collection("products").doc(id).get();
@@ -313,17 +509,24 @@ export const deleteProductModel = async (id: string): Promise<Product | null> =>
 
   const product = doc.data() as Product;
 
-  await db.collection("products").doc(id).delete();
+  await db.collection("products").doc(id).update({
+    is_active: false,
+    status: "archived",
+    deleted_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
 
   return product;
 };
 
 /**
- * Restore a soft-deleted product by setting is_active = true.
+ * Restore a soft-deleted product by setting is_active = true, status = 'active', deleted_at = null.
  */
 export const restoreProductModel = async (id: string): Promise<Product> => {
   await db.collection("products").doc(id).update({
     is_active: true,
+    status: "active",
+    deleted_at: null,
     updated_at: new Date().toISOString(),
   });
 
@@ -504,7 +707,11 @@ export const searchProductsModel = async (
           category_name = catDoc.data()?.category_name;
         }
       }
-      return { ...p, category_name };
+      
+      const variants = await getVariantsByProductModel(p.id);
+      const images = await getImagesByProductModel(p.id);
+      
+      return { ...p, category_name, variants, images };
     }),
   );
 
@@ -594,7 +801,10 @@ export const getNewArrivalsModel = async (options: {
         is_favorited = !favSnapshot.empty;
       }
 
-      return { ...p, category_name, is_favorited };
+      const variants = await getVariantsByProductModel(p.id);
+      const images = await getImagesByProductModel(p.id);
+
+      return { ...p, category_name, is_favorited, variants, images };
     }),
   );
 

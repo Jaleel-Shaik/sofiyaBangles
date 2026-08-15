@@ -51,12 +51,11 @@ export const generateQrCodeDataUrl = async (otpauthUrl: string): Promise<string>
 /**
  * Verifies a 6-digit TOTP code against an unencrypted secret
  * Uses epochTolerance to account for clock drift between device and server.
- * epochTolerance of 30 seconds means ±30 seconds (±1 time window).
+ * epochTolerance of 60 seconds means ±60 seconds (±2 time windows) of drift tolerance.
  */
 export const verifyTotpCode = (secret: string, token: string): boolean => {
   try {
-    // verifySync in otplib v13+ returns { valid: boolean, delta: number | null }
-    const result = verifySync({ token, secret, epochTolerance: 30 });
+    const result = verifySync({ token, secret, epochTolerance: 60 });
     return result.valid;
   } catch (error) {
     console.error("TOTP verification error:", error);

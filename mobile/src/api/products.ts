@@ -7,17 +7,21 @@ export interface Product {
   description: string;
   price: number;
   image_url: string;
-  images?: string[];
+  images?: any[];
   category_id: string;
   quantity: number;
   likes?: number;
   rating?: number;
   reviews?: number;
   is_active: boolean;
+  status?: 'draft' | 'active' | 'out_of_stock' | 'archived';
+  deleted_at?: string | null;
   has_variants?: boolean;
   variants?: any[];
   accepts_custom_size?: boolean;
   custom_size_price?: number | string;
+  model_type_id: string;
+  model_type_name?: string;
   created_at?: string;
   updated_at?: string;
 }

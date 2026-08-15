@@ -2,16 +2,28 @@ import { apiClient } from "./client";
 
 export interface OrderItem {
   id: string;
-  user_id: string;
+  order_id: string;
   product_id: string;
   product_name: string;
+  quantity: number;
   price: number;
-  image_url: string | null;
+  size?: string;
+  color?: string;
+  image_url?: string | null;
   status: string;
   is_reviewed: boolean;
   review_id: string | null;
-  purchased_at: string;
-  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Order {
+  id: string;
+  user_id: string;
+  total_amount: number;
+  status: string;
+  shipping_address_snapshot?: any;
+  items?: OrderItem[];
   created_at: string;
   updated_at: string;
 }
@@ -24,19 +36,25 @@ export interface ReviewPayload {
 }
 
 export const createOrder = async (payload: {
-  productId: string;
-  productName: string;
-  price: number;
-  imageUrl?: string | null;
+  items: {
+    product_id: string;
+    product_name: string;
+    quantity: number;
+    price: number;
+    image_url?: string | null;
+    size?: string;
+    color?: string;
+  }[];
+  shippingAddressSnapshot?: any;
 }) => {
   const res = await apiClient.post("orders", payload);
-  return res.data.data as OrderItem;
+  return res.data.data as Order;
 };
 
 export const getUserOrders = async () => {
   const res = await apiClient.get("orders");
   const data = Array.isArray(res.data?.data) ? res.data.data : [];
-  return data as OrderItem[];
+  return data as Order[];
 };
 
 export const createReview = async (payload: ReviewPayload) => {

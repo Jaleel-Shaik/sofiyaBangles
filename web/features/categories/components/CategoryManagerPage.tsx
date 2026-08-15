@@ -53,24 +53,25 @@ export default function CategoriesPage() {
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error("Category name is required"); return; }
+    if (!selectedModelType) { toast.error("Model type is required"); return; }
     setSaving(true);
     try {
       const data = {
         category_name: name,
-        model_type_id: selectedModelType || undefined,
+        model_type_id: selectedModelType,
         standard_sizes: sizes.split(",").map(s => s.trim()).filter(Boolean),
       };
       if (editingId) {
         await adminApi.updateCategory(editingId, data);
         toast.success("Category updated");
       } else {
-        await adminApi.createCategory(data as any);
+        await adminApi.createCategory(data);
         toast.success("Category created");
       }
       resetForm();
       fetchData();
     } catch (e: any) {
-      toast.error(e.message || "Failed to save");
+      toast.error(e?.response?.data?.message || e.message || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -82,8 +83,8 @@ export default function CategoriesPage() {
       await adminApi.deleteCategory(id);
       toast.success("Category deleted");
       fetchData();
-    } catch {
-      toast.error("Failed to delete");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || e.message || "Failed to delete");
     }
   };
 

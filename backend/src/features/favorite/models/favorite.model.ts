@@ -51,7 +51,7 @@ export const removeFavoriteModel = async (
 
 export const getUserFavoritesModel = async (
   userId: string,
-): Promise<Product[]> => {
+): Promise<any[]> => {
   const favSnapshot = await db.collection("favorites")
     .where("user_id", "==", userId)
     .get();
@@ -62,7 +62,7 @@ export const getUserFavoritesModel = async (
     .map(doc => doc.data() as Favorite)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const productPromises = favorites.map(async (fav) => {
+  const favoritePromises = favorites.map(async (fav) => {
     const productDoc = await db.collection("products").doc(fav.product_id).get();
     if (!productDoc.exists) return null;
     
@@ -77,11 +77,11 @@ export const getUserFavoritesModel = async (
       }
     }
 
-    return { ...p, category_name, is_favorited: true } as Product;
+    return { ...fav, product: { ...p, category_name, is_favorited: true } };
   });
 
-  const products = await Promise.all(productPromises);
-  return products.filter((p): p is Product => p !== null);
+  const populatedFavorites = await Promise.all(favoritePromises);
+  return populatedFavorites.filter((f) => f !== null);
 };
 
 export const isFavoritedModel = async (

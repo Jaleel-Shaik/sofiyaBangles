@@ -17,8 +17,13 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    product_name: "", description: "", price: "", quantity: "0",
-    category_id: "", unique_code: "", is_active: "true",
+    product_name: "",
+    description: "",
+    price: "",
+    quantity: "0",
+    category_id: "",
+    unique_code: "",
+    status: "active",
   });
   const [selectedModelType, setSelectedModelType] = useState("");
   const [hasVariants, setHasVariants] = useState(false);
@@ -29,6 +34,7 @@ export default function EditProductPage() {
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const initialCategoryIdRef = useRef("");
   const currentCategory = useMemo(() => categories.find(c => c.id === form.category_id), [categories, form.category_id]);
 
@@ -48,9 +54,8 @@ export default function EditProductPage() {
   };
 
   useEffect(() => {
-    Promise.all([adminApi.getProductById(id), adminApi.getCategories(), adminApi.getModelTypes()])
-      .then(([product, cats, mts]) => {
-        setCategories(cats);
+    Promise.all([adminApi.getProductById(id), adminApi.getModelTypes()])
+      .then(([product, mts]) => {
         setModelTypes(mts);
         if (product) {
           initialCategoryIdRef.current = product.category_id || "";
@@ -61,11 +66,10 @@ export default function EditProductPage() {
             quantity: String(product.quantity || "0"),
             category_id: product.category_id || "",
             unique_code: product.unique_code || "",
-            is_active: product.is_active !== false ? "true" : "false",
+            status: product.status || (product.is_active !== false ? "active" : "draft"),
           });
-          const cat = cats.find(c => c.id === product.category_id);
-          if (cat) setSelectedModelType(cat.model_type_id || "");
-          if (product.images?.length) setExistingImages(product.images);
+          setSelectedModelType(product.model_type_id || "");
+          if (product.images?.length) setExistingImages(product.images.map((img: any) => typeof img === 'string' ? img : img.image_url));
           else if (product.image_url) setExistingImages([product.image_url]);
           if (product.variants?.length) {
             setHasVariants(true);
@@ -83,6 +87,18 @@ export default function EditProductPage() {
       .catch(() => toast.error("Failed to load product"))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (selectedModelType) {
+      adminApi.getCategories(selectedModelType)
+        .then(cats => setCategories(cats))
+        .catch(() => setCategories([]));
+    } else {
+      setCategories([]);
+    }
+  }, [selectedModelType]);
+
+  const filteredCategories = categories;
 
   useEffect(() => {
     if (!currentCategory) {
@@ -118,11 +134,6 @@ export default function EditProductPage() {
     }
   }, [form.category_id, currentCategory]);
 
-  const filteredCategories = useMemo(() => {
-    if (!selectedModelType) return [];
-    return categories.filter(c => c.model_type_id === selectedModelType);
-  }, [categories, selectedModelType]);
-
 
 
   const updateVariant = (vid: string, field: "price" | "quantity", value: string) => {
@@ -131,6 +142,21 @@ export default function EditProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: Record<string, string> = {};
+    if (!form.product_name.trim()) newErrors.product_name = "Product name is required";
+    if (!form.price) newErrors.price = "Price is required";
+    else if (parseFloat(form.price) <= 0) newErrors.price = "Price must be a positive number";
+    if (!selectedModelType) newErrors.model_type_id = "Model Type is required";
+    if (!form.category_id) newErrors.category_id = "Category is required";
+    if (existingImages.length === 0 && newImageFiles.length === 0) newErrors.images = "Please select at least one image";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      const firstError = Object.values(newErrors)[0];
+      toast.error(firstError);
+      return;
+    }
+    setErrors({});
     setSaving(true);
     try {
       const fd = new FormData();
@@ -138,9 +164,11 @@ export default function EditProductPage() {
       fd.append("price", String(parseFloat(form.price)));
       fd.append("description", form.description);
       fd.append("category_id", form.category_id);
+      if (selectedModelType) fd.append("model_type_id", selectedModelType);
       fd.append("quantity", String(parseInt(form.quantity) || 0));
       fd.append("unique_code", form.unique_code);
-      fd.append("is_active", form.is_active);
+      fd.append("status", form.status);
+      fd.append("is_active", form.status === "active" || form.status === "out_of_stock" ? "true" : "false");
       fd.append("has_variants", String(hasVariants));
       fd.append("accepts_custom_size", String(acceptsCustomSize));
       if (variants.length > 0) {
@@ -179,16 +207,22 @@ export default function EditProductPage() {
           </div>
           <div>
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
-            <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-[#E5E5E5] rounded-xl p-8 text-center hover:border-[#E8436E] transition-colors cursor-pointer bg-[#FAFAFA]">
-              <Upload className="w-8 h-8 mx-auto mb-2 text-[#A3A3A3]" />
-              <p className="text-sm text-[#A3A3A3] font-medium">Drop new images here or click to upload</p>
+            <div 
+              onClick={() => fileInputRef.current?.click()} 
+              className={`border-2 border-dashed rounded-xl p-8 text-center hover:border-[#E8436E] transition-colors cursor-pointer ${
+                errors.images ? "border-red-500 bg-red-50/5 hover:border-red-500" : "border-[#E5E5E5] bg-[#FAFAFA]"
+              }`}
+            >
+              <Upload className={`w-8 h-8 mx-auto mb-2 ${errors.images ? "text-red-400" : "text-[#A3A3A3]"}`} />
+              <p className={`text-sm font-medium ${errors.images ? "text-red-500" : "text-[#A3A3A3]"}`}>Drop new images here or click to upload</p>
             </div>
+            {errors.images && <p className="text-red-500 text-xs mt-1.5 font-semibold">{errors.images}</p>}
             {(existingImages.length > 0 || newImagePreviews.length > 0) && (
               <div className="flex gap-2 mt-4 flex-wrap">
-                {existingImages.map((url, i) => (
+                 {existingImages.map((url, i) => (
                   <div key={`e-${i}`} className="w-20 h-20 rounded-xl overflow-hidden border border-[#E5E5E5] relative group shadow-sm">
                     <img src={url} alt="" className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => removeExistingImage(i)} className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 rounded-full p-1 transition-colors">
+                    <button type="button" onClick={() => removeExistingImage(i)} className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 rounded-full p-1 transition-colors cursor-pointer">
                       <X className="w-3 h-3 text-white" />
                     </button>
                   </div>
@@ -196,7 +230,7 @@ export default function EditProductPage() {
                 {newImagePreviews.map((img, i) => (
                   <div key={`n-${i}`} className="w-20 h-20 rounded-xl overflow-hidden border border-[#E5E5E5] relative group shadow-sm">
                     <img src={img} alt="" className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => removeNewImage(i)} className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 rounded-full p-1 transition-colors">
+                    <button type="button" onClick={() => removeNewImage(i)} className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 rounded-full p-1 transition-colors cursor-pointer">
                       <X className="w-3 h-3 text-white" />
                     </button>
                   </div>
@@ -217,15 +251,49 @@ export default function EditProductPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 md:col-span-1">
               <label className="block text-sm font-semibold text-[#525252] mb-1.5">Product Name *</label>
-              <input value={form.product_name} onChange={e => setForm(f => ({ ...f, product_name: e.target.value }))} className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-xl outline-none focus:border-[#E8436E] transition-colors" />
+              <input 
+                value={form.product_name} 
+                onChange={e => {
+                  setForm(f => ({ ...f, product_name: e.target.value }));
+                  if (errors.product_name) setErrors(prev => { const c = { ...prev }; delete c.product_name; return c; });
+                }} 
+                className={`w-full px-4 py-2.5 border rounded-xl outline-none focus:border-[#E8436E] transition-colors ${
+                  errors.product_name ? "border-red-500 bg-red-50/10 focus:border-red-500" : "border-[#E5E5E5]"
+                }`} 
+              />
+              {errors.product_name && <p className="text-red-500 text-xs mt-1.5 font-semibold">{errors.product_name}</p>}
             </div>
             <div className="col-span-2 md:col-span-1">
               <label className="block text-sm font-semibold text-[#525252] mb-1.5">Price (₹) *</label>
-              <input type="number" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-xl outline-none focus:border-[#E8436E] transition-colors" />
+              <input 
+                type="number" 
+                step="0.01" 
+                value={form.price} 
+                onChange={e => {
+                  setForm(f => ({ ...f, price: e.target.value }));
+                  if (errors.price) setErrors(prev => { const c = { ...prev }; delete c.price; return c; });
+                }} 
+                className={`w-full px-4 py-2.5 border rounded-xl outline-none focus:border-[#E8436E] transition-colors ${
+                  errors.price ? "border-red-500 bg-red-50/10 focus:border-red-500" : "border-[#E5E5E5]"
+                }`} 
+              />
+              {errors.price && <p className="text-red-500 text-xs mt-1.5 font-semibold">{errors.price}</p>}
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-semibold text-[#525252] mb-1.5">Description</label>
               <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} className="w-full px-4 py-2.5 border border-[#E5E5E5] rounded-xl outline-none focus:border-[#E8436E] transition-colors" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-semibold text-[#525252] mb-1.5">Product Status *</label>
+              <select
+                value={form.status}
+                onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                className="w-full px-4 py-2.5 bg-white border border-[#E5E5E5] rounded-xl outline-none focus:border-[#E8436E] transition-colors text-sm cursor-pointer"
+              >
+                <option value="active">Active (Visible and sellable)</option>
+                <option value="draft">Draft (Hidden)</option>
+                <option value="out_of_stock">Out of Stock (Visible, not sellable)</option>
+              </select>
             </div>
           </div>
         </div>
@@ -239,22 +307,38 @@ export default function EditProductPage() {
             <h2 className="text-lg font-bold text-[#171717]">Categorization</h2>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-[#525252] mb-2">Model Type</label>
-            <div className="flex gap-2 flex-wrap">
-              {modelTypes.map(mt => (
-                <button type="button" key={mt.id}
-                  onClick={() => { setSelectedModelType(mt.id); setForm(f => ({ ...f, category_id: "" })); }}
-                  className={`px-5 py-2.5 rounded-full text-sm font-bold border transition-all ${selectedModelType === mt.id ? "bg-[#E8436E] text-white border-[#E8436E] shadow-sm shadow-[#E8436E]/20" : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#E8436E]"}`}
-                >
-                  {mt.name}
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold text-[#525252]">Model Type *</label>
+              {errors.model_type_id && <span className="text-red-500 text-xs font-semibold">{errors.model_type_id}</span>}
             </div>
+            <select
+              value={selectedModelType}
+              onChange={(e) => {
+                setSelectedModelType(e.target.value);
+                setForm(f => ({ ...f, category_id: "" }));
+                if (e.target.value && errors.model_type_id) {
+                  setErrors(prev => { const copy = { ...prev }; delete copy.model_type_id; return copy; });
+                }
+              }}
+              className={`w-full px-4 py-2.5 bg-white border rounded-xl outline-none focus:border-[#E8436E] transition-colors text-sm cursor-pointer ${
+                errors.model_type_id ? "border-red-500 bg-red-50/5 focus:border-red-500" : "border-[#E5E5E5]"
+              }`}
+            >
+              <option value="">Select Model Type</option>
+              {modelTypes.map(mt => (
+                <option key={mt.id} value={mt.id}>
+                  {mt.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {selectedModelType && (
             <div className="space-y-3 pt-2">
-              <label className="block text-sm font-semibold text-[#525252]">Select Category *</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-semibold text-[#525252]">Select Category *</label>
+                {errors.category_id && <span className="text-red-500 text-xs font-semibold">{errors.category_id}</span>}
+              </div>
               {filteredCategories.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {filteredCategories.map((c) => {
@@ -265,12 +349,16 @@ export default function EditProductPage() {
                         key={c.id}
                         onClick={(e) => {
                           e.preventDefault();
-                          setForm(f => ({ ...f, category_id: f.category_id === c.id ? "" : c.id }));
+                          const nextVal = form.category_id === c.id ? "" : c.id;
+                          setForm(f => ({ ...f, category_id: nextVal }));
+                          if (nextVal && errors.category_id) setErrors(prev => { const copy = { ...prev }; delete copy.category_id; return copy; });
                         }}
                         className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer text-left w-full transition-all ${
                           isSelected
                             ? "bg-[#FFF0F3] border-[#E8436E] shadow-sm"
-                            : "bg-white border-[#E5E5E5] hover:border-[#E8436E]"
+                            : errors.category_id
+                              ? "bg-red-50/5 border-red-300 hover:border-red-500"
+                              : "bg-white border-[#E5E5E5] hover:border-[#E8436E]"
                         }`}
                       >
                         <div className="w-16 h-16 rounded-xl bg-[#FAFAFA] mr-4 border border-[#E5E5E5] overflow-hidden flex-shrink-0">
@@ -375,8 +463,8 @@ export default function EditProductPage() {
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Link href="/dashboard/products" className="px-6 py-3 text-sm font-semibold text-[#525252] border border-[#E5E5E5] rounded-xl hover:bg-[#F5F5F5] transition-colors">Cancel</Link>
-          <button type="submit" disabled={saving} className="gradient-primary text-white font-bold py-3 px-8 rounded-xl flex items-center gap-2 shadow-lg shadow-[#E8436E]/20 transition-transform active:scale-[0.98] disabled:opacity-60">
+          <Link href="/dashboard/products" className="px-6 py-3 text-sm font-semibold text-[#525252] border border-[#E5E5E5] rounded-xl hover:bg-[#F5F5F5] transition-colors cursor-pointer">Cancel</Link>
+          <button type="submit" disabled={saving} className="gradient-primary text-white font-bold py-3 px-8 rounded-xl flex items-center gap-2 shadow-lg shadow-[#E8436E]/20 transition-transform active:scale-[0.98] disabled:opacity-60 cursor-pointer">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {saving ? "Saving..." : "Update Product"}
           </button>

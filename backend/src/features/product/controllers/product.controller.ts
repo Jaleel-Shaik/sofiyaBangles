@@ -18,23 +18,8 @@ import {
 
 export const createProduct = async (req: AuthRequest, res: Response) => {
   try {
-    let parsedBody = { ...req.body };
-    
-    if (typeof parsedBody.has_variants === 'string') {
-      parsedBody.has_variants = parsedBody.has_variants === 'true';
-    }
-    if (typeof parsedBody.accepts_custom_size === 'string') {
-      parsedBody.accepts_custom_size = parsedBody.accepts_custom_size === 'true';
-    }
-    if (typeof parsedBody.is_active === 'string') {
-      parsedBody.is_active = parsedBody.is_active === 'true';
-    }
-    if (typeof parsedBody.variants === 'string') {
-      try { parsedBody.variants = JSON.parse(parsedBody.variants); } catch (e) {}
-    }
-
     const product = await createProductService(
-      parsedBody,
+      req.body,
       req.files as Express.Multer.File[] | undefined,
       req.user!.userId,
     );
@@ -45,6 +30,30 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
       message: "Product created successfully.",
     });
   } catch (error: any) {
+    if (error.message === "MODEL_TYPE_NOT_FOUND") {
+      res.status(400).json({
+        success: false,
+        code: "MODEL_TYPE_NOT_FOUND",
+        message: "The selected model type does not exist.",
+      });
+      return;
+    }
+    if (error.message === "CATEGORY_NOT_FOUND") {
+      res.status(400).json({
+        success: false,
+        code: "CATEGORY_NOT_FOUND",
+        message: "The selected category does not exist or is inactive.",
+      });
+      return;
+    }
+    if (error.message === "INVALID_MODEL_CATEGORY_RELATIONSHIP") {
+      res.status(400).json({
+        success: false,
+        code: "INVALID_MODEL_CATEGORY_RELATIONSHIP",
+        message: "The selected category does not belong to the selected product model.",
+      });
+      return;
+    }
     console.error("CreateProduct error:", error);
     res.status(500).json({
       success: false,
@@ -155,23 +164,9 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
   try {
     const id = getParam(req, "id");
     
-    let parsedBody = { ...req.body };
-    if (typeof parsedBody.has_variants === 'string') {
-      parsedBody.has_variants = parsedBody.has_variants === 'true';
-    }
-    if (typeof parsedBody.accepts_custom_size === 'string') {
-      parsedBody.accepts_custom_size = parsedBody.accepts_custom_size === 'true';
-    }
-    if (typeof parsedBody.is_active === 'string') {
-      parsedBody.is_active = parsedBody.is_active === 'true';
-    }
-    if (typeof parsedBody.variants === 'string') {
-      try { parsedBody.variants = JSON.parse(parsedBody.variants); } catch (e) {}
-    }
-
     const product = await updateProductService(
       id,
-      parsedBody,
+      req.body,
       req.files as Express.Multer.File[] | undefined,
       req.user!.userId,
     );
@@ -182,6 +177,30 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
       message: "Product updated successfully.",
     });
   } catch (error: any) {
+    if (error.message === "MODEL_TYPE_NOT_FOUND") {
+      res.status(400).json({
+        success: false,
+        code: "MODEL_TYPE_NOT_FOUND",
+        message: "The selected model type does not exist.",
+      });
+      return;
+    }
+    if (error.message === "CATEGORY_NOT_FOUND") {
+      res.status(400).json({
+        success: false,
+        code: "CATEGORY_NOT_FOUND",
+        message: "The selected category does not exist or is inactive.",
+      });
+      return;
+    }
+    if (error.message === "INVALID_MODEL_CATEGORY_RELATIONSHIP") {
+      res.status(400).json({
+        success: false,
+        code: "INVALID_MODEL_CATEGORY_RELATIONSHIP",
+        message: "The selected category does not belong to the selected product model.",
+      });
+      return;
+    }
     if (error.message === "PRODUCT_NOT_FOUND") {
       res.status(404).json({
         success: false,
