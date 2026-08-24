@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Edit, Trash2, Package, Loader2, ShoppingCart, Minus, Plus } from "lucide-react";
 import Link from "next/link";
@@ -10,12 +10,21 @@ import { adminApi, type Product } from "@/src/lib/api";
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const id = params.id as string;
+  const rawQty = searchParams?.get("qty");
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sellQty, setSellQty] = useState(1);
+  const [sellQty, setSellQty] = useState(() => (rawQty ? Math.max(1, parseInt(rawQty, 10) || 1) : 1));
   const [selling, setSelling] = useState(false);
+
+  useEffect(() => {
+    if (rawQty) {
+      const parsed = parseInt(rawQty, 10);
+      if (parsed && parsed >= 1) setSellQty(parsed);
+    }
+  }, [rawQty]);
 
   const fetchProduct = async () => {
     try {

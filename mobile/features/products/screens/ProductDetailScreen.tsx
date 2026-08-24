@@ -13,7 +13,7 @@ import {
   NativeScrollEvent,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { getProductById, Product } from "@/src/api/products";
 import { addFavorite, removeFavorite, getFavorites } from "@/src/api/favorites";
@@ -24,6 +24,7 @@ import { useSizeStore } from "@/src/store/sizeStore";
 import { getCategories } from "@/src/api/categories";
 import { getModelTypes } from "@/src/api/modelTypes";
 import { createOrder, createReview, getProductReviews } from "@/src/api/orders";
+import { openWhatsAppEnquiry, shareProduct } from "@/src/utils/whatsapp";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GALLERY_IMAGE_WIDTH = SCREEN_WIDTH;
@@ -42,6 +43,21 @@ export default function ProductDetailScreen() {
   const [useCustomSize, setUseCustomSize] = useState(false);
   const [selectedCustomProfileId, setSelectedCustomProfileId] =
     useState<string>("");
+
+  const customProfiles = useMemo(() => {
+    if (!product?.category_id) return [];
+    return preferences.filter(
+      (p) => p.category_id === product.category_id && p.is_custom,
+    );
+  }, [preferences, product?.category_id]);
+
+  const activeCustomProfile = useMemo(() => {
+    return (
+      customProfiles.find((p) => p.id === selectedCustomProfileId) ||
+      customProfiles[0] ||
+      null
+    );
+  }, [customProfiles, selectedCustomProfileId]);
   const [productModelTypeName, setProductModelTypeName] = useState<string>("");
   const [reviews, setReviews] = useState<
     {
@@ -209,7 +225,9 @@ export default function ProductDetailScreen() {
           quantity: selectedQuantity,
           price: displayPrice,
           image_url: galleryImages[activeImageIndex] || product.image_url || null,
-          size: useCustomSize ? 'Custom' : (getActiveVariant()?.size || undefined),
+          size: useCustomSize
+            ? (activeCustomProfile?.profile_name ? `Custom (${activeCustomProfile.profile_name})` : 'Custom')
+            : (getActiveVariant()?.size || undefined),
         }]
       });
       Alert.alert("Saved", "This product is now in your orders list.");
@@ -242,33 +260,63 @@ export default function ProductDetailScreen() {
     }
   };
 
-  const openWhatsApp = () => {
+  const openWhatsApp = async () => {
     if (!product) return;
-    const phone = process.env.EXPO_PUBLIC_WHATSAPP_NUMBER || "+1234567890";
-    let text = `Hello, I want to purchase ${product.product_name}.\nUnique Code: ${product.unique_code || "N/A"}\nQuantity: ${selectedQuantity}`;
+
+    let size: string | undefined;
+    let customMeasurements: Record<string, string> | undefined;
 
     if (useCustomSize) {
-      const customPref = preferences.find(
-        (p) => p.id === selectedCustomProfileId,
-      );
-      text += `\nSize: Custom Made to Order`;
-      if (customPref && customPref.custom_measurements) {
-        text += `\nMy Measurements:`;
-        Object.entries(customPref.custom_measurements).forEach(([k, v]) => {
-          text += `\n- ${k}: ${v}`;
-        });
+      const profile = activeCustomProfile;
+      size = profile?.profile_name
+        ? `Custom Made to Order (${profile.profile_name})`
+        : 'Custom Made to Order';
+      if (profile && profile.custom_measurements) {
+        customMeasurements = profile.custom_measurements as Record<string, string>;
       }
     } else {
       const variant = getActiveVariant();
       if (variant) {
-        text += `\nSize: ${variant.size}`;
+        size = variant.size;
       }
     }
 
-    text += `\nIs this available?`;
-    Linking.openURL(
-      `whatsapp://send?phone=${phone}&text=${encodeURIComponent(text)}`,
-    );
+    await openWhatsAppEnquiry({
+      productId: product.id,
+      productName: product.product_name,
+      description: product.description,
+      categoryId: product.unique_code || product.category_id,
+      cost: getDisplayPrice(),
+      size,
+      uniqueCode: product.unique_code,
+      quantity: selectedQuantity > 1 ? selectedQuantity : undefined,
+      customMeasurements,
+    });
+  };
+
+  const handleShare = async () => {
+    if (!product) return;
+
+    let size: string | undefined;
+    if (useCustomSize) {
+      size = 'Custom Made to Order';
+    } else {
+      const variant = getActiveVariant();
+      if (variant) {
+        size = variant.size;
+      }
+    }
+
+    await shareProduct({
+      productId: product.id,
+      productName: product.product_name,
+      description: product.description,
+      categoryId: product.unique_code || product.category_id,
+      cost: getDisplayPrice(),
+      size,
+      uniqueCode: product.unique_code,
+      quantity: selectedQuantity > 1 ? selectedQuantity : undefined,
+    });
   };
 
   if (loading) {
@@ -311,11 +359,6 @@ export default function ProductDetailScreen() {
 
   const displayPrice = getDisplayPrice();
   const displayStock = getDisplayStock();
-  const customProfiles = product?.category_id
-    ? preferences.filter(
-        (p) => p.category_id === product.category_id && p.is_custom,
-      )
-    : [];
 
   return (
     <View className="flex-1 bg-white">
@@ -329,16 +372,24 @@ export default function ProductDetailScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
-        <TouchableOpacity
-          className="w-10 h-10 bg-white/90 rounded-full items-center justify-center shadow-sm"
-          onPress={toggleFavorite}
-        >
-          <Ionicons
-            name={isFavorite ? "heart" : "heart-outline"}
-            size={24}
-            color={isFavorite ? "#e11d48" : "#1e293b"}
-          />
-        </TouchableOpacity>
+        <View className="flex-row gap-2">
+          <TouchableOpacity
+            className="w-10 h-10 bg-white/90 rounded-full items-center justify-center shadow-sm"
+            onPress={handleShare}
+          >
+            <Ionicons name="share-social-outline" size={20} color="#1e293b" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="w-10 h-10 bg-white/90 rounded-full items-center justify-center shadow-sm"
+            onPress={toggleFavorite}
+          >
+            <Ionicons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={24}
+              color={isFavorite ? "#e11d48" : "#1e293b"}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -514,40 +565,69 @@ export default function ProductDetailScreen() {
                   {useCustomSize && (
                     <View className="p-4">
                       {customProfiles.length > 0 ? (
-                        <>
-                          <Text className="text-xs text-text-hint mb-3 font-bold uppercase tracking-widest">
-                            Select Saved Profile
+                        <View className="space-y-4">
+                          <Text className="text-xs text-text-hint font-bold uppercase tracking-widest">
+                            Select Custom Size Profile
                           </Text>
                           <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
                           >
-                            {customProfiles.map((p) => (
-                              <TouchableOpacity
-                                key={p.id}
-                                onPress={() => setSelectedCustomProfileId(p.id)}
-                                className={`mr-3 px-4 py-3 rounded-xl border-2 ${selectedCustomProfileId === p.id ? "border-primary bg-primary/10" : "border-divider bg-slate-50"}`}
-                              >
-                                <View className="flex-row items-center">
-                                  <Ionicons
-                                    name="person-outline"
-                                    size={14}
-                                    color={
-                                      selectedCustomProfileId === p.id
-                                        ? "#e11d48"
-                                        : "#64748B"
-                                    }
-                                  />
-                                  <Text
-                                    className={`text-sm font-bold ml-1.5 ${selectedCustomProfileId === p.id ? "text-primary" : "text-text-primary"}`}
-                                  >
-                                    {p.profile_name}
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            ))}
+                            {customProfiles.map((p: any) => {
+                              const isSelected = (selectedCustomProfileId || customProfiles[0]?.id) === p.id;
+                              return (
+                                <TouchableOpacity
+                                  key={p.id}
+                                  onPress={() => setSelectedCustomProfileId(p.id)}
+                                  className={`mr-3 px-4 py-3 rounded-2xl border-2 ${
+                                    isSelected
+                                      ? "border-primary bg-primary/10"
+                                      : "border-divider bg-slate-50"
+                                  }`}
+                                >
+                                  <View className="flex-row items-center">
+                                    <Ionicons
+                                      name="person-outline"
+                                      size={14}
+                                      color={isSelected ? "#e11d48" : "#64748B"}
+                                    />
+                                    <Text
+                                      className={`text-sm font-bold ml-1.5 ${
+                                        isSelected ? "text-primary" : "text-text-primary"
+                                      }`}
+                                    >
+                                      {p.profile_name || "Custom Profile"}
+                                    </Text>
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
                           </ScrollView>
-                        </>
+
+                          {/* Selected Custom Profile Measurements Breakdown */}
+                          {activeCustomProfile && activeCustomProfile.custom_measurements && Object.keys(activeCustomProfile.custom_measurements).length > 0 && (
+                            <View className="bg-slate-50 p-4 rounded-2xl border border-divider mt-2">
+                              <View className="flex-row items-center justify-between mb-2 pb-2 border-b border-divider/60">
+                                <Text className="text-xs font-bold text-text-primary">
+                                  Measurements for {activeCustomProfile.profile_name || "Custom Fit"}
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={() => router.push("/(tabs)/size-preferences" as any)}
+                                >
+                                  <Text className="text-xs font-bold text-primary">Edit</Text>
+                                </TouchableOpacity>
+                              </View>
+                              <View className="space-y-1.5">
+                                {Object.entries(activeCustomProfile.custom_measurements as Record<string, string>).map(([key, val]) => (
+                                  <View key={key} className="flex-row justify-between items-center">
+                                    <Text className="text-xs text-text-secondary capitalize">{key.replace(/_/g, ' ')}</Text>
+                                    <Text className="text-xs font-bold text-text-primary">{val}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                          )}
+                        </View>
                       ) : (
                         <View className="items-center bg-primary/5 p-4 rounded-2xl border border-dashed border-primary/30">
                           <Ionicons
@@ -560,7 +640,7 @@ export default function ProductDetailScreen() {
                           </Text>
                           <TouchableOpacity
                             onPress={() =>
-                              router.push("/profile/size-preferences" as any)
+                              router.push("/(tabs)/size-preferences" as any)
                             }
                             className="bg-primary px-5 py-2.5 rounded-full"
                           >

@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { getProductById, Product } from '@/src/api/products';
@@ -8,14 +8,21 @@ import { getProductById, Product } from '@/src/api/products';
 import { sellProduct, deleteProduct } from '@/src/api/admin';
 
 export default function ProductDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, qty } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sellQty, setSellQty] = useState(1);
+  const [sellQty, setSellQty] = useState(() => (qty ? Math.max(1, parseInt(qty as string, 10) || 1) : 1));
   const [selling, setSelling] = useState(false);
+
+  useEffect(() => {
+    if (qty) {
+      const parsed = parseInt(qty as string, 10);
+      if (parsed && parsed >= 1) setSellQty(parsed);
+    }
+  }, [qty]);
 
   const fetchProduct = async () => {
     setLoading(true);

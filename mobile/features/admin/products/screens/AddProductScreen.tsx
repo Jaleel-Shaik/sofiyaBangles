@@ -70,6 +70,7 @@ export default function AddProductScreen() {
     fetchCats();
   }, [selectedModelType]);
 
+  const [customSizeInput, setCustomSizeInput] = useState('');
   const filteredCategories = categories;
 
   const currentCategory = useMemo(() => categories.find(c => c.id === selectedCategory), [categories, selectedCategory]);
@@ -80,13 +81,10 @@ export default function AddProductScreen() {
   }, [selectedModelType]);
 
   useEffect(() => {
-    setHasVariants(false);
-    setAcceptsCustomSize(false);
-    setVariants([]);
     if (currentCategory) {
       if (currentCategory.size_type === 'standard' || currentCategory.size_type === 'both') {
         setHasVariants(true);
-        if (currentCategory.standard_sizes) {
+        if (currentCategory.standard_sizes && currentCategory.standard_sizes.length > 0) {
           setVariants(currentCategory.standard_sizes.map(sz => ({
             id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             size: sz,
@@ -94,15 +92,44 @@ export default function AddProductScreen() {
             quantity: quantity || '0'
           })));
         }
+      } else {
+        setHasVariants(false);
+        setVariants([]);
       }
       if (currentCategory.size_type === 'custom' || currentCategory.size_type === 'both') {
         setAcceptsCustomSize(true);
         setCustomSizePrice(price);
+      } else {
+        setAcceptsCustomSize(false);
       }
     }
-  }, [currentCategory, price, quantity]);
+  }, [currentCategory]);
 
+  const addCustomSize = () => {
+    if (!customSizeInput.trim()) {
+      Alert.alert('Error', 'Please enter a size name (e.g. 2.10, L, XL)');
+      return;
+    }
+    const sizeName = customSizeInput.trim();
+    if (variants.some(v => v.size.toLowerCase() === sizeName.toLowerCase())) {
+      Alert.alert('Error', `Size "${sizeName}" already exists`);
+      return;
+    }
+    setVariants(prev => [
+      ...prev,
+      {
+        id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        size: sizeName,
+        price: price || '0',
+        quantity: '0'
+      }
+    ]);
+    setCustomSizeInput('');
+  };
 
+  const removeVariant = (id: string) => {
+    setVariants(prev => prev.filter(v => v.id !== id));
+  };
 
   const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
@@ -112,6 +139,10 @@ export default function AddProductScreen() {
     if (!selectedModelType) newErrors.model_type_id = 'Model Type is required';
     if (!selectedCategory) newErrors.category = 'Category is required';
     if (imageUrls.length === 0) newErrors.images = 'At least one image is required';
+
+    if (hasVariants && variants.length === 0) {
+      newErrors.variants = 'Please add at least one size variant or disable size variants';
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -126,9 +157,13 @@ export default function AddProductScreen() {
     const parsedVariants = variants.map(v => ({
       id: v.id,
       size: v.size,
-      price: parseFloat(v.price) || 0,
+      price: parseFloat(v.price) || parseFloat(price) || 0,
       quantity: parseInt(v.quantity, 10) || 0
     }));
+
+    const totalQuantity = hasVariants
+      ? variants.reduce((sum, v) => sum + (parseInt(v.quantity, 10) || 0), 0)
+      : (parseInt(quantity, 10) || 0);
 
     setLoading(true);
     try {
@@ -139,18 +174,16 @@ export default function AddProductScreen() {
         category_id: selectedCategory,
         categoryName: catName,
         model_type_id: selectedModelType,
-        quantity: parseInt(quantity, 10) || 0,
+        quantity: totalQuantity,
         is_active: isActive,
         has_variants: hasVariants,
-        variants: JSON.stringify(parsedVariants),
+        variants: hasVariants && parsedVariants.length > 0 ? JSON.stringify(parsedVariants) : '[]',
         accepts_custom_size: acceptsCustomSize,
         custom_size_price: parseFloat(customSizePrice) || parseFloat(price)
       }, imageUrls);
       router.replace('/(admin)/(tabs)/add-success' as any);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to add product');
-
-
     } finally {
       setLoading(false);
     }
@@ -376,62 +409,152 @@ export default function AddProductScreen() {
         
         {/* Inventory & Sizing Card */}
         <View className="bg-surface p-5 rounded-2xl mb-6 border border-divider">
-          <View className="flex-row items-center mb-4">
-            <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
-              <Ionicons name="layers" size={16} color="#e11d48" />
+          <View className="flex-row items-center justify-between mb-4 pb-2 border-b border-divider">
+            <View className="flex-row items-center">
+              <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
+                <Ionicons name="layers" size={16} color="#e11d48" />
+              </View>
+              <Text className="text-lg font-bold text-text-primary">Inventory & Sizing</Text>
             </View>
-            <Text className="text-lg font-bold text-text-primary">Inventory & Sizing</Text>
+
+            {/* Toggle Size Variants */}
+            <TouchableOpacity
+              onPress={() => {
+                const nextVal = !hasVariants;
+                setHasVariants(nextVal);
+                if (nextVal && variants.length === 0 && currentCategory?.standard_sizes) {
+                  setVariants(currentCategory.standard_sizes.map(sz => ({
+                    id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    size: sz,
+                    price: price || '0',
+                    quantity: quantity || '0'
+                  })));
+                }
+              }}
+              className={`px-3 py-1.5 rounded-xl border flex-row items-center ${
+                hasVariants ? 'bg-primary/10 border-primary' : 'bg-surface border-divider'
+              }`}
+            >
+              <View className={`w-2 h-2 rounded-full mr-1.5 ${hasVariants ? 'bg-primary' : 'bg-slate-300'}`} />
+              <Text className={`text-xs font-bold ${hasVariants ? 'text-primary' : 'text-text-secondary'}`}>
+                {hasVariants ? 'Sizes: ON' : 'Sizes: OFF'}
+              </Text>
+            </TouchableOpacity>
           </View>
           
           {!hasVariants ? (
-            <TextInputField label="Total Available Quantity" placeholder="e.g. 10" keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
+            <View>
+              <TextInputField 
+                label="Total Available Stock Quantity" 
+                placeholder="e.g. 10" 
+                keyboardType="numeric" 
+                value={quantity} 
+                onChangeText={setQuantity} 
+              />
+              <Text className="text-xs text-text-hint mt-1 ml-1">Single-size / free-size product with standard price ₹{price || '0'}.</Text>
+            </View>
           ) : (
             <View className="mb-4">
-              <Text className="text-sm font-bold text-text-secondary mb-3 ml-1">Size Variants</Text>
-              {variants.map((v) => (
-                <View key={v.id} className="flex-row items-center bg-surface p-3 rounded-2xl border border-divider mb-3">
-                  <View className="bg-surface border border-divider px-4 py-3 rounded-xl mr-3 items-center justify-center">
-                    <Text className="font-bold text-primary text-lg">{v.size}</Text>
-                  </View>
-                  <View className="flex-1 mr-2">
-                    <Text className="text-[10px] text-text-secondary font-bold mb-1 uppercase ml-1">Price (₹)</Text>
-                    <TextInput 
-                      placeholder="Price" 
-                      value={v.price} 
-                      onChangeText={(val) => updateVariant(v.id, 'price', val)} 
-                      keyboardType="numeric" 
-                      className="bg-surface border border-divider rounded-xl px-4 py-2.5 text-text-primary font-semibold" 
-                    />
-                  </View>
-                  <View className="w-24">
-                    <Text className="text-[10px] text-text-secondary font-bold mb-1 uppercase ml-1">Stock</Text>
-                    <TextInput 
-                      placeholder="Qty" 
-                      value={v.quantity} 
-                      onChangeText={(val) => updateVariant(v.id, 'quantity', val)} 
-                      keyboardType="numeric" 
-                      className="bg-surface border border-divider rounded-xl px-4 py-2.5 text-text-primary font-semibold" 
-                    />
-                  </View>
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-sm font-bold text-text-secondary ml-1">Size Variants</Text>
+                {variants.length > 0 && (
+                  <Text className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                    Total: {variants.reduce((sum, v) => sum + (parseInt(v.quantity, 10) || 0), 0)} units
+                  </Text>
+                )}
+              </View>
+
+              {/* Add Custom Size Bar */}
+              <View className="flex-row items-center bg-[#FAFAFA] p-2 rounded-2xl border border-divider mb-4">
+                <TextInput
+                  placeholder="Add size (e.g. 2.10, L, XL)..."
+                  value={customSizeInput}
+                  onChangeText={setCustomSizeInput}
+                  className="flex-1 px-3 py-2 text-text-primary text-sm font-semibold"
+                />
+                <TouchableOpacity
+                  onPress={addCustomSize}
+                  className="bg-[#111827] px-4 py-2 rounded-xl"
+                >
+                  <Text className="text-white text-xs font-bold">+ Add Size</Text>
+                </TouchableOpacity>
+              </View>
+
+              {variants.length === 0 ? (
+                <View className="p-5 border border-dashed border-divider rounded-2xl items-center">
+                  <Text className="text-xs text-text-hint text-center">No sizes added yet. Use the field above to add sizes, or toggle Sizes OFF.</Text>
                 </View>
-              ))}
+              ) : (
+                variants.map((v) => (
+                  <View key={v.id} className="flex-row items-center bg-surface p-3 rounded-2xl border border-divider mb-3">
+                    <View className="bg-primary/10 border border-primary/20 px-3.5 py-2.5 rounded-xl mr-3 items-center justify-center min-w-[50px]">
+                      <Text className="font-bold text-primary text-base">{v.size}</Text>
+                    </View>
+                    <View className="flex-1 mr-2">
+                      <Text className="text-[10px] text-text-secondary font-bold mb-1 uppercase ml-1">Price (₹)</Text>
+                      <TextInput 
+                        placeholder="Price" 
+                        value={v.price} 
+                        onChangeText={(val) => updateVariant(v.id, 'price', val)} 
+                        keyboardType="numeric" 
+                        className="bg-[#FAFAFA] border border-divider rounded-xl px-3 py-2 text-text-primary font-semibold text-sm" 
+                      />
+                    </View>
+                    <View className="w-20 mr-2">
+                      <Text className="text-[10px] text-text-secondary font-bold mb-1 uppercase ml-1">Stock</Text>
+                      <TextInput 
+                        placeholder="Qty" 
+                        value={v.quantity} 
+                        onChangeText={(val) => updateVariant(v.id, 'quantity', val)} 
+                        keyboardType="numeric" 
+                        className="bg-[#FAFAFA] border border-divider rounded-xl px-3 py-2 text-text-primary font-semibold text-sm" 
+                      />
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => removeVariant(v.id)}
+                      className="p-2 self-end mb-1"
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
             </View>
           )}
 
-          {acceptsCustomSize && (
-            <View className="mt-2 bg-primary/5 p-5 rounded-2xl border border-primary/20">
-              <View className="flex-row items-center mb-2">
-                <Ionicons name="cut" size={18} color="#e11d48" />
-                <Text className="font-bold text-primary ml-2 text-base">Custom Measurements</Text>
-              </View>
-              <Text className="text-xs text-text-secondary mb-4 font-medium leading-5">Customers can enter their own measurements ({(() => {
-                return currentCategory?.custom_measurement_fields?.join(', ') || 'custom fields';
-              })()}) when ordering this product.</Text>
-              <View className="bg-surface p-1 rounded-2xl">
-                <TextInputField label="Custom Size Price (₹)" placeholder="e.g. 3000" keyboardType="numeric" value={customSizePrice} onChangeText={setCustomSizePrice} />
-              </View>
+          {/* Custom Sizing Toggle */}
+          <View className="pt-3 border-t border-divider mt-2">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-sm font-bold text-text-primary">Accepts Custom Measurements</Text>
+              <TouchableOpacity
+                onPress={() => setAcceptsCustomSize(!acceptsCustomSize)}
+                className={`px-3 py-1.5 rounded-xl border ${
+                  acceptsCustomSize ? 'bg-primary/10 border-primary' : 'bg-surface border-divider'
+                }`}
+              >
+                <Text className={`text-xs font-bold ${acceptsCustomSize ? 'text-primary' : 'text-text-secondary'}`}>
+                  {acceptsCustomSize ? 'Custom: ON' : 'Custom: OFF'}
+                </Text>
+              </TouchableOpacity>
             </View>
-          )}
+
+            {acceptsCustomSize && (
+              <View className="bg-primary/5 p-4 rounded-2xl border border-primary/20 space-y-3">
+                <Text className="text-xs text-text-secondary font-medium leading-5">
+                  Customers can enter custom measurements {currentCategory?.custom_measurement_fields?.length ? `(${currentCategory.custom_measurement_fields.join(', ')})` : ''} when ordering.
+                </Text>
+                <View className="bg-surface p-1 rounded-2xl">
+                  <TextInputField 
+                    label="Custom Size Price (₹)" 
+                    placeholder="e.g. 3000" 
+                    keyboardType="numeric" 
+                    value={customSizePrice} 
+                    onChangeText={setCustomSizePrice} 
+                  />
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         <View className="h-32" />

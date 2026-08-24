@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, ActivityIndicator, Linking, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { useFavoriteStore } from '@/src/store/favoriteStore';
 import Header from '@/src/components/Header';
 import FilterPill from '@/src/components/FilterPill';
 import FavoriteItemCard from '@/src/components/FavoriteItemCard';
+import { openWhatsAppEnquiry } from '@/src/utils/whatsapp';
 
 export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState<Favorite[]>([]);
@@ -42,16 +43,16 @@ export default function FavoritesScreen() {
     }
   };
 
-  const openWhatsApp = (productName?: string) => {
-    const phone = process.env.EXPO_PUBLIC_WHATSAPP_NUMBER || '+1234567890';
-    let text = "Hello, I am interested in your bangles.";
-    if (productName) {
-      text = `Hello, I want to inquire about the ${productName}. Is it available?`;
-    } else {
-      const names = favorites.map(f => f.product?.product_name).join(", ");
-      text = `Hello, I want to inquire about the following items: ${names}`;
-    }
-    Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(text)}`);
+  const openWhatsApp = async (product?: any) => {
+    if (!product) return;
+    await openWhatsAppEnquiry({
+      productId: product.id,
+      productName: product.product_name,
+      description: product.description,
+      categoryId: product.unique_code || product.category_id,
+      cost: product.price,
+      uniqueCode: product.unique_code,
+    });
   };
 
   const favCategoryIds = new Set(favorites.map(f => f.product?.category_id).filter(Boolean));
@@ -121,7 +122,7 @@ export default function FavoritesScreen() {
               key={fav.id}
               product={fav.product}
               onRemove={() => handleRemove(fav.product_id)}
-              onWhatsApp={() => openWhatsApp(fav.product?.product_name)}
+              onWhatsApp={() => openWhatsApp(fav.product)}
             />
           ))
         )}

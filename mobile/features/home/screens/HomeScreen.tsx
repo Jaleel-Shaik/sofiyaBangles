@@ -8,9 +8,10 @@ import {
   RefreshControl,
   FlatList,
 } from "react-native";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useFocusEffect } from "expo-router";
 import { useAuthStore } from "@/src/store/authStore";
+import { useSizeStore } from "@/src/store/sizeStore";
 import { getRecommendedProducts, Product } from "@/src/api/products";
 import { getCategories, Category } from "@/src/api/categories";
 import { getUserOrders } from "@/src/api/orders";
@@ -24,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const { preferences, fetchPreferences } = useSizeStore();
   const router = useRouter();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -31,6 +33,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSizeFilter, setSelectedSizeFilter] = useState<string>("all");
   const [purchasedProductIds, setPurchasedProductIds] = useState<string[]>([]);
 
   const [page, setPage] = useState(1);
@@ -78,10 +81,12 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      fetchPreferences();
       const loadPurchasedProducts = async () => {
         try {
           const orders = await getUserOrders();
-          setPurchasedProductIds(orders.map((order) => order.product_id));
+          const productIds = orders.flatMap((order) => order.items?.map((item) => item.product_id) || []);
+          setPurchasedProductIds(productIds.filter(Boolean));
         } catch (error) {
           console.error("Failed to load purchased products", error);
         }
@@ -89,6 +94,59 @@ export default function HomeScreen() {
       loadPurchasedProducts();
     }, [])
   );
+
+  const availableSizes = useMemo(() => {
+    const sizeSet = new Set<string>();
+    products.forEach((p) => {
+      if (p.has_variants && p.variants) {
+        p.variants.forEach((v) => {
+          if (v.size && v.quantity > 0) sizeSet.add(v.size);
+        });
+      }
+    });
+    return Array.from(sizeSet);
+  }, [products]);
+
+  const hasConfiguredSizes = preferences.length > 0;
+
+  const filteredProducts = useMemo(() => {
+    if (selectedSizeFilter === "all") return products;
+
+    if (selectedSizeFilter === "my_sizes") {
+      return products.filter((p) => {
+        const hasCustomPref = preferences.some(
+          (pref) => pref.category_id === p.category_id && pref.is_custom
+        );
+        if (p.accepts_custom_size && hasCustomPref) return true;
+
+        const userPref = preferences.find(
+          (pref) => pref.category_id === p.category_id && !pref.is_custom
+        );
+        if (userPref && userPref.standard_size && p.has_variants && p.variants) {
+          return p.variants.some(
+            (v) => v.size === userPref.standard_size && v.quantity > 0
+          );
+        }
+
+        if (!p.has_variants) return true;
+
+        return false;
+      });
+    }
+
+    if (selectedSizeFilter === "custom") {
+      return products.filter((p) => p.accepts_custom_size);
+    }
+
+    return products.filter((p) => {
+      if (p.has_variants && p.variants) {
+        return p.variants.some(
+          (v) => v.size === selectedSizeFilter && v.quantity > 0
+        );
+      }
+      return false;
+    });
+  }, [products, selectedSizeFilter, preferences]);
 
   useFocusEffect(
     useCallback(() => {
@@ -202,12 +260,119 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <View className="px-5 mt-5 mb-3">
+      {/* Size Preferences & Filter Bar */}
+      <View className="mt-5 px-5">
+        <View className="flex-row justify-between items-center mb-2.5">
+          <View className="flex-row items-center">
+            <Ionicons name="funnel-outline" size={14} color="#e11d48" />
+            <Text className="text-sm font-bold text-text-primary ml-1.5">Filter by Size</Text>
+          </View>
+          <TouchableOpacity onPress={() => router.push("/(tabs)/size-preferences" as any)}>
+            <Text className="text-xs font-bold text-primary">My Size Preferences</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 px-5">
+          {/* All Sizes */}
+          <TouchableOpacity
+            onPress={() => setSelectedSizeFilter("all")}
+            className={`mr-2 px-3.5 py-1.5 rounded-full border ${
+              selectedSizeFilter === "all"
+                ? "bg-primary border-primary"
+                : "bg-white border-divider"
+            }`}
+          >
+            <Text
+              className={`text-xs font-bold ${
+                selectedSizeFilter === "all" ? "text-white" : "text-text-secondary"
+              }`}
+            >
+              All Sizes
+            </Text>
+          </TouchableOpacity>
+
+          {/* My Sizes Option */}
+          {hasConfiguredSizes && (
+            <TouchableOpacity
+              onPress={() => setSelectedSizeFilter("my_sizes")}
+              className={`mr-2 px-3.5 py-1.5 rounded-full border flex-row items-center ${
+                selectedSizeFilter === "my_sizes"
+                  ? "bg-primary border-primary"
+                  : "bg-rose-50 border-rose-200"
+              }`}
+            >
+              <Ionicons
+                name="sparkles"
+                size={12}
+                color={selectedSizeFilter === "my_sizes" ? "white" : "#e11d48"}
+              />
+              <Text
+                className={`text-xs font-bold ml-1 ${
+                  selectedSizeFilter === "my_sizes" ? "text-white" : "text-primary"
+                }`}
+              >
+                My Sizes ★
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Individual sizes found in products */}
+          {availableSizes.map((sz) => (
+            <TouchableOpacity
+              key={sz}
+              onPress={() => setSelectedSizeFilter(sz)}
+              className={`mr-2 px-3.5 py-1.5 rounded-full border ${
+                selectedSizeFilter === sz
+                  ? "bg-primary border-primary"
+                  : "bg-white border-divider"
+              }`}
+            >
+              <Text
+                className={`text-xs font-bold ${
+                  selectedSizeFilter === sz ? "text-white" : "text-text-secondary"
+                }`}
+              >
+                Size {sz}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          {/* Custom Size Option */}
+          <TouchableOpacity
+            onPress={() => setSelectedSizeFilter("custom")}
+            className={`mr-4 px-3.5 py-1.5 rounded-full border flex-row items-center ${
+              selectedSizeFilter === "custom"
+                ? "bg-primary border-primary"
+                : "bg-white border-divider"
+            }`}
+          >
+            <Ionicons
+              name="cut-outline"
+              size={12}
+              color={selectedSizeFilter === "custom" ? "white" : "#64748b"}
+            />
+            <Text
+              className={`text-xs font-bold ml-1 ${
+                selectedSizeFilter === "custom" ? "text-white" : "text-text-secondary"
+              }`}
+            >
+              Custom Sized
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+
+      <View className="px-5 mt-5 mb-3 flex-row justify-between items-center">
         <Text className="text-base font-bold text-text-primary">
           {searchQuery.trim()
             ? `Results for "${searchQuery.trim()}"`
             : "Recommended"}
         </Text>
+        {selectedSizeFilter !== "all" && (
+          <Text className="text-xs text-primary font-semibold">
+            {filteredProducts.length} in {selectedSizeFilter === "my_sizes" ? "My Sizes" : selectedSizeFilter === "custom" ? "Custom" : `Size ${selectedSizeFilter}`}
+          </Text>
+        )}
       </View>
     </>
   );
@@ -215,7 +380,7 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-[#FAFAFA]">
       <FlatList
-        data={products}
+        data={filteredProducts}
         keyExtractor={(item) => item.id}
         numColumns={2}
         contentContainerStyle={{ paddingBottom: 100 }}

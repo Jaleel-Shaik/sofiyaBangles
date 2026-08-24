@@ -71,3 +71,11 @@ export const env = {
   SUPER_ADMIN_SESSION_EXPIRY_DAYS: Number(process.env.SUPER_ADMIN_SESSION_EXPIRY_DAYS) || 1,
   SUPER_ADMIN_REFRESH_TOKEN_EXPIRY_DAYS: Number(process.env.SUPER_ADMIN_REFRESH_TOKEN_EXPIRY_DAYS) || 7,
 } as const;
+
+// ─── Startup Validation ──────────────────────────────────────
+if (!env.WHATSAPP_NUMBER) {
+  console.warn(
+    "⚠️  WHATSAPP_NUMBER is not configured in .env. " +
+    "WhatsApp enquiry links will use the fallback placeholder number."
+  );
+}
