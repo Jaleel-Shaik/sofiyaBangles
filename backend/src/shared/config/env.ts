@@ -4,6 +4,12 @@ dotenv.config();
 
 export const env = {
   PORT: Number(process.env.PORT) || 5000,
+  NODE_ENV: process.env.NODE_ENV || "development",
+
+  // CORS — comma-separated list of allowed origins
+  // e.g. "http://localhost:3000,https://admin.sofiyabangles.com"
+  // Leave empty in dev to allow all origins
+  CORS_ORIGINS: process.env.CORS_ORIGINS || "",
 
   // Database
   DB_HOST: process.env.DB_HOST || "",

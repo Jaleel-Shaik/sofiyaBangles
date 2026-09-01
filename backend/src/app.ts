@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./shared/config/env";
+import { corsOptions } from "./shared/config/cors";
 import { errorHandler } from "./shared/middlewares/error.middleware";
 import { apiLogMiddleware } from "./shared/middlewares/apiLog.middleware";
 import authRoutes from "./features/auth/routes/auth.routes";
@@ -18,11 +19,23 @@ import sizePreferenceRoutes from "./features/size-preference/routes/sizePreferen
 import orderRoutes from "./features/order/routes/order.routes";
 
 const app = express();
-app.use(cors());
+app.use(cors(corsOptions));
+
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoints for Docker container health checks & load balancers
+app.get(["/health", "/api/health"], (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "sofiya-bangles-backend",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);

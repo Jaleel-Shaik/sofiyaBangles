@@ -1,0 +1,47 @@
+# ==============================================================================
+# SOFIYA BANGLES - DEVELOPMENT DOCKER COMPOSE (Hot-Reloading)
+# ==============================================================================
+# Run with: docker compose -f docker-compose.dev.yml up --build
+# ==============================================================================
+
+services:
+  backend-dev:
+    image: node:22-alpine
+    container_name: sofiya-backend-dev
+    working_dir: /app
+    ports:
+      - "${BACKEND_PORT:-5050}:5000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=5000
+      - NODE_ENV=development
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json
+    command: npm run dev
+    networks:
+      - sofiya-network-dev
+
+  web-dev:
+    image: node:22-alpine
+    container_name: sofiya-web-dev
+    working_dir: /app
+    ports:
+      - "${WEB_PORT:-3050}:3000"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT:-5050}/api
+    command: npm run dev
+    networks:
+      - sofiya-network-dev
+
+networks:
+  sofiya-network-dev:
+    driver: bridge

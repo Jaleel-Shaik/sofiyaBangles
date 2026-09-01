@@ -4,19 +4,58 @@ import { env } from './env';
 import fs from 'fs';
 import path from 'path';
 
-// We initialize using the default credentials. 
-// In production, GOOGLE_APPLICATION_CREDENTIALS env var should be set.
-// For local development, we can provide a service account JSON, or rely on application default credentials.
+// Resolve the service-account.json in order of priority:
+// 1. FIREBASE_SERVICE_ACCOUNT_JSON (inline JSON string in env)
+// 2. FIREBASE_SERVICE_ACCOUNT_BASE64 (base64 encoded JSON string in env)
+// 3. GOOGLE_APPLICATION_CREDENTIALS env var (explicit file path)
+// 4. Project root / CWD (works in Docker where file is mounted at /app/)
+// 5. Relative to compiled __dirname (legacy fallback)
+function getFirebaseCredential(): admin.credential.Credential {
+  // Option A: Raw JSON string in environment variable
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    try {
+      const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      console.log('Loading Firebase credentials from FIREBASE_SERVICE_ACCOUNT_JSON env var');
+      return admin.credential.cert(parsed);
+    } catch (e) {
+      console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON, falling back to file resolution', e);
+    }
+  }
+
+  // Option B: Base64-encoded JSON string in environment variable
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+    try {
+      const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf-8');
+      const parsed = JSON.parse(decoded);
+      console.log('Loading Firebase credentials from FIREBASE_SERVICE_ACCOUNT_BASE64 env var');
+      return admin.credential.cert(parsed);
+    } catch (e) {
+      console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT_BASE64, falling back to file resolution', e);
+    }
+  }
+
+  // Option C: File path candidates
+  const candidates = [
+    process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    path.resolve(process.cwd(), 'service-account.json'),
+    path.resolve(__dirname, '../../service-account.json'),
+    path.resolve(__dirname, '../../../service-account.json'),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      console.log(`Loading Firebase credentials from file: ${candidate}`);
+      return admin.credential.cert(require(candidate));
+    }
+  }
+
+  console.log('No service-account.json found, using application default credentials');
+  return admin.credential.applicationDefault();
+}
+
 if (!admin.apps.length) {
   try {
-    const serviceAccountPath = path.resolve(__dirname, '../../service-account.json');
-    let credential;
-
-    if (fs.existsSync(serviceAccountPath)) {
-      credential = admin.credential.cert(require(serviceAccountPath));
-    } else {
-      credential = admin.credential.applicationDefault();
-    }
+    const credential = getFirebaseCredential();
 
     admin.initializeApp({
       credential,
