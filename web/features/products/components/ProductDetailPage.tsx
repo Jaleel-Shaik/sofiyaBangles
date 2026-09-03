@@ -52,7 +52,7 @@ export default function ProductDetailPage() {
   };
 
   const handleSell = async () => {
-    if (!product) return;
+    if (selling || !product) return;
     if (sellQty < 1) { toast.error("Quantity must be at least 1"); return; }
     if (sellQty > product.quantity) { toast.error("Not enough stock"); return; }
     setSelling(true);
@@ -188,7 +188,7 @@ export default function ProductDetailPage() {
                   <button
                     onClick={handleSell}
                     disabled={selling}
-                    className="flex-1 gradient-primary text-white font-semibold py-2.5 px-5 rounded-xl transition-all hover:shadow-lg hover:shadow-[#E8436E]/25 flex items-center justify-center gap-2"
+                    className="flex-1 gradient-primary text-white font-semibold py-2.5 px-5 rounded-xl transition-all hover:shadow-lg hover:shadow-[#E8436E]/25 flex items-center justify-center gap-2 disabled:opacity-60 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer"
                   >
                     {selling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                       <>

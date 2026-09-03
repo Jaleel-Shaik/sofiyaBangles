@@ -61,6 +61,7 @@ export const corsOptions: CorsOptions = {
     "X-Requested-With",
     "Accept",
     "Origin",
+    "x-client-type",
   ],
 
   // Headers the client can read from the response

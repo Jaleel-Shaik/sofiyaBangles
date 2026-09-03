@@ -214,7 +214,7 @@ export default function ProductDetailScreen() {
   };
 
   const handleMarkBought = async () => {
-    if (!product) return;
+    if (isOrdering || !product) return;
     try {
       setIsOrdering(true);
       const galleryImages = getGalleryImages();
@@ -240,7 +240,7 @@ export default function ProductDetailScreen() {
   };
 
   const handleSubmitReview = async () => {
-    if (!product) return;
+    if (isReviewSubmitting || !product) return;
     try {
       setIsReviewSubmitting(true);
       await createReview({

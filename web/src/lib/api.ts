@@ -416,9 +416,8 @@ export const adminApi = {
       .then((r) => r.data.data);
   },
 
-  // Analytics
-  getOverviewAnalytics: () =>
-    apiClient.get('/analytics/overview').then(r => extractData<AnalyticsOverview>(r)),
+  getOverviewAnalytics: (categoryId?: string, modelTypeId?: string) =>
+    apiClient.get('/analytics/overview', { params: { category_id: categoryId, model_type_id: modelTypeId } }).then(r => extractData<AnalyticsOverview>(r)),
 
   // Users
   getUsers: () =>

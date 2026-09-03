@@ -44,6 +44,7 @@ export default function ManageModelTypesScreen() {
   );
 
   const handleSave = async () => {
+    if (saving) return;
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter a name for the Model Type.');
       return;
@@ -71,7 +72,7 @@ export default function ManageModelTypesScreen() {
   };
 
   const handleUpdate = async () => {
-    if (!editingId) return;
+    if (updating || !editingId) return;
     if (!editName.trim()) {
       Alert.alert('Error', 'Please enter a name.');
       return;

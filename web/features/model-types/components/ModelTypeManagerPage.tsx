@@ -41,6 +41,7 @@ export default function ModelTypesPage() {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     if (!name.trim()) { toast.error("Name is required"); return; }
     setSaving(true);
     try {
@@ -98,8 +99,9 @@ export default function ModelTypesPage() {
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={resetForm} className="px-5 py-2.5 text-sm font-medium text-[#525252]">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="gradient-primary text-white font-semibold py-2.5 px-6 rounded-xl">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+              <button onClick={handleSave} disabled={saving} className="gradient-primary text-white font-semibold py-2.5 px-6 rounded-xl flex items-center gap-2 disabled:opacity-60 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {saving ? "Saving..." : "Save"}
               </button>
             </div>
           </div>

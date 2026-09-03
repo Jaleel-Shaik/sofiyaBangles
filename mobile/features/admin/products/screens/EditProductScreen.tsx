@@ -65,8 +65,8 @@ export default function EditProductScreen() {
             setImageUrls(productData.images || (productData.image_url ? [productData.image_url] : []));
             
             if (productData.variants && productData.variants.length > 0) {
-              setVariants(productData.variants.map((v: any) => ({
-                id: v.id || `v-${Math.random()}`,
+              setVariants(productData.variants.map((v: any, idx: number) => ({
+                id: v.id || `v-${idx}-${v.size}`,
                 size: v.size,
                 price: v.price.toString(),
                 quantity: v.quantity.toString()
@@ -170,6 +170,7 @@ export default function EditProductScreen() {
 
 
   const handleSubmit = async () => {
+    if (loading) return;
     const newErrors: Record<string, string> = {};
     if (!name.trim()) newErrors.name = 'Product name is required';
     if (!price) newErrors.price = 'Price is required';
@@ -226,16 +227,28 @@ export default function EditProductScreen() {
     }
   };
 
+  const MAX_IMAGES = 7;
+
   const pickImage = async () => {
+    if (imageUrls.length >= MAX_IMAGES) {
+      Alert.alert('Limit Reached', `Maximum image limit reached! Only up to ${MAX_IMAGES} images are allowed per product.`);
+      return;
+    }
+
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
       quality: 0.8,
+      selectionLimit: MAX_IMAGES - imageUrls.length,
     });
 
     if (!result.canceled) {
       const selectedUris = result.assets.map(a => a.uri);
-      setImageUrls(prev => [...prev, ...selectedUris]);
+      const availableSlots = MAX_IMAGES - imageUrls.length;
+      if (selectedUris.length > availableSlots) {
+        Alert.alert('Limit Exceeded', `Only ${availableSlots} more image(s) added (Limit: ${MAX_IMAGES} images).`);
+      }
+      setImageUrls(prev => [...prev, ...selectedUris.slice(0, availableSlots)]);
     }
   };
 
@@ -271,26 +284,45 @@ export default function EditProductScreen() {
       <ScrollView className="flex-1 px-4 pt-6" showsVerticalScrollIndicator={false}>
         {/* Images Section */}
         <View className="mb-6">
-          <View className="flex-row justify-between items-center mb-3 ml-1">
-            <Text className="text-sm font-bold text-text-secondary">Product Images</Text>
-            {errors.images && <Text className="text-xs font-bold text-red-500">{errors.images}</Text>}
+          <View className="flex-row justify-between items-center mb-2 ml-1">
+            <View className="flex-row items-center">
+              <Text className="text-sm font-bold text-text-secondary">Product Images </Text>
+              <Text className="text-xs font-bold text-primary">({imageUrls.length} / {MAX_IMAGES})</Text>
+            </View>
+            <View className="bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+              <Text className="text-[10px] font-bold text-primary">Up to 7 Images Only</Text>
+            </View>
           </View>
+          
+          {/* Guide Banner */}
+          <View className="flex-row items-center bg-amber-50 p-3 rounded-xl border border-amber-200/80 mb-3">
+            <Ionicons name="information-circle" size={18} color="#d97706" style={{ marginRight: 8 }} />
+            <Text className="text-xs text-amber-900 font-medium flex-1">
+              <Text className="font-bold">Image Guide:</Text> Upload up to 7 images per product (JPG, PNG). The 1st photo is the main cover.
+            </Text>
+          </View>
+
+          {errors.images && <Text className="text-xs font-bold text-red-500 mb-2 ml-1">{errors.images}</Text>}
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-1 py-1">
-            <TouchableOpacity 
-              className={`w-40 h-40 bg-surface rounded-2xl border-2 border-dashed items-center justify-center mr-4 ${
-                errors.images ? 'border-red-500 bg-red-50/10' : 'border-primary/30'
-              }`}
-              onPress={() => {
-                pickImage();
-                if (errors.images) setErrors(prev => { const copy = { ...prev }; delete copy.images; return copy; });
-              }}
-              activeOpacity={0.7}
-            >
-              <View className="w-12 h-12 bg-primary/10 rounded-full items-center justify-center mb-2">
-                <Ionicons name="camera" size={24} color="#e11d48" />
-              </View>
-              <Text className="text-primary font-semibold text-xs">Add Photos</Text>
-            </TouchableOpacity>
+            {imageUrls.length < MAX_IMAGES && (
+              <TouchableOpacity 
+                className={`w-40 h-40 bg-surface rounded-2xl border-2 border-dashed items-center justify-center mr-4 ${
+                  errors.images ? 'border-red-500 bg-red-50/10' : 'border-primary/30'
+                }`}
+                onPress={() => {
+                  pickImage();
+                  if (errors.images) setErrors(prev => { const copy = { ...prev }; delete copy.images; return copy; });
+                }}
+                activeOpacity={0.7}
+              >
+                <View className="w-12 h-12 bg-primary/10 rounded-full items-center justify-center mb-2">
+                  <Ionicons name="camera" size={24} color="#e11d48" />
+                </View>
+                <Text className="text-primary font-semibold text-xs">Add Photos</Text>
+                <Text className="text-[10px] text-text-secondary mt-1">({MAX_IMAGES - imageUrls.length} slots left)</Text>
+              </TouchableOpacity>
+            )}
             {imageUrls.map((uri, idx) => (
               <View key={idx} className="relative mr-4">
                 <Image source={{ uri }} className="w-40 h-40 rounded-2xl bg-surface" resizeMode="cover" />
@@ -300,6 +332,11 @@ export default function EditProductScreen() {
                 >
                   <Ionicons name="close" size={16} color="white" />
                 </TouchableOpacity>
+                {idx === 0 && (
+                  <View className="absolute bottom-2 left-2 bg-primary px-2 py-0.5 rounded-md">
+                    <Text className="text-[10px] font-bold text-white">Cover</Text>
+                  </View>
+                )}
               </View>
             ))}
           </ScrollView>

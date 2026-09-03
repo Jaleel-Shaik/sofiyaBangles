@@ -92,6 +92,7 @@ export default function ManageCategoriesScreen() {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter a name for the Category.');
       return;

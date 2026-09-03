@@ -12,9 +12,13 @@ export const getAdminProducts = async (page = 1, limit = 10) => {
   }
 };
 
-export const getOverviewAnalytics = async () => {
+export const getOverviewAnalytics = async (categoryId?: string, modelTypeId?: string) => {
   try {
-    const res = await apiClient.get('analytics/overview');
+    const params: Record<string, string> = {};
+    if (categoryId) params.category_id = categoryId;
+    if (modelTypeId) params.model_type_id = modelTypeId;
+
+    const res = await apiClient.get('analytics/overview', { params });
     const data = res.data.data;
     return {
       totalProducts: data.totalProducts,

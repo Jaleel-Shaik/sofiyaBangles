@@ -26,6 +26,7 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     if (!form.full_name.trim()) {
       toast.error("Full name is required");
       return;
@@ -150,10 +151,10 @@ export default function ProfilePage() {
             </button>
           ) : (
             <div className="flex items-center gap-3">
-              <button onClick={cancelEditing} disabled={saving} className="px-5 py-2.5 rounded-xl border border-[#E5E5E5] text-[#525252] font-semibold hover:bg-[#F5F5F5] transition-colors disabled:opacity-60">
+              <button onClick={cancelEditing} disabled={saving} className="px-5 py-2.5 rounded-xl border border-[#E5E5E5] text-[#525252] font-semibold hover:bg-[#F5F5F5] transition-colors disabled:opacity-60 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer">
                 Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} className="gradient-primary text-white font-semibold py-2.5 px-6 rounded-xl disabled:opacity-60 flex items-center gap-2">
+              <button onClick={handleSave} disabled={saving} className="gradient-primary text-white font-semibold py-2.5 px-6 rounded-xl disabled:opacity-60 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer flex items-center gap-2">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 {saving ? "Saving..." : "Save Changes"}
               </button>

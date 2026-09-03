@@ -21,7 +21,12 @@ import orderRoutes from "./features/order/routes/order.routes";
 const app = express();
 app.use(cors(corsOptions));
 
-app.use(helmet());
+app.use(helmet({
+  // Allow cross-origin API consumption (frontend on different port/domain)
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  // Disable CSP for API server — it serves JSON, not HTML pages
+  contentSecurityPolicy: false,
+}));
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -33,6 +38,28 @@ app.get(["/health", "/api/health"], (_req, res) => {
     service: "sofiya-bangles-backend",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+  });
+});
+
+// Root API endpoint
+app.get("/api", (_req, res) => {
+  res.status(200).json({
+    message: "Sofiya Bangles API",
+    version: "1.0.0",
+    endpoints: [
+      "/api/health",
+      "/api/auth",
+      "/api/products",
+      "/api/categories",
+      "/api/favorites",
+      "/api/users",
+      "/api/settings",
+      "/api/analytics",
+      "/api/notifications",
+      "/api/model-types",
+      "/api/size-preferences",
+      "/api/orders",
+    ],
   });
 });
 

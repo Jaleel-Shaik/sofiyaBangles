@@ -7,9 +7,11 @@ import {
   getRecentSignupsService,
 } from "../services/analytics.service";
 
-export const getOverview = async (_req: AuthRequest, res: Response) => {
+export const getOverview = async (req: AuthRequest, res: Response) => {
   try {
-    const analytics = await getOverviewAnalyticsService();
+    const category_id = getQuery(req, "category_id");
+    const model_type_id = getQuery(req, "model_type_id");
+    const analytics = await getOverviewAnalyticsService({ category_id, model_type_id });
 
     res.json({
       success: true,

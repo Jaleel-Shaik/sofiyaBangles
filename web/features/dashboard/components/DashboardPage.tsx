@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import { motion } from "framer-motion";
 import {
@@ -11,7 +11,7 @@ import {
   ArrowRight,
   ShoppingCart,
 } from "lucide-react";
-import { adminApi, type Product, type AnalyticsOverview, type Category } from "@/src/lib/api";
+import { adminApi, type Product, type AnalyticsOverview, type Category, type ModelType } from "@/src/lib/api";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -19,21 +19,27 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<AnalyticsOverview | null>(null);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [modelTypes, setModelTypes] = useState<ModelType[]>([]);
+  const [selectedModelType, setSelectedModelType] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       setError(null);
       try {
-        const [analyticsData, productsData, cats] = await Promise.all([
+        const [analyticsData, productsData, cats, mts] = await Promise.all([
           adminApi.getOverviewAnalytics(),
           adminApi.getAdminProducts(1, 5),
           adminApi.getCategories(),
+          adminApi.getModelTypes(),
         ]);
         setStats(analyticsData);
         setRecentProducts(productsData.products || []);
         setCategories(cats);
+        setModelTypes(mts);
       } catch (err: any) {
         const msg = err?.response?.data?.message || err?.message || "Failed to connect to server";
         setError(msg);
@@ -44,6 +50,34 @@ export default function DashboardPage() {
     };
     fetchData();
   }, []);
+
+  // Filter categories based on selected model type
+  const filteredCategories = useMemo(() => {
+    if (!selectedModelType) return categories;
+    return categories.filter((c) => c.model_type_id === selectedModelType);
+  }, [categories, selectedModelType]);
+
+  // Re-fetch overview analytics whenever filters change
+  useEffect(() => {
+    const updateStats = async () => {
+      setStatsLoading(true);
+      try {
+        const data = await adminApi.getOverviewAnalytics(
+          selectedCategory || undefined,
+          selectedModelType || undefined
+        );
+        setStats(data);
+      } catch (err) {
+        console.error("Failed to update overview stats", err);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    if (!loading) {
+      updateStats();
+    }
+  }, [selectedModelType, selectedCategory]);
 
   return (
     <div className="space-y-6">
@@ -63,10 +97,39 @@ export default function DashboardPage() {
 
       {/* Overview Stats */}
       <div>
-        <h2 className="text-lg font-bold text-[#171717] mb-4">Overview</h2>
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[1, 2].map((i) => (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-lg font-bold text-[#171717]">Overview</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={selectedModelType}
+              onChange={(e) => {
+                setSelectedModelType(e.target.value);
+                setSelectedCategory("");
+              }}
+              className="text-xs font-semibold px-3 py-2 rounded-xl border border-[#E5E5E5] bg-white text-[#171717] focus:outline-none focus:border-[#E8436E] cursor-pointer shadow-sm"
+            >
+              <option value="">All Model Types</option>
+              {modelTypes.map((mt) => (
+                <option key={mt.id} value={mt.id}>{mt.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="text-xs font-semibold px-3 py-2 rounded-xl border border-[#E5E5E5] bg-white text-[#171717] focus:outline-none focus:border-[#E8436E] cursor-pointer shadow-sm"
+            >
+              <option value="">All Categories</option>
+              {filteredCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.category_name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {loading || statsLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
               <div key={i} className="bg-white rounded-2xl border border-[#E5E5E5] p-5 animate-pulse">
                 <div className="w-10 h-10 bg-gray-200 rounded-xl mb-3" />
                 <div className="h-7 w-20 bg-gray-200 rounded mb-2" />
@@ -75,7 +138,7 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -88,10 +151,28 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold text-[#171717]">
                 {stats?.totalProducts || 0}
               </p>
-              <p className="text-sm text-[#A3A3A3] font-medium mt-1">
-                Total Products
+              <p className="text-sm text-[#737373] font-medium mt-1">
+                Total Products {selectedCategory || selectedModelType ? "(Filtered)" : ""}
               </p>
             </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.08 }}
+              className="bg-white rounded-2xl border border-[#E5E5E5] p-5 hover:shadow-md transition-shadow"
+            >
+              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-3">
+                <Layers className="w-5 h-5 text-emerald-500" />
+              </div>
+              <p className="text-2xl font-bold text-[#171717]">
+                {stats?.totalStock || 0}
+              </p>
+              <p className="text-sm text-[#737373] font-medium mt-1">
+                Total Stock Items {selectedCategory || selectedModelType ? "(Filtered)" : ""}
+              </p>
+            </motion.div>
+
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -104,8 +185,8 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold text-[#171717]">
                 {stats?.itemsSold || 0}
               </p>
-              <p className="text-sm text-[#A3A3A3] font-medium mt-1">
-                Sold Products
+              <p className="text-sm text-[#737373] font-medium mt-1">
+                Sold Products {selectedCategory || selectedModelType ? "(Filtered)" : ""}
               </p>
             </motion.div>
           </div>

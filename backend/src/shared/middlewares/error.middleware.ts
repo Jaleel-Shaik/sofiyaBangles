@@ -25,6 +25,10 @@ export const errorHandler = (
       res.status(400).json({ success: false, message: "File size exceeds the 5MB limit." });
       return;
     }
+    if (err.code === "LIMIT_UNEXPECTED_FILE") {
+      res.status(400).json({ success: false, message: "Maximum 7 images allowed per product." });
+      return;
+    }
     res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
     return;
   }

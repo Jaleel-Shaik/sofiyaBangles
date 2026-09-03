@@ -32,7 +32,7 @@ router.post(
   "/",
   authenticate,
   requireRole("admin", "super_admin"),
-  upload.array("images", 5),
+  upload.array("images", 7),
   validate(createProductSchema),
   createProduct,
 );
@@ -40,7 +40,7 @@ router.put(
   "/:id",
   authenticate,
   requireRole("admin", "super_admin"),
-  upload.array("images", 5),
+  upload.array("images", 7),
   validate(updateProductSchema),
   updateProduct,
 );
