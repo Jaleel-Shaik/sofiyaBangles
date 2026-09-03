@@ -6,25 +6,46 @@ import { env } from "./env";
  *
  * Behavior:
  * - Development (NODE_ENV !== "production"):
- *     Allows ALL origins so local dev with multiple ports works seamlessly.
+ *     Allows ALL origins.
  *
  * - Production (NODE_ENV === "production"):
- *     Only allows origins explicitly listed in CORS_ORIGINS env var.
- *     Rejects requests from unlisted origins with a clear error.
- *
- * Usage in .env:
- *   CORS_ORIGINS=http://localhost:3000,https://admin.sofiyabangles.com,https://sofiyabangles.com
+ *     1. Allows any origin listed in CORS_ORIGINS env var.
+ *     2. Automatically allows all *.vercel.app preview & production deployments.
+ *     3. Automatically allows localhost/127.0.0.1 for local dev/testing.
+ *     4. Requests with no origin (native Expo apps, cURL, server-to-server) are allowed.
+ *     5. Rejects unlisted origins cleanly without throwing a 500 error.
  */
 
-function buildAllowedOrigins(): string[] {
-  if (!env.CORS_ORIGINS) return [];
-  return env.CORS_ORIGINS
+function isOriginAllowed(origin: string): boolean {
+  const originsFromEnv = (process.env.CORS_ORIGINS || env.CORS_ORIGINS || "")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((o) => o.trim().toLowerCase())
     .filter(Boolean);
-}
 
-const allowedOrigins = buildAllowedOrigins();
+  const lowerOrigin = origin.toLowerCase();
+
+  // Direct match from env
+  if (originsFromEnv.some((allowed) => allowed === lowerOrigin)) {
+    return true;
+  }
+
+  // Allow all Vercel deployment URLs (production, git branch previews, commit previews)
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === "vercel.app" || hostname.endsWith(".vercel.app")) {
+      return true;
+    }
+    // Allow local development
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return true;
+    }
+  } catch {
+    // Malformed origin URL
+  }
+
+  return false;
+}
 
 export const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
@@ -38,14 +59,14 @@ export const corsOptions: CorsOptions = {
       return callback(null, true);
     }
 
-    // In production, check against the allowed list
-    if (allowedOrigins.includes(origin)) {
+    // Check allowed origins
+    if (isOriginAllowed(origin)) {
       return callback(null, true);
     }
 
-    // Reject unknown origins
+    // Cleanly reject unknown origins without throwing a 500 Internal Server Error
     console.warn(`🚫 CORS blocked origin: ${origin}`);
-    return callback(new Error(`Origin ${origin} is not allowed by CORS policy`));
+    return callback(null, false);
   },
 
   // Allow credentials (cookies, authorization headers)
@@ -62,6 +83,7 @@ export const corsOptions: CorsOptions = {
     "Accept",
     "Origin",
     "x-client-type",
+    "x-client-version",
   ],
 
   // Headers the client can read from the response
@@ -72,4 +94,6 @@ export const corsOptions: CorsOptions = {
 
   // Cache preflight responses for 10 minutes (reduces OPTIONS requests)
   maxAge: 600,
+  optionsSuccessStatus: 204,
 };
+
