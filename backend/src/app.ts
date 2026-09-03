@@ -31,6 +31,8 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+import { firebaseCredentialSource, firebaseInitError } from "./shared/config/firebase";
+
 // Health check endpoints for Docker container health checks & load balancers
 app.get(["/health", "/api/health"], (_req, res) => {
   res.status(200).json({
@@ -38,6 +40,11 @@ app.get(["/health", "/api/health"], (_req, res) => {
     service: "sofiya-bangles-backend",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    firebase: {
+      source: firebaseCredentialSource,
+      ready: firebaseCredentialSource !== "none" && !firebaseCredentialSource.includes("unconfigured"),
+      error: firebaseInitError,
+    },
   });
 });
 

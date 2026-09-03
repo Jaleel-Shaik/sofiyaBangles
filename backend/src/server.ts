@@ -3,9 +3,6 @@ import app from "./app";
 import { cleanupExpiredSessionsAndTokens } from "./features/auth/services/totp.service";
 const PORT = env.PORT || 5000;
 console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
