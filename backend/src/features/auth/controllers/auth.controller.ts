@@ -538,6 +538,14 @@ export const verify2FAController = async (req: AuthRequest, res: Response) => {
       });
       return;
     }
+    if (error.message === "FAILED_TO_DECRYPT_2FA_SECRET") {
+      res.status(400).json({
+        success: false,
+        code: "FAILED_TO_DECRYPT_2FA_SECRET",
+        message: "Failed to decrypt 2FA secret with configured keys.",
+      });
+      return;
+    }
     console.error("Verify 2FA controller error:", error);
     res.status(500).json({
       success: false,
