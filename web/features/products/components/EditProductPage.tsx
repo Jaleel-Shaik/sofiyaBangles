@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2, Upload, X, Trash2, Info } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, Plus, X, Trash2, Info } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { adminApi, apiClient, type Category, type ModelType } from "@/src/lib/api";
