@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
+const isVercel = Boolean(process.env.VERCEL);
+
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Standalone output is only needed for custom Docker builds, not for Vercel
+  ...(isVercel ? {} : { output: "standalone" }),
   images: {
     domains: ["res.cloudinary.com"],
   },
