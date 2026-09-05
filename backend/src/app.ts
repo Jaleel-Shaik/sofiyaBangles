@@ -17,6 +17,7 @@ import notificationRoutes from "./features/notification/routes/notification.rout
 import modelTypeRoutes from "./features/model-type/routes/modelType.routes";
 import sizePreferenceRoutes from "./features/size-preference/routes/sizePreference.routes";
 import orderRoutes from "./features/order/routes/order.routes";
+import superAdminRoutes from "./features/super-admin/routes/superAdmin.routes";
 
 const app = express();
 app.use(cors(corsOptions));
@@ -66,6 +67,7 @@ app.get("/api", (_req, res) => {
       "/api/model-types",
       "/api/size-preferences",
       "/api/orders",
+      "/api/super-admin",
     ],
   });
 });
@@ -81,6 +83,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/model-types", modelTypeRoutes);
 app.use("/api/size-preferences", sizePreferenceRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/super-admin", superAdminRoutes);
 app.use(apiLogMiddleware);
 app.use(errorHandler);
 export default app;

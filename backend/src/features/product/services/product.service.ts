@@ -24,6 +24,7 @@ export const createProductService = async (
   input: CreateProductInput,
   files: Express.Multer.File[] | undefined,
   actorId: string,
+  actorRole?: 'admin' | 'super_admin',
 ) => {
   let imageUrls: string[] = [];
 
@@ -36,6 +37,9 @@ export const createProductService = async (
   const product = await createProductModel({
     ...input,
     images: images,
+    created_by: actorId,
+    created_by_role: actorRole || 'admin',
+    updated_by: actorId,
   });
 
   // Audit log
@@ -44,7 +48,7 @@ export const createProductService = async (
     action: "PRODUCT_CREATED",
     table_name: "products",
     record_id: product.id,
-    new_data: { product_name: product.product_name, price: product.price },
+    new_data: { product_name: product.product_name, price: product.price, created_by_role: actorRole || 'admin' },
   });
 
   return product;
@@ -169,6 +173,7 @@ export const updateProductService = async (
   const product = await updateProductModel(id, {
     ...restInput,
     images: formattedImages as any[],
+    updated_by: actorId,
   });
 
   // Identify old images that were replaced (non-blocking cleanup)

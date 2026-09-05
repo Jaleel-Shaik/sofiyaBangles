@@ -21,13 +21,23 @@ export interface User {
 
 export interface LoginResponse {
   message: string;
+  challengeId?: string;
+  challenge_id?: string;
+  state?: string;
+  status?: string;
   /** Backend field indicating 2FA is required for this user */
+  requiresOtp?: boolean;
   require_otp?: boolean;
+  isTotpSetupRequired?: boolean;
+  setup_required?: boolean;
+  qrCodeUrl?: string;
+  qr_code_url?: string;
+  expiresAt?: string;
+  expires_at?: string;
   otp_pending_token?: string;
   is_2fa_enabled?: boolean;
-  setup_required?: boolean;
-  qr_code_url?: string;
   secret?: string;
+  otpauthUrl?: string;
   otpauth_url?: string;
   
   // Direct login response (non-admin users)
@@ -43,6 +53,8 @@ export interface Verify2FAResponse {
   refresh_token: string;
   session_id?: string;
   user: User;
+  backupCodes?: string[];
+  backup_codes?: string[];
 }
 
 export interface RefreshTokenResponse {
@@ -227,6 +239,7 @@ export interface Product {
   accepts_custom_size?: boolean;
   custom_size_price?: number | string;
   model_type_id: string;
+  category_name?: string;
   model_type_name?: string;
   created_at?: string;
   updated_at?: string;
@@ -432,13 +445,30 @@ export const authApi = {
   login: (email: string, password: string) =>
     apiClient.post<{ success: boolean; data: LoginResponse }>("/auth/login", { email, password }).then((r) => r.data.data),
 
-  verify2FA: (otpPendingToken: string, otpCode: string) =>
-    apiClient
-      .post<{ success: boolean; data: Verify2FAResponse }>("/auth/verify-2fa", {
-        otp_pending_token: otpPendingToken,
-        otp_code: otpCode,
-      })
-      .then((r) => r.data.data),
+  verify2FA: (
+    payloadOrToken:
+      | {
+          challengeId?: string;
+          challenge_id?: string;
+          email?: string;
+          otp?: string;
+          otp_code?: string;
+          otp_pending_token?: string;
+          useBackupCode?: boolean;
+          use_backup_code?: boolean;
+        }
+      | string,
+    legacyOtpCode?: string
+  ) => {
+    const payload =
+      typeof payloadOrToken === "string"
+        ? { otp_pending_token: payloadOrToken, otp_code: legacyOtpCode }
+        : payloadOrToken;
+
+    return apiClient
+      .post<{ success: boolean; data: Verify2FAResponse }>("/auth/verify-2fa", payload)
+      .then((r) => r.data.data);
+  },
 
   refreshToken: (refreshToken: string) =>
     apiClient
@@ -482,3 +512,266 @@ export const authApi = {
   updateProfile: (data: { full_name?: string; phone?: string }) =>
     apiClient.put<{ success: boolean; data: User; message: string }>("/auth/me", data).then((r) => r.data.data),
 };
+
+// --- SuperAdmin API ---
+
+export interface SuperAdminDashboardData {
+  kpis: {
+    totalProducts: number;
+    activeProducts: number;
+    productsSold: number;
+    unitsSold: number;
+    grossSales: number;
+    netSales: number;
+    totalRefunds: number;
+    adminEarnings: number;
+    superAdminEarnings: number;
+    pendingOrders: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+  };
+  commission: {
+    admin_percentage: number;
+    super_admin_percentage: number;
+    updated_at: string;
+    updated_by?: string;
+  };
+  salesTrend: Array<{
+    date: string;
+    grossSales: number;
+    adminEarnings: number;
+    superAdminEarnings: number;
+    unitsSold: number;
+    orderCount: number;
+  }>;
+  topSellingProducts: Array<{
+    product_id: string;
+    product_name: string;
+    category_name: string;
+    image_url: string | null;
+    units_sold: number;
+    gross_revenue: number;
+    super_admin_share: number;
+    stock: number;
+  }>;
+  categoryPerformance: Array<{
+    category_id: string;
+    category_name: string;
+    units_sold: number;
+    gross_revenue: number;
+    super_admin_share: number;
+  }>;
+  recentSales: Array<{
+    order_id: string;
+    order_number: string;
+    customer_name?: string;
+    created_at: string;
+    items_count: number;
+    total_amount: number;
+    super_admin_share: number;
+    admin_share: number;
+    status: string;
+  }>;
+  recentActivity: Array<{
+    id: string;
+    actor_id: string | null;
+    actor_name?: string;
+    action: string;
+    details: string;
+    created_at: string;
+  }>;
+}
+
+export interface RevenueLedgerItem {
+  id: string;
+  order_id: string;
+  order_item_id: string;
+  product_id: string;
+  product_name?: string;
+  sale_rate?: number;
+  quantity?: number;
+  admin_id: string;
+  admin_name?: string;
+  gross_amount: number;
+  admin_share_percentage: number;
+  super_admin_share_percentage: number;
+  admin_share_amount: number;
+  super_admin_share_amount: number;
+  transaction_type: "SALE" | "REFUND" | "ADJUSTMENT" | "REVERSAL";
+  status: "completed" | "reversed";
+  currency: string;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductAnalyticsDetail {
+  product: Product;
+  metrics: {
+    units_sold: number;
+    orders_count: number;
+    gross_revenue: number;
+    admin_share: number;
+    super_admin_share: number;
+    first_sale_date: string | null;
+    last_sale_date: string | null;
+    current_stock: number;
+  };
+  salesHistory: Array<{
+    order_id: string;
+    order_number: string;
+    sale_date: string;
+    quantity: number;
+    unit_price: number;
+    total_amount: number;
+    admin_share: number;
+    super_admin_share: number;
+  }>;
+  stockHistory: Array<{
+    id: string;
+    action: string;
+    quantity_change: number;
+    new_quantity: number;
+    actor_id: string | null;
+    created_at: string;
+  }>;
+}
+
+export const superAdminApi = {
+  getDashboard: (params?: { period?: string; fromDate?: string; toDate?: string; categoryId?: string; modelTypeId?: string; adminId?: string }) =>
+    apiClient.get("/super-admin/dashboard", { params }).then((r) => extractData<SuperAdminDashboardData>(r)),
+
+  getSalesList: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
+    apiClient.get("/super-admin/sales", { params }).then((r) => ({
+      sales: extractData<any[]>(r),
+      total: r.data?.pagination?.total || 0,
+    })),
+
+  getSaleDetail: (id: string) =>
+    apiClient.get(`/super-admin/sales/${id}`).then((r) => extractData<any>(r)),
+
+  getProductsAnalytics: (params?: { page?: number; limit?: number }) =>
+    apiClient.get("/super-admin/products-analytics", { params }).then((r) => ({
+      products: extractData<any[]>(r),
+      total: r.data?.pagination?.total || 0,
+    })),
+
+  getProductAnalyticsDetail: (id: string) =>
+    apiClient.get(`/super-admin/products-analytics/${id}`).then((r) => extractData<ProductAnalyticsDetail>(r)),
+
+  getRevenueLedger: (params?: { page?: number; limit?: number; fromDate?: string; toDate?: string; transactionType?: string; adminId?: string }) =>
+    apiClient.get("/super-admin/revenue", { params }).then((r) => ({
+      items: extractData<RevenueLedgerItem[]>(r),
+      total: r.data?.pagination?.total || 0,
+    })),
+
+  getAdminActivity: (params?: { page?: number; limit?: number; actorId?: string; action?: string }) =>
+    apiClient.get("/super-admin/activity", { params }).then((r) => ({
+      items: extractData<any[]>(r),
+      total: r.data?.pagination?.total || 0,
+    })),
+
+  getNotifications: () =>
+    apiClient.get("/super-admin/notifications").then((r) => extractData<any[]>(r)),
+
+  markNotificationRead: (id: string) =>
+    apiClient.patch(`/super-admin/notifications/${id}/read`).then((r) => r.data),
+
+  getCommissionSettings: () =>
+    apiClient.get("/super-admin/settings/commission").then((r) => extractData<any>(r)),
+
+  updateCommissionSettings: (data: { admin_percentage: number; super_admin_percentage: number }) =>
+    apiClient.put("/super-admin/settings/commission", data).then((r) => extractData<any>(r)),
+
+  completeOrder: (id: string) =>
+    apiClient.post(`/orders/${id}/complete`).then((r) => r.data),
+
+  refundOrder: (id: string, reason?: string) =>
+    apiClient.post(`/orders/${id}/refund`, { reason }).then((r) => r.data),
+
+  // Staff & Admin Management
+  getAdmins: () =>
+    apiClient.get("/super-admin/admins").then((r) => extractData<AdminStaff[]>(r)),
+
+  createAdmin: (data: { full_name: string; email: string; password: string; phone?: string }) =>
+    apiClient.post("/super-admin/admins", data).then((r) => r.data),
+
+  updateAdminStatus: (id: string, isActive: boolean) =>
+    apiClient.patch(`/super-admin/admins/${id}/status`, { isActive }).then((r) => r.data),
+
+  deleteAdmin: (id: string) =>
+    apiClient.delete(`/super-admin/admins/${id}`).then((r) => r.data),
+
+  // Full Order Management
+  getOrders: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
+    apiClient.get("/orders/admin/all", { params }).then((r) => ({
+      orders: (r.data?.data || []) as AdminOrder[],
+      total: r.data?.pagination?.total || 0,
+      totalPages: r.data?.pagination?.totalPages || 1,
+    })),
+
+  createOrder: (data: {
+    items: Array<{ productId: string; variantId?: string | null; quantity: number }>;
+    shippingAddressSnapshot?: any;
+  }) => apiClient.post("/orders", data).then((r) => r.data),
+
+  updateOrderStatus: (id: string, status: string, notes?: string) =>
+    apiClient.patch(`/orders/${id}/status`, { status, notes }).then((r) => r.data),
+
+  // Customer Management
+  getCustomers: (params?: { page?: number; limit?: number; search?: string }) =>
+    apiClient.get("/users", { params: { ...params, role: "user" } }).then((r) => ({
+      customers: extractData<UserProfile[]>(r),
+      total: r.data?.pagination?.total || 0,
+    })),
+
+  exportSalesCsvUrl: `${API_URL}/super-admin/export/sales`,
+  exportRevenueCsvUrl: `${API_URL}/super-admin/export/revenue`,
+  exportProductsCsvUrl: `${API_URL}/super-admin/export/products`,
+};
+
+export interface AdminStaff {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string | null;
+  role: string;
+  isActive: boolean;
+  twoFactorEnabled: boolean;
+  created_at: string | null;
+  updated_at?: string | null;
+}
+
+export interface AdminOrder {
+  id: string;
+  order_number: string;
+  user_id: string;
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  items: Array<{
+    id?: string;
+    productId?: string;
+    product_id?: string;
+    productNameSnapshot?: string;
+    product_name?: string;
+    quantity: number;
+    itemPrice?: number;
+    unit_price?: number;
+    total_amount?: number;
+    imageUrl?: string | null;
+    image_url?: string | null;
+  }>;
+  shippingAddressSnapshot?: any;
+  shipping_address?: any;
+  shipping_address_snapshot?: any;
+  total_amount: number;
+  subtotal?: number;
+  status: string;
+  payment_status: string;
+  payment_method?: string;
+  admin_notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+

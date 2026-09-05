@@ -7,7 +7,7 @@ let cachedShopWhatsAppNumber: string | null = null;
 
 /**
  * Strips all non-numeric characters from a phone number.
- * Ensures the number is in pure international format (e.g. 919390902587).
+ * Ensures the number is in pure international format (e.g. 919876543210).
  *
  * If the number is exactly 10 digits (Indian mobile), prepends "91".
  */

@@ -103,11 +103,22 @@ export const createIdentityModel = async (data: {
   avatar_url?: string;
   expo_push_token?: string;
   is_active?: boolean;
+  isActive?: boolean;
   is_2fa_enabled?: boolean;
+  twoFactorEnabled?: boolean;
   two_fa_secret?: string | null;
+  twoFactorSecretEncrypted?: string | null;
+  pendingTwoFactorSecretEncrypted?: string | null;
+  backupCodesHash?: string[];
+  failedOtpAttempts?: number;
+  accountLockedUntil?: string | null;
 }): Promise<IdentityRef> => {
   const newId = uuidv4();
   const userType = userTypeForRole(data.role || "user");
+  const isActive = data.isActive ?? data.is_active ?? true;
+  const is2fa = data.twoFactorEnabled ?? data.is_2fa_enabled ?? false;
+  const secret = data.twoFactorSecretEncrypted ?? data.two_fa_secret ?? null;
+
   const profileData: Profile = {
     id: newId,
     full_name: data.full_name,
@@ -117,10 +128,18 @@ export const createIdentityModel = async (data: {
     role: (data.role as UserRole) || "user",
     avatar_url: data.avatar_url || null,
     expo_push_token: data.expo_push_token || null,
-    is_active: data.is_active ?? true,
-    is_2fa_enabled: data.is_2fa_enabled ?? false,
-    two_fa_secret: data.two_fa_secret ?? null,
+    is_active: isActive,
+    isActive: isActive,
+    is_2fa_enabled: is2fa,
+    twoFactorEnabled: is2fa,
+    two_fa_secret: secret,
+    twoFactorSecretEncrypted: secret,
+    pendingTwoFactorSecretEncrypted: data.pendingTwoFactorSecretEncrypted ?? null,
+    backupCodesHash: data.backupCodesHash || [],
+    failedOtpAttempts: data.failedOtpAttempts || 0,
+    accountLockedUntil: data.accountLockedUntil ?? null,
     two_fa_updated_at: null,
+    twoFactorEnabledAt: null,
     created_at: nowISTISO(),
     updated_at: nowISTISO(),
   };
@@ -142,9 +161,17 @@ export const updateIdentityModel = async (
       | "expo_push_token"
       | "password_hash"
       | "is_active"
+      | "isActive"
       | "is_2fa_enabled"
+      | "twoFactorEnabled"
       | "two_fa_secret"
+      | "twoFactorSecretEncrypted"
+      | "pendingTwoFactorSecretEncrypted"
+      | "backupCodesHash"
+      | "failedOtpAttempts"
+      | "accountLockedUntil"
       | "two_fa_updated_at"
+      | "twoFactorEnabledAt"
       | "role"
     >
   >,
@@ -153,6 +180,15 @@ export const updateIdentityModel = async (
     ...data,
     updated_at: nowISTISO(),
   };
+
+  // Keep snake_case and camelCase in sync if either is provided
+  if ("isActive" in data && !("is_active" in data)) updateData.is_active = data.isActive;
+  if ("is_active" in data && !("isActive" in data)) updateData.isActive = data.is_active;
+  if ("twoFactorEnabled" in data && !("is_2fa_enabled" in data)) updateData.is_2fa_enabled = data.twoFactorEnabled;
+  if ("is_2fa_enabled" in data && !("twoFactorEnabled" in data)) updateData.twoFactorEnabled = data.is_2fa_enabled;
+  if ("twoFactorSecretEncrypted" in data && !("two_fa_secret" in data)) updateData.two_fa_secret = data.twoFactorSecretEncrypted;
+  if ("two_fa_secret" in data && !("twoFactorSecretEncrypted" in data)) updateData.twoFactorSecretEncrypted = data.two_fa_secret;
+
   Object.keys(updateData).forEach(
     (key) => updateData[key] === undefined && delete updateData[key],
   );

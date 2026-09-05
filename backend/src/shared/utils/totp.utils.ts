@@ -1,4 +1,4 @@
-import { generateSecret, verifySync } from "otplib";
+import { generateSecret, verifySync, generateSync } from "otplib";
 import QRCode from "qrcode";
 
 const ISSUER_NAME = "Sofiya Bangles";
@@ -49,16 +49,41 @@ export const generateQrCodeDataUrl = async (otpauthUrl: string): Promise<string>
 };
 
 /**
- * Verifies a 6-digit TOTP code against an unencrypted secret
- * Uses epochTolerance to account for clock drift between device and server.
- * epochTolerance of 60 seconds means ±60 seconds (±2 time windows) of drift tolerance.
+ * Verifies a 6-digit TOTP code against an unencrypted secret.
+ * Uses ±30 second clock tolerance (epochTolerance: 30).
  */
-export const verifyTotpCode = (secret: string, token: string): boolean => {
+export const verifyTotpCode = (secret: string, token: string, tolerance = 30): boolean => {
   try {
-    const result = verifySync({ token, secret, epochTolerance: 60 });
+    const result = verifySync({ token, secret, epochTolerance: tolerance });
     return result.valid;
   } catch (error) {
     console.error("TOTP verification error:", error);
     return false;
   }
 };
+
+/**
+ * Generates the current 6-digit TOTP code for a given secret
+ */
+export const generateTotpCode = (secret: string): string => {
+  return generateSync({ secret });
+};
+
+/**
+ * Generates secure plaintext backup recovery codes (format: XXXX-XXXX)
+ */
+export const generateBackupCodes = (count = 10): string[] => {
+  const codes: string[] = [];
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // clear alphanumeric without confusing chars (no 0/O, 1/I)
+  for (let i = 0; i < count; i++) {
+    let part1 = "";
+    let part2 = "";
+    for (let j = 0; j < 4; j++) {
+      part1 += chars.charAt(Math.floor(Math.random() * chars.length));
+      part2 += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    codes.push(`${part1}-${part2}`);
+  }
+  return codes;
+};
+

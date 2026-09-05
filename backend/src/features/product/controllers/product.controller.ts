@@ -22,6 +22,7 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
       req.body,
       req.files as Express.Multer.File[] | undefined,
       req.user!.userId,
+      req.user?.role as "admin" | "super_admin" | undefined,
     );
 
     res.status(201).json({

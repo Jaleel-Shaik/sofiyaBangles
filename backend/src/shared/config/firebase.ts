@@ -43,17 +43,18 @@ function getFirebaseCredential(): admin.credential.Credential {
 
   // Option C: File path candidates
   const candidates = [
-    process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    process.env.GOOGLE_APPLICATION_CREDENTIALS ? path.resolve(process.cwd(), process.env.GOOGLE_APPLICATION_CREDENTIALS) : null,
     path.resolve(process.cwd(), 'service-account.json'),
     path.resolve(__dirname, '../../service-account.json'),
     path.resolve(__dirname, '../../../service-account.json'),
-  ];
+  ].filter(Boolean) as string[];
 
   for (const candidate of candidates) {
     if (candidate && fs.existsSync(candidate)) {
       console.log(`✅ Loading Firebase credentials from file: ${candidate}`);
       firebaseCredentialSource = `file:${candidate}`;
-      return admin.credential.cert(require(candidate));
+      const serviceAccount = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+      return admin.credential.cert(serviceAccount);
     }
   }
 

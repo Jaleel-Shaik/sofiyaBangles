@@ -25,23 +25,29 @@ interface AuthState {
   isLoading: boolean;
   is2FAPending: boolean;
   otpPendingToken: string | null;
+  challengeId: string | null;
+  expiresAt: string | null;
+  email: string | null;
   setupRequired: boolean;
   qrCodeUrl: string | null;
   manualSecret: string | null;
   loginStep: "idle" | "password_verified" | "2fa_verified" | "complete";
   accessDenied: boolean;
   accessDeniedMessage: string | null;
+  backupCodes: string[] | null;
 }
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<LoginResponse>;
-  verify2FA: (otpCode: string) => Promise<Verify2FAResponse>;
+  verify2FA: (otpCode: string, useBackupCode?: boolean) => Promise<Verify2FAResponse>;
   verifyFirstOTP: (otpCode: string) => Promise<Verify2FAResponse>;
+  completeAuthentication: (authData: Verify2FAResponse) => void;
   regenerateQR: () => Promise<{ qr_code_url: string; secret: string; otp_pending_token: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   getSessions: () => Promise<any[]>;
   clearAccessDenied: () => void;
+  clear2FAPending: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,12 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: true,
     is2FAPending: false,
     otpPendingToken: null,
+    challengeId: null,
+    expiresAt: null,
+    email: null,
     setupRequired: false,
     qrCodeUrl: null,
     manualSecret: null,
     loginStep: "idle",
     accessDenied: false,
     accessDeniedMessage: null,
+    backupCodes: null,
   });
 
   // Load persisted auth state on mount
@@ -92,11 +102,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           loginStep: "complete",
           isLoading: false,
         }));
+        return;
       } catch (err) {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("user");
+      }
+    }
+
+    // Check for pending 2FA challenge in sessionStorage (persisted across browser refresh)
+    const sessionChallenge = sessionStorage.getItem("2fa_challenge_id");
+    const sessionExpiresAt = sessionStorage.getItem("2fa_expires_at");
+    const sessionEmail = sessionStorage.getItem("2fa_email");
+    const sessionSetupState = sessionStorage.getItem("2fa_setup_state");
+    const sessionQrUrl = sessionStorage.getItem("2fa_qr_code_url");
+
+    if (sessionChallenge && sessionExpiresAt) {
+      if (new Date() >= new Date(sessionExpiresAt)) {
+        // Expired
+        sessionStorage.removeItem("2fa_challenge_id");
+        sessionStorage.removeItem("2fa_expires_at");
+        sessionStorage.removeItem("2fa_email");
+        sessionStorage.removeItem("2fa_setup_state");
+        sessionStorage.removeItem("2fa_qr_code_url");
+        toast.error("Setup session expired. Please log in again.");
         setState((prev) => ({ ...prev, isLoading: false }));
+      } else {
+        // Active challenge restored from sessionStorage
+        setState((prev) => ({
+          ...prev,
+          is2FAPending: true,
+          challengeId: sessionChallenge,
+          expiresAt: sessionExpiresAt,
+          email: sessionEmail,
+          qrCodeUrl: sessionQrUrl,
+          setupRequired: sessionSetupState === "setup_required",
+          loginStep: "password_verified",
+          isLoading: false,
+        }));
       }
     } else {
       setState((prev) => ({ ...prev, isLoading: false }));
@@ -109,7 +152,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const unsub = sessionManager.onEnd(async (reason: SessionEndReason) => {
       // Only handle non-close reasons (token expiry, session timeout)
-      // Page reload/browser close should NOT clear tokens - they persist until expiry
       if (reason !== "browser_close" && reason !== "tab_close") {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
@@ -144,6 +186,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const clear2FAPending = useCallback(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("2fa_challenge_id");
+      sessionStorage.removeItem("2fa_expires_at");
+      sessionStorage.removeItem("2fa_email");
+      sessionStorage.removeItem("2fa_setup_state");
+      sessionStorage.removeItem("2fa_qr_code_url");
+    }
+    setState((prev) => ({
+      ...prev,
+      is2FAPending: false,
+      challengeId: null,
+      expiresAt: null,
+      email: null,
+      otpPendingToken: null,
+      setupRequired: false,
+      qrCodeUrl: null,
+      manualSecret: null,
+      loginStep: "idle",
+      backupCodes: null,
+    }));
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     // Clear any stale session-ended flags from a previous session
     sessionManager.clearEndReason();
@@ -152,23 +217,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await authApi.login(email, password);
 
-      if (result.setup_required) {
-        // First login: need to set up 2FA (admin/super_admin)
+      const isSetup = Boolean(result.isTotpSetupRequired ?? result.setup_required);
+      const isOtp = Boolean(result.requiresOtp ?? result.require_otp ?? result.otp_pending_token);
+      const challengeId = result.challengeId || result.challenge_id || null;
+      const expiresAt = result.expiresAt || result.expires_at || null;
+
+      if (isSetup) {
+        // First login: 2FA setup required (persist ONLY challengeId, expiresAt, and setup state in sessionStorage)
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("2fa_challenge_id", challengeId || "");
+          sessionStorage.setItem("2fa_expires_at", expiresAt || "");
+          sessionStorage.setItem("2fa_email", email);
+          sessionStorage.setItem("2fa_qr_code_url", result.qrCodeUrl || result.qr_code_url || "");
+          sessionStorage.setItem("2fa_setup_state", "setup_required");
+        }
+
         setState((prev) => ({
           ...prev,
           is2FAPending: true,
+          challengeId,
+          expiresAt,
+          email,
           otpPendingToken: result.otp_pending_token || null,
           setupRequired: true,
-          qrCodeUrl: result.qr_code_url || null,
+          qrCodeUrl: result.qrCodeUrl || result.qr_code_url || null,
           manualSecret: result.secret || null,
           loginStep: "password_verified",
           isLoading: false,
         }));
-      } else if (result.otp_pending_token) {
-        // 2FA is enabled, need OTP verification (admin/super_admin)
+      } else if (isOtp) {
+        // Subsequent login: OTP verification required
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("2fa_challenge_id", challengeId || "");
+          sessionStorage.setItem("2fa_expires_at", expiresAt || "");
+          sessionStorage.setItem("2fa_email", email);
+          sessionStorage.setItem("2fa_setup_state", "otp_pending");
+        }
+
         setState((prev) => ({
           ...prev,
           is2FAPending: true,
+          challengeId,
+          expiresAt,
+          email,
           otpPendingToken: result.otp_pending_token || null,
           setupRequired: false,
           qrCodeUrl: null,
@@ -177,7 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isLoading: false,
         }));
       } else if (result.access_token && result.user) {
-        // Direct token response (regular users bypass 2FA)
+        // Direct token response (regular users without 2FA bypass)
         if (result.user.role === "user") {
           throw new Error("PLATFORM_ACCESS_DENIED_USER_WEB");
         }
@@ -194,6 +285,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           refreshTokenValue: result.refresh_token || null,
           isAuthenticated: true,
           is2FAPending: false,
+          challengeId: null,
+          expiresAt: null,
+          email: null,
           otpPendingToken: null,
           setupRequired: false,
           qrCodeUrl: null,
@@ -232,15 +326,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const verify2FA = useCallback(async (otpCode: string) => {
-    if (!state.otpPendingToken) {
-      throw new Error("No OTP pending token. Please login again.");
-    }
-
+  const verify2FA = useCallback(async (otpCode: string, useBackupCode?: boolean) => {
     setState((prev) => ({ ...prev, isLoading: true, accessDenied: false, accessDeniedMessage: null }));
 
     try {
-      const result = await authApi.verify2FA(state.otpPendingToken, otpCode);
+      const challengeId = state.challengeId || (typeof window !== "undefined" ? sessionStorage.getItem("2fa_challenge_id") : null);
+      const email = state.email || (typeof window !== "undefined" ? sessionStorage.getItem("2fa_email") : null);
+
+      const result = await authApi.verify2FA({
+        challengeId: challengeId || undefined,
+        challenge_id: challengeId || undefined,
+        email: email || undefined,
+        otp: otpCode,
+        otp_code: otpCode,
+        otp_pending_token: state.otpPendingToken || undefined,
+        useBackupCode,
+      });
 
       if (result.user.role === "user") {
         throw new Error("PLATFORM_ACCESS_DENIED_USER_WEB");
@@ -252,6 +353,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("user", JSON.stringify(result.user));
       if (result.session_id) localStorage.setItem("session_id", result.session_id);
 
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("2fa_challenge_id");
+        sessionStorage.removeItem("2fa_expires_at");
+        sessionStorage.removeItem("2fa_email");
+        sessionStorage.removeItem("2fa_setup_state");
+        sessionStorage.removeItem("2fa_qr_code_url");
+      }
+
       setState((prev) => ({
         ...prev,
         user: result.user,
@@ -259,6 +368,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshTokenValue: result.refresh_token,
         isAuthenticated: true,
         is2FAPending: false,
+        challengeId: null,
+        expiresAt: null,
+        email: null,
         otpPendingToken: null,
         setupRequired: false,
         qrCodeUrl: null,
@@ -289,40 +401,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       throw error;
     }
-  }, [state.otpPendingToken]);
+  }, [state.challengeId, state.email, state.otpPendingToken]);
 
   const verifyFirstOTP = useCallback(async (otpCode: string) => {
-    if (!state.otpPendingToken) {
-      throw new Error("No OTP pending token. Please login again.");
-    }
-
     setState((prev) => ({ ...prev, isLoading: true, accessDenied: false, accessDeniedMessage: null }));
 
     try {
-      const result = await authApi.verify2FA(state.otpPendingToken, otpCode);
+      const challengeId = state.challengeId || (typeof window !== "undefined" ? sessionStorage.getItem("2fa_challenge_id") : null);
+      const email = state.email || (typeof window !== "undefined" ? sessionStorage.getItem("2fa_email") : null);
+
+      const result = await authApi.verify2FA({
+        challengeId: challengeId || undefined,
+        challenge_id: challengeId || undefined,
+        email: email || undefined,
+        otp: otpCode,
+        otp_code: otpCode,
+        otp_pending_token: state.otpPendingToken || undefined,
+      });
 
       if (result.user.role === "user") {
         throw new Error("PLATFORM_ACCESS_DENIED_USER_WEB");
       }
 
-      // Store auth data
-      localStorage.setItem("access_token", result.access_token);
-      localStorage.setItem("refresh_token", result.refresh_token);
-      localStorage.setItem("user", JSON.stringify(result.user));
-      if (result.session_id) localStorage.setItem("session_id", result.session_id);
+      const backupCodes = result.backupCodes || result.backup_codes || [];
 
+      // Transition to 2fa_verified so mandatory backup-code screen displays
       setState((prev) => ({
         ...prev,
-        user: result.user,
-        accessToken: result.access_token,
-        refreshTokenValue: result.refresh_token,
-        isAuthenticated: true,
-        is2FAPending: false,
-        otpPendingToken: null,
-        setupRequired: false,
-        qrCodeUrl: null,
-        manualSecret: null,
-        loginStep: "complete",
+        backupCodes,
+        loginStep: "2fa_verified",
         isLoading: false,
       }));
 
@@ -348,7 +455,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       throw error;
     }
-  }, [state.otpPendingToken]);
+  }, [state.challengeId, state.email, state.otpPendingToken]);
+
+  const completeAuthentication = useCallback((authData: Verify2FAResponse) => {
+    localStorage.setItem("access_token", authData.access_token);
+    localStorage.setItem("refresh_token", authData.refresh_token);
+    localStorage.setItem("user", JSON.stringify(authData.user));
+    if (authData.session_id) localStorage.setItem("session_id", authData.session_id);
+
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("2fa_challenge_id");
+      sessionStorage.removeItem("2fa_expires_at");
+      sessionStorage.removeItem("2fa_email");
+      sessionStorage.removeItem("2fa_setup_state");
+      sessionStorage.removeItem("2fa_qr_code_url");
+    }
+
+    setState((prev) => ({
+      ...prev,
+      user: authData.user,
+      accessToken: authData.access_token,
+      refreshTokenValue: authData.refresh_token,
+      isAuthenticated: true,
+      is2FAPending: false,
+      challengeId: null,
+      expiresAt: null,
+      email: null,
+      otpPendingToken: null,
+      setupRequired: false,
+      qrCodeUrl: null,
+      manualSecret: null,
+      loginStep: "complete",
+      isLoading: false,
+      backupCodes: null,
+    }));
+  }, []);
 
   const regenerateQR = useCallback(async () => {
     if (!state.otpPendingToken) {
@@ -398,12 +539,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: false,
       is2FAPending: false,
       otpPendingToken: null,
+      challengeId: null,
+      expiresAt: null,
+      email: null,
       setupRequired: false,
       qrCodeUrl: null,
       manualSecret: null,
       loginStep: "idle",
       accessDenied: false,
       accessDeniedMessage: null,
+      backupCodes: null,
     });
   }, []);
 
@@ -436,11 +581,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     verify2FA,
     verifyFirstOTP,
+    completeAuthentication,
     regenerateQR,
     logout,
     refreshUser,
     getSessions,
     clearAccessDenied,
+    clear2FAPending,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

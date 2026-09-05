@@ -34,8 +34,16 @@ export interface Profile {
   password_hash: string;
   expo_push_token: string | null;
   is_active: boolean;
+  isActive?: boolean;
   is_2fa_enabled?: boolean;
+  twoFactorEnabled?: boolean;
   two_fa_secret?: string | null; // Encrypted secret
+  twoFactorSecretEncrypted?: string | null;
+  pendingTwoFactorSecretEncrypted?: string | null;
+  backupCodesHash?: string[];
+  failedOtpAttempts?: number;
+  accountLockedUntil?: string | null;
+  twoFactorEnabledAt?: string | null;
   two_fa_updated_at?: string | null; // Rotation timestamp
   created_at: string;
   updated_at: string;
@@ -81,18 +89,27 @@ export interface RefreshToken {
  */
 export interface LoginChallenge {
   id: string;
+  challengeId?: string;
   user_id: string;
+  userId?: string;
+  email?: string;
   user_type: UserType;
   otp_type: "TOTP";
   otp_hash: string | null;
   correlation_id?: string;
-  status: "PENDING" | "VERIFIED" | "EXPIRED" | "FAILED";
+  status: "PENDING" | "OTP_PENDING" | "VERIFIED" | "OTP_VERIFIED" | "EXPIRED" | "LOCKED" | "FAILED";
   expires_at: string;
+  expiresAt?: string;
   created_at: string;
+  createdAt?: string;
   verified_at: string | null;
   failed_attempts: number;
+  failedAttempts?: number;
   ip_address: string;
+  ipAddress?: string;
   device_info: DeviceInformation;
+  deviceInfo?: DeviceInformation;
+  isTotpSetupRequired?: boolean;
 }
 
 /**
@@ -201,6 +218,9 @@ export interface Product {
   has_variants?: boolean;
   accepts_custom_size?: boolean;
   custom_size_price?: number;
+  created_by?: string;
+  created_by_role?: 'admin' | 'super_admin';
+  updated_by?: string;
   created_at: string;
   updated_at: string;
   // Joined fields (read-only, populated at query time)
@@ -238,7 +258,7 @@ export interface Order {
   id: string;
   user_id: string;
   order_number: string;
-  status: "pending" | "confirmed" | "processing" | "shipped" | "out_for_delivery" | "delivered" | "cancelled" | "return_requested" | "returned";
+  status: "pending" | "confirmed" | "processing" | "shipped" | "out_for_delivery" | "delivered" | "completed" | "cancelled" | "return_requested" | "returned";
   payment_status: "pending" | "paid" | "failed" | "refunded" | "partially_refunded";
   subtotal: number;
   discount: number;
@@ -246,6 +266,9 @@ export interface Order {
   tax_amount: number;
   total_amount: number;
   shipping_address_snapshot?: Address | null;
+  completed_at?: string | null;
+  refunded_at?: string | null;
+  refund_reason?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -255,12 +278,153 @@ export interface OrderItem {
   order_id: string;
   product_id: string;
   variant_id?: string | null;
+  category_id?: string;
+  category_name_snapshot?: string;
   product_name_snapshot: string;
   sku_snapshot?: string | null;
   price_snapshot: number;
   quantity: number;
   subtotal: number;
+  discount?: number;
+  final_unit_price?: number;
+  final_amount?: number;
   created_at: string;
+}
+
+// ─── SuperAdmin Revenue & Commission Types ───────────────
+export type RevenueTransactionType = 'SALE' | 'REFUND' | 'ADJUSTMENT' | 'REVERSAL';
+
+export interface RevenueLedgerItem {
+  id: string;
+  order_id: string;
+  order_item_id: string;
+  product_id: string;
+  admin_id: string;
+  gross_amount: number;
+  admin_share_percentage: number;
+  super_admin_share_percentage: number;
+  admin_share_amount: number;
+  super_admin_share_amount: number;
+  transaction_type: RevenueTransactionType;
+  status: 'completed' | 'reversed';
+  currency: string;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformCommissionSettings {
+  admin_percentage: number;
+  super_admin_percentage: number;
+  updated_at: string;
+  updated_by?: string;
+}
+
+export interface SalesAnalyticsQuery {
+  fromDate?: string;
+  toDate?: string;
+  period?: 'today' | 'yesterday' | '7d' | '30d' | 'this_month' | 'last_month' | 'this_year' | 'custom';
+  categoryId?: string;
+  modelTypeId?: string;
+  adminId?: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+}
+
+export interface SuperAdminDashboardData {
+  kpis: {
+    totalProducts: number;
+    activeProducts: number;
+    productsSold: number;
+    unitsSold: number;
+    grossSales: number;
+    netSales: number;
+    totalRefunds: number;
+    adminEarnings: number;
+    superAdminEarnings: number;
+    pendingOrders: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+  };
+  commission: PlatformCommissionSettings;
+  salesTrend: Array<{
+    date: string;
+    grossSales: number;
+    adminEarnings: number;
+    superAdminEarnings: number;
+    unitsSold: number;
+    orderCount: number;
+  }>;
+  topSellingProducts: Array<{
+    product_id: string;
+    product_name: string;
+    category_name: string;
+    image_url: string | null;
+    units_sold: number;
+    gross_revenue: number;
+    super_admin_share: number;
+    stock: number;
+  }>;
+  categoryPerformance: Array<{
+    category_id: string;
+    category_name: string;
+    units_sold: number;
+    gross_revenue: number;
+    super_admin_share: number;
+  }>;
+  recentSales: Array<{
+    order_id: string;
+    order_number: string;
+    customer_name?: string;
+    created_at: string;
+    items_count: number;
+    total_amount: number;
+    super_admin_share: number;
+    admin_share: number;
+    status: string;
+  }>;
+  recentActivity: Array<{
+    id: string;
+    actor_id: string | null;
+    actor_name?: string;
+    action: string;
+    details: string;
+    created_at: string;
+  }>;
+}
+
+export interface ProductAnalyticsDetail {
+  product: Product;
+  metrics: {
+    units_sold: number;
+    orders_count: number;
+    gross_revenue: number;
+    admin_share: number;
+    super_admin_share: number;
+    first_sale_date: string | null;
+    last_sale_date: string | null;
+    current_stock: number;
+  };
+  salesHistory: Array<{
+    order_id: string;
+    order_number: string;
+    sale_date: string;
+    quantity: number;
+    unit_price: number;
+    total_amount: number;
+    admin_share: number;
+    super_admin_share: number;
+  }>;
+  stockHistory: Array<{
+    id: string;
+    action: string;
+    quantity_change: number;
+    new_quantity: number;
+    actor_id: string | null;
+    created_at: string;
+  }>;
 }
 
 export interface Cart {
@@ -318,7 +482,7 @@ export interface Notification {
 export interface AuditLog {
   id: string;
   actor_id: string | null;
-  user_type: UserType | null;
+  user_type: UserRole | null;
   action: string;
   table_name: string | null;
   record_id: string | null;

@@ -18,9 +18,8 @@ export function getDashboardHref(user: NavigateUser | null, token: string | null
   }
   switch (user.role) {
     case ROLES.ADMIN:
-      return '/(admin)/(tabs)/dashboard';
     case ROLES.SUPER_ADMIN:
-      return '/login';
+      return '/(admin)/(tabs)/dashboard';
     default:
       return '/(tabs)/home';
   }

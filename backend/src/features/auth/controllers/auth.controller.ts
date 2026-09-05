@@ -446,18 +446,50 @@ export const verifyOtp = async (req: AuthRequest, res: Response) => {
  */
 export const verify2FAController = async (req: AuthRequest, res: Response) => {
   try {
-    const { otp_pending_token, otp_code, challenge_id } = req.body;
+    const {
+      otp_pending_token,
+      otp_code,
+      challenge_id,
+      challengeId,
+      email,
+      otp,
+      useBackupCode,
+      use_backup_code,
+    } = req.body;
+
+    const resolvedChallengeId = challengeId || challenge_id;
+    const resolvedCode = (otp || otp_code || "").trim();
+    const resolvedBackup = Boolean(useBackupCode ?? use_backup_code);
     const deviceInfo = extractDeviceInfo(req);
     const platform = resolvePlatform(req.headers["x-client-type"] as string | undefined);
-    const result = await verify2FAOtpService(otp_pending_token, otp_code, deviceInfo, platform, challenge_id);
+
+    const result = await verify2FAOtpService(
+      otp_pending_token,
+      resolvedCode,
+      deviceInfo,
+      platform,
+      resolvedChallengeId,
+      email,
+      resolvedBackup
+    );
 
     res.json({
       success: true,
       data: result,
-      message: "2FA Verification successful. User authenticated.",
+      message: resolvedBackup
+        ? "Backup recovery code verified successfully. User authenticated."
+        : "2FA Verification successful. User authenticated.",
     });
 
   } catch (error: any) {
+    if (error.message === "INVALID_BACKUP_CODE") {
+      res.status(400).json({
+        success: false,
+        code: "INVALID_BACKUP_CODE",
+        message: "Invalid or already used backup recovery code.",
+      });
+      return;
+    }
     if (error.message === "PLATFORM_ACCESS_DENIED_USER_WEB") {
       res.status(403).json({
         success: false,

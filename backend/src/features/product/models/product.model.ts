@@ -54,6 +54,9 @@ export const createProductModel = async (payload: {
   images?: any[]; // Array of image_url objects
   accepts_custom_size?: boolean;
   custom_size_price?: number | string;
+  created_by?: string;
+  created_by_role?: 'admin' | 'super_admin';
+  updated_by?: string;
 }): Promise<Product> => {
   // ── CENTRAL INTEGRITY RULE ─────────────────────────────────────
   // 1. Validate model_type exists
@@ -125,6 +128,9 @@ export const createProductModel = async (payload: {
     has_variants: payload.has_variants || false,
     accepts_custom_size: payload.accepts_custom_size || false,
     custom_size_price: payload.custom_size_price ? Number(payload.custom_size_price) : payload.price,
+    created_by: payload.created_by || undefined,
+    created_by_role: payload.created_by_role || undefined,
+    updated_by: payload.updated_by || payload.created_by || undefined,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -371,6 +377,7 @@ export const updateProductModel = async (
     variants: any[];
     accepts_custom_size: boolean;
     custom_size_price: number | string;
+    updated_by: string;
   }>,
 ): Promise<Product> => {
   const updateData: any = { ...data, updated_at: new Date().toISOString() };

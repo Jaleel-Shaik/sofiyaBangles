@@ -174,12 +174,30 @@ export const verifyOtp = async (email: string, otp: string) => {
   }
 };
 
-export const verify2FAOtp = async (otpPendingToken: string, otpCode: string) => {
+export const verify2FAOtp = async (
+  payloadOrToken: string | {
+    otpPendingToken?: string;
+    otp_pending_token?: string;
+    challengeId?: string;
+    challenge_id?: string;
+    email?: string;
+    otp?: string;
+    otp_code?: string;
+    useBackupCode?: boolean;
+    use_backup_code?: boolean;
+  },
+  otpCode?: string
+) => {
   try {
-    const res = await apiClient.post('/auth/verify-2fa', {
-      otp_pending_token: otpPendingToken,
-      otp_code: otpCode,
-    }, {
+    const body =
+      typeof payloadOrToken === 'string'
+        ? {
+            otp_pending_token: payloadOrToken,
+            otp_code: otpCode,
+          }
+        : payloadOrToken;
+
+    const res = await apiClient.post('/auth/verify-2fa', body, {
       headers: {
         'x-client-type': 'mobile',
       },

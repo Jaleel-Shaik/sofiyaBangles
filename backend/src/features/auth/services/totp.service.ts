@@ -1,11 +1,15 @@
 import jwt from "jsonwebtoken";
 import { env } from "../../../shared/config/env";
 import { encryptSecret, decryptSecret } from "../../../shared/utils/crypto.utils";
-import { generateTotpSecret, generateQrCodeDataUrl, verifyTotpCode } from "../../../shared/utils/totp.utils";
+import { generateTotpSecret, generateQrCodeDataUrl, verifyTotpCode, generateBackupCodes } from "../../../shared/utils/totp.utils";
 import { findProfileByIdModel } from "../models/auth.model";
 import { findIdentityByEmailModel, findIdentityByIdModel } from "../../../shared/models/identity.model";
 import {
   updateProfile2FA,
+  updateProfilePendingSecret,
+  activateProfile2FA,
+  consumeBackupCodeModel,
+  lockAccountForBruteForceModel,
   getOtpStatusModel,
   recordOtpFailureModel,
   resetOtpFailuresModel,
@@ -44,8 +48,10 @@ import { v4 as uuidv4 } from "uuid";
 /**
  * Step 1: Initial Login (Password verification)
  *
- * After the password is verified a temporary `login_challenges` record is
- * created (challengeId + expiry). The OTP/2FA step then completes the login.
+ * After password verification a temporary `login_challenges` record is created
+ * with exact 10-minute lifetime (expiresAt = createdAt + 10m).
+ * Do NOT issue an access token, refresh token, Firebase token, custom token,
+ * or authenticated session before OTP verification.
  */
 export const initiateLoginService = async (
   email: string,
@@ -61,8 +67,14 @@ export const initiateLoginService = async (
   const profile = identity.profile;
   const userType = identity.user_type;
 
-  if (!profile.is_active) {
+  const isActive = profile.isActive ?? profile.is_active;
+  if (isActive === false) {
     throw new Error("ACCOUNT_DISABLED");
+  }
+
+  // Check account lockout
+  if (profile.accountLockedUntil && new Date(profile.accountLockedUntil) > new Date()) {
+    throw new Error("ACCOUNT_LOCKED_15_MINUTES");
   }
 
   const correlationId = "AUTH-" + uuidv4();
@@ -105,58 +117,88 @@ export const initiateLoginService = async (
 
   // Check 2FA requirement
   const roleConfig = getRoleAuthConfig(profile.role);
-  const has2FAEnabled = profile.is_2fa_enabled && profile.two_fa_secret;
+  const has2FAEnabled = Boolean(
+    (profile.twoFactorEnabled || profile.is_2fa_enabled) &&
+    (profile.twoFactorSecretEncrypted || profile.two_fa_secret)
+  );
   const roleRequires2FA = requires2FAEnforcement(profile.role);
 
   if (has2FAEnabled) {
-    // 2FA already enabled (any role) - verify OTP
-    const otpStatus = await getOtpStatusModel(profile.id);
-    if (otpStatus && otpStatus.locked_until && new Date(otpStatus.locked_until) > new Date()) {
-      throw new Error("ACCOUNT_LOCKED_15_MINUTES");
-    }
-
-    // Create a temporary login challenge
-    const challenge = await createLoginChallengeModel({ userId: profile.id, userType, deviceInfo, correlationId });
+    // 2FA already configured: create normal OTP_PENDING login challenge (10 min lifetime)
+    const challenge = await createLoginChallengeModel({
+      userId: profile.id,
+      email: profile.email,
+      userType,
+      deviceInfo,
+      correlationId,
+      isTotpSetupRequired: false,
+      ttlMs: 10 * 60 * 1000,
+    });
 
     const otpPendingToken = jwt.sign(
       { userId: profile.id, email: profile.email, role: profile.role, userType, type: "OTP_PENDING", challengeId: challenge.id, platform },
       env.JWT_SECRET,
-      { expiresIn: roleConfig.otpPendingExpiry } as jwt.SignOptions
+      { expiresIn: "10m" } as jwt.SignOptions
     );
 
     return {
-      require_otp: true,
-      setup_required: false,
-      otp_pending_token: otpPendingToken,
+      challengeId: challenge.id,
       challenge_id: challenge.id,
-      message: "Please enter 6-digit Google Authenticator OTP.",
+      state: "OTP_PENDING",
+      status: "OTP_PENDING",
+      requiresOtp: true,
+      require_otp: true,
+      isTotpSetupRequired: false,
+      setup_required: false,
+      expiresAt: challenge.expires_at,
+      expires_at: challenge.expires_at,
+      otp_pending_token: otpPendingToken,
+      message: "Please enter 6-digit Google Authenticator OTP or use Backup Recovery Code.",
     };
   } else if (roleRequires2FA) {
-    // First login: setup 2FA + temporary challenge
-    // Always generate a new TOTP secret to invalidate any previous setup QR codes
+    // First login: setup 2FA + temporary challenge (10 min lifetime)
+    // Generate temporary TOTP secret and encrypt with AES
     const result = generateTotpSecret(profile.email);
     const secret = result.secret;
     const encryptedSecret = encryptSecret(secret);
     const qrCodeUrl = await generateQrCodeDataUrl(result.otpauthUrl);
 
-    await updateProfile2FA(profile.id, encryptedSecret, false);
+    // Store ONLY as pendingTwoFactorSecretEncrypted
+    await updateProfilePendingSecret(profile.id, encryptedSecret);
 
-    const challenge = await createLoginChallengeModel({ userId: profile.id, userType, deviceInfo, correlationId });
+    const challenge = await createLoginChallengeModel({
+      userId: profile.id,
+      email: profile.email,
+      userType,
+      deviceInfo,
+      correlationId,
+      isTotpSetupRequired: true,
+      ttlMs: 10 * 60 * 1000,
+    });
 
     const setupToken = jwt.sign(
       { userId: profile.id, email: profile.email, role: profile.role, userType, type: "2FA_SETUP", challengeId: challenge.id, platform },
       env.JWT_SECRET,
-      { expiresIn: roleConfig.qrSetupExpiry } as jwt.SignOptions
+      { expiresIn: "10m" } as jwt.SignOptions
     );
 
     return {
-      require_otp: true,
-      setup_required: true,
-      qr_code_url: qrCodeUrl,
-      otp_pending_token: setupToken,
+      challengeId: challenge.id,
       challenge_id: challenge.id,
+      state: "OTP_PENDING",
+      status: "OTP_PENDING",
+      requiresOtp: true,
+      require_otp: true,
+      isTotpSetupRequired: true,
+      setup_required: true,
+      qrCodeUrl,
+      qr_code_url: qrCodeUrl,
       secret,
-      otpauth_url: `otpauth://totp/${encodeURIComponent("Sofiya Bangles")}:${encodeURIComponent(profile.email)}?secret=${secret}&issuer=${encodeURIComponent("Sofiya Bangles")}&algorithm=SHA1&digits=6&period=30`,
+      otpauthUrl: result.otpauthUrl,
+      otpauth_url: result.otpauthUrl,
+      expiresAt: challenge.expires_at,
+      expires_at: challenge.expires_at,
+      otp_pending_token: setupToken,
       message: "Scan QR code using Google Authenticator.",
     };
   } else {
@@ -166,8 +208,7 @@ export const initiateLoginService = async (
 };
 
 /**
- * Resolves the pending login challenge either from the request body
- * (challenge_id) or from the otp_pending_token JWT payload (legacy clients).
+ * Resolves the login challenge by challengeId or legacy JWT token payload.
  */
 const resolveLoginChallenge = async (bodyChallengeId: string | undefined, decodedToken: any) => {
   const challengeId = bodyChallengeId || decodedToken?.challengeId;
@@ -179,10 +220,18 @@ const resolveLoginChallenge = async (bodyChallengeId: string | undefined, decode
   if (!challenge) {
     throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
   }
-  if (challenge.status !== "PENDING") {
+
+  // Challenge status check (replay protection)
+  if (challenge.status === "LOCKED") {
+    throw new Error("ACCOUNT_LOCKED_15_MINUTES");
+  }
+  if (challenge.status !== "OTP_PENDING" && challenge.status !== "PENDING") {
     throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
   }
-  if (new Date(challenge.expires_at) < new Date()) {
+
+  // Independent backend expiration check
+  const expiresAt = new Date(challenge.expires_at || challenge.expiresAt || 0);
+  if (new Date() >= expiresAt) {
     await updateLoginChallengeModel(challenge.id, { status: "EXPIRED" });
     throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
   }
@@ -191,120 +240,221 @@ const resolveLoginChallenge = async (bodyChallengeId: string | undefined, decode
 };
 
 /**
- * Step 2: Verify Google Authenticator OTP Code against the login challenge
+ * Step 2: Verify Google Authenticator OTP or Backup Recovery Code against login challenge
  */
 export const verify2FAOtpService = async (
-  otpPendingToken: string,
+  otpPendingToken: string | undefined,
   otpCode: string,
   deviceInfo: DeviceInformation,
   platform: Platform,
-  bodyChallengeId?: string
+  bodyChallengeId?: string,
+  bodyEmail?: string,
+  useBackupCode?: boolean
 ) => {
-  let decoded: any;
-  try {
-    decoded = jwt.verify(otpPendingToken, env.JWT_SECRET);
-  } catch (err) {
-    throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
+  let decoded: any = null;
+  if (otpPendingToken) {
+    try {
+      decoded = jwt.verify(otpPendingToken, env.JWT_SECRET);
+    } catch {
+      // If bodyChallengeId is provided, we can continue without valid JWT
+      if (!bodyChallengeId) {
+        throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
+      }
+    }
   }
 
-  if (decoded.type !== "OTP_PENDING" && decoded.type !== "2FA_SETUP") {
-    throw new Error("INVALID_PENDING_TOKEN_TYPE");
-  }
-
-  const userId = decoded.userId;
   const challenge = await resolveLoginChallenge(bodyChallengeId, decoded);
-
-  // The challenge must belong to the same account as the verified token
-  if (challenge.user_id !== userId) {
+  const rawUserId = challenge.user_id || challenge.userId;
+  if (!rawUserId) {
     throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
   }
+  const userId: string = rawUserId;
+  const challengeDocId: string = challenge.id || challenge.challengeId || "";
 
   const profile = await findProfileByIdModel(userId);
   if (!profile) {
     throw new Error("USER_NOT_FOUND");
   }
 
+  const userType: UserType = (challenge.user_type as UserType) || (profile.role === "user" ? "user" : "admin");
+
+  // Cross-account validation
+  if (bodyEmail && profile.email.toLowerCase() !== bodyEmail.trim().toLowerCase()) {
+    throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
+  }
+
   // Verify platform access before proceeding
   assertPlatformAccess(profile.role, platform);
 
-  // 1. Check Brute-force Lockout
-  const otpStatus = await getOtpStatusModel(userId);
-  if (otpStatus && otpStatus.locked_until && new Date(otpStatus.locked_until) > new Date()) {
+  // 1. Check Brute-force Lockout on profile and challenge
+  if (profile.accountLockedUntil && new Date(profile.accountLockedUntil) > new Date()) {
     throw new Error("ACCOUNT_LOCKED_15_MINUTES");
   }
 
-  // 2. Secret check
-  if (!profile.two_fa_secret) {
-    throw new Error("2FA_SECRET_NOT_FOUND");
+  const currentFailedAttempts = challenge.failedAttempts ?? challenge.failed_attempts ?? 0;
+  if (currentFailedAttempts >= 5) {
+    await lockAccountForBruteForceModel(userId, challengeDocId);
+    throw new Error("ACCOUNT_LOCKED_15_MINUTES");
   }
 
-  // 3. Replay Attack Prevention
-  const alreadyUsed = await isOtpTokenUsedModel(userId, otpCode);
-  if (alreadyUsed) {
-    await recordOtpFailureModel(userId);
-    await create2FAAuditLogModel({
-      userId,
-      userType: challenge.user_type,
-      action: "OTP_FAILED",
-      deviceInfo,
-      details: "Replay attack detected. OTP already used.",
-      correlationId: challenge.correlation_id,
-    });
-    throw new Error("OTP_ALREADY_USED");
-  }
-
-  // 4. Decrypt secret and verify code
-  const plainSecret = decryptSecret(profile.two_fa_secret);
-  const isValid = verifyTotpCode(plainSecret, otpCode);
-
-  if (!isValid) {
-    await updateLoginChallengeModel(challenge.id, {
-      failed_attempts: challenge.failed_attempts + 1,
+  // Failure handler for wrong OTP / wrong backup code
+  const recordFailedAttempt = async (isBackup: boolean) => {
+    const newCount = currentFailedAttempts + 1;
+    await updateLoginChallengeModel(challengeDocId, {
+      failed_attempts: newCount,
+      failedAttempts: newCount,
     });
 
-    const lockoutResult = await recordOtpFailureModel(userId);
-    await create2FAAuditLogModel({
-      userId,
-      userType: challenge.user_type,
-      action: "OTP_FAILED",
-      deviceInfo,
-      details: lockoutResult.locked ? "Account locked after 5 failed attempts." : "Invalid OTP entered.",
-      correlationId: challenge.correlation_id,
-    });
-
-    if (lockoutResult.locked) {
+    if (newCount >= 5) {
+      await lockAccountForBruteForceModel(userId, challengeDocId);
+      await create2FAAuditLogModel({
+        userId,
+        userType,
+        action: "ACCOUNT_LOCKED",
+        deviceInfo,
+        details: "Account locked for 15 minutes after 5 failed 2FA attempts.",
+        correlationId: challenge.correlation_id,
+      });
       await createSecurityEventModel({
         userId,
-        userType: challenge.user_type,
-        eventType: "ACCOUNT_LOCKED",
+        userType,
+        eventType: "2FA_BRUTE_FORCE_LOCKOUT",
         severity: "critical",
         deviceInfo,
-        details: "Account locked for 15 minutes after 5 consecutive wrong OTP attempts.",
+        details: `Account locked for 15 minutes after 5 failed attempts (challenge: ${challengeDocId}).`,
       });
       throw new Error("ACCOUNT_LOCKED_15_MINUTES");
     }
-    throw new Error("INVALID_OTP");
+
+    await create2FAAuditLogModel({
+      userId,
+      userType,
+      action: "OTP_FAILED",
+      deviceInfo,
+      details: isBackup ? "Invalid backup recovery code." : "Invalid OTP code entered.",
+      correlationId: challenge.correlation_id,
+    });
+
+    if (isBackup) {
+      throw new Error("INVALID_BACKUP_CODE");
+    } else {
+      throw new Error("INVALID_OTP");
+    }
+  };
+
+  const isBackupRecovery = Boolean(useBackupCode);
+
+  if (isBackupRecovery) {
+    // --- Backup Code Recovery Flow ---
+    const backupCodesHash = profile.backupCodesHash || [];
+    if (!backupCodesHash.length) {
+      await recordFailedAttempt(true);
+    }
+
+    const cleanInputCode = otpCode.trim().toUpperCase();
+    let matchedHash: string | null = null;
+
+    for (const hash of backupCodesHash) {
+      const isMatch = await bcrypt.compare(cleanInputCode, hash);
+      if (isMatch) {
+        matchedHash = hash;
+        break;
+      }
+    }
+
+    if (!matchedHash) {
+      await recordFailedAttempt(true);
+    }
+
+    // Single-use: remove/invalidate the used backup code hash immediately
+    await consumeBackupCodeModel(userId, matchedHash!);
+
+    await create2FAAuditLogModel({
+      userId,
+      userType,
+      action: "OTP_SUCCESS",
+      deviceInfo,
+      details: "Authenticated successfully using a single-use Backup Recovery Code.",
+      correlationId: challenge.correlation_id,
+    });
+  } else {
+    // --- Standard Google Authenticator TOTP Flow ---
+    const cleanOtp = otpCode.trim();
+
+    // Replay Attack Prevention
+    const alreadyUsed = await isOtpTokenUsedModel(userId, cleanOtp);
+    if (alreadyUsed) {
+      await recordOtpFailureModel(userId);
+      await create2FAAuditLogModel({
+        userId,
+        userType,
+        action: "OTP_FAILED",
+        deviceInfo,
+        details: "Replay attack detected. OTP already used.",
+        correlationId: challenge.correlation_id,
+      });
+      throw new Error("OTP_ALREADY_USED");
+    }
+
+    // Determine which secret to decrypt (pending temporary secret during setup vs permanent secret)
+    const isFirstTimeSetup = challenge.isTotpSetupRequired ||
+      (!profile.twoFactorEnabled && !profile.is_2fa_enabled);
+
+    const encryptedSecret = isFirstTimeSetup
+      ? profile.pendingTwoFactorSecretEncrypted || profile.twoFactorSecretEncrypted || profile.two_fa_secret
+      : profile.twoFactorSecretEncrypted || profile.two_fa_secret;
+
+    if (!encryptedSecret) {
+      throw new Error("2FA_SECRET_NOT_FOUND");
+    }
+
+    const plainSecret = decryptSecret(encryptedSecret);
+    // Verify TOTP with ±30 second clock tolerance
+    const isValid = verifyTotpCode(plainSecret, cleanOtp, 30);
+
+    if (!isValid) {
+      await recordFailedAttempt(false);
+    }
+
+    // Mark OTP as used for replay protection
+    await markOtpTokenAsUsedModel(userId, cleanOtp);
+
+    // Reset failure counters
+    await resetOtpFailuresModel(userId);
   }
 
-  // 5. Mark OTP as used (Replay protection)
-  await markOtpTokenAsUsedModel(userId, otpCode);
-
-  // 6. Reset failure counters
-  await resetOtpFailuresModel(userId);
-
-  // 7. Mark challenge verified then delete it (temporary record)
-  await updateLoginChallengeModel(challenge.id, {
-    status: "VERIFIED",
-    verified_at: new Date().toISOString(),
+  // Mark challenge OTP_VERIFIED
+  await updateLoginChallengeModel(challengeDocId, {
+    status: "OTP_VERIFIED",
+    verified_at: nowISTISO(),
   });
-  await deleteLoginChallengeModel(challenge.id);
 
-  // 8. If this was First Login Setup, enable 2FA permanently
-  if (decoded.type === "2FA_SETUP" || !profile.is_2fa_enabled) {
-    await updateProfile2FA(userId, profile.two_fa_secret, true);
+  let generatedBackupCodes: string[] | undefined = undefined;
+
+  // If first-time setup: activate 2FA and generate 10 backup codes
+  const isFirstTimeSetup = challenge.isTotpSetupRequired ||
+    (!profile.twoFactorEnabled && !profile.is_2fa_enabled);
+
+  if (isFirstTimeSetup) {
+    const activeEncryptedSecret = profile.pendingTwoFactorSecretEncrypted ||
+      profile.twoFactorSecretEncrypted ||
+      profile.two_fa_secret ||
+      "";
+
+    // Generate exactly 10 backup recovery codes
+    generatedBackupCodes = generateBackupCodes(10);
+
+    // Hash backup codes with bcrypt before storing
+    const hashedBackupCodes = await Promise.all(
+      generatedBackupCodes.map((c) => bcrypt.hash(c, 10))
+    );
+
+    // Move pending -> permanent secret, enable 2FA, store hashed backup codes
+    await activateProfile2FA(userId, activeEncryptedSecret, hashedBackupCodes);
+
     await createSecurityEventModel({
       userId,
-      userType: challenge.user_type,
+      userType,
       eventType: "2FA_ENABLED",
       severity: "warning",
       deviceInfo,
@@ -312,7 +462,7 @@ export const verify2FAOtpService = async (
     });
     await create2FAAuditLogModel({
       userId,
-      userType: challenge.user_type,
+      userType,
       action: "2FA_ENABLED",
       deviceInfo,
       details: "Google Authenticator 2FA enabled successfully during first login.",
@@ -322,15 +472,28 @@ export const verify2FAOtpService = async (
 
   await create2FAAuditLogModel({
     userId,
-    userType: challenge.user_type,
+    userType,
     action: "OTP_SUCCESS",
     deviceInfo,
     correlationId: challenge.correlation_id,
   });
 
-  // 9. Issue full Access JWT & Refresh Token (role-based)
+  // Issue full Access JWT & Refresh Token (role-based)
   const roleConfig = getRoleAuthConfig(profile.role);
-  return await issueFullTokensAndSession(profile, challenge.user_type, deviceInfo, platform, roleConfig, challenge.correlation_id);
+  const authResult = await issueFullTokensAndSession(
+    profile,
+    challenge.user_type,
+    deviceInfo,
+    platform,
+    roleConfig,
+    challenge.correlation_id
+  );
+
+  return {
+    ...authResult,
+    backupCodes: generatedBackupCodes,
+    backup_codes: generatedBackupCodes,
+  };
 };
 
 /**

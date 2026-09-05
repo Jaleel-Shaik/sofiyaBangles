@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/lib/auth-context";
+import { type Verify2FAResponse } from "@/src/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
-  Smartphone,
   Loader2,
   Scan,
   RefreshCw,
@@ -15,21 +16,31 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  Download,
+  KeyRound,
+  CheckCircle2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-type SetupStep = "qr" | "verify";
+type SetupStep = "qr" | "verify" | "backup_codes";
 
 export default function Setup2FAScreen() {
-  const { qrCodeUrl, manualSecret, regenerateQR, verifyFirstOTP, isLoading } = useAuth();
+  const router = useRouter();
+  const { qrCodeUrl, manualSecret, regenerateQR, verifyFirstOTP, completeAuthentication, isLoading } = useAuth();
   const [currentStep, setCurrentStep] = useState<SetupStep>("qr");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedBackupCodes, setCopiedBackupCodes] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrExpired, setQrExpired] = useState(false);
+
+  // Backup codes state
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [acknowledgedBackup, setAcknowledgedBackup] = useState(false);
+  const savedAuthResultRef = useRef<Verify2FAResponse | null>(null);
 
   // QR expiry timer (10 min)
   useEffect(() => {
@@ -41,7 +52,7 @@ export default function Setup2FAScreen() {
   const handleRegenerateQR = async () => {
     setQrLoading(true);
     try {
-      const result = await regenerateQR();
+      await regenerateQR();
       setQrExpired(false);
       toast.success("New QR code generated");
     } catch (error: any) {
@@ -96,8 +107,12 @@ export default function Setup2FAScreen() {
     if (otpCode.length !== 6) return;
 
     try {
-      await verifyFirstOTP(otpCode);
-      toast.success("2FA setup complete!");
+      const result = await verifyFirstOTP(otpCode);
+      savedAuthResultRef.current = result;
+      const codes = result.backupCodes || result.backup_codes || [];
+      setBackupCodes(codes);
+      setCurrentStep("backup_codes");
+      toast.success("Authenticator verified! Please save your backup codes.");
     } catch (error: any) {
       const message =
         error?.response?.data?.message || "Invalid OTP. Please try again.";
@@ -120,6 +135,46 @@ export default function Setup2FAScreen() {
     }
   };
 
+  const copyAllBackupCodes = async () => {
+    if (!backupCodes.length) return;
+    const formatted = `SOFIYA BANGLES - 2FA BACKUP RECOVERY CODES\nGenerated: ${new Date().toISOString()}\n\nEach code can be used ONCE if you lose access to Google Authenticator.\n\n${backupCodes.map((code, idx) => `${idx + 1}. ${code}`).join("\n")}`;
+    try {
+      await navigator.clipboard.writeText(formatted);
+      setCopiedBackupCodes(true);
+      setTimeout(() => setCopiedBackupCodes(false), 2000);
+      toast.success("Backup codes copied to clipboard!");
+    } catch {
+      toast.error("Failed to copy codes");
+    }
+  };
+
+  const downloadBackupCodes = () => {
+    if (!backupCodes.length) return;
+    const content = `SOFIYA BANGLES - 2FA BACKUP RECOVERY CODES\nGenerated: ${new Date().toISOString()}\n\nImportant: Keep these codes confidential. Each code is single-use only.\n\n${backupCodes.map((code, idx) => `${idx + 1}. ${code}`).join("\n")}\n`;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sofiya-bangles-backup-codes.txt";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Backup codes downloaded!");
+  };
+
+  const handleFinishSetup = () => {
+    if (!acknowledgedBackup) {
+      toast.error("Please confirm you have safely saved your backup codes.");
+      return;
+    }
+    if (savedAuthResultRef.current) {
+      completeAuthentication(savedAuthResultRef.current);
+    }
+    toast.success("2FA setup finalized! Welcome.");
+    router.push("/dashboard");
+  };
+
   return (
     <div className="min-h-screen flex">
       {/* Left Panel */}
@@ -131,7 +186,11 @@ export default function Setup2FAScreen() {
             transition={{ duration: 0.5, type: "spring" }}
             className="w-24 h-24 bg-white/80 backdrop-blur rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl"
           >
-            <Scan className="w-12 h-12 text-[#E8436E]" />
+            {currentStep === "backup_codes" ? (
+              <KeyRound className="w-12 h-12 text-[#E8436E]" />
+            ) : (
+              <Scan className="w-12 h-12 text-[#E8436E]" />
+            )}
           </motion.div>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -139,7 +198,7 @@ export default function Setup2FAScreen() {
             transition={{ delay: 0.2 }}
             className="text-3xl font-bold text-[#7A0D3C] mb-4"
           >
-            Set Up 2FA
+            {currentStep === "backup_codes" ? "Save Recovery Codes" : "Set Up 2FA"}
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -147,9 +206,19 @@ export default function Setup2FAScreen() {
             transition={{ delay: 0.4 }}
             className="text-lg text-[#991A4D]"
           >
-            First-time setup requires
-            <br />
-            Google Authenticator
+            {currentStep === "backup_codes" ? (
+              <>
+                Mandatory one-time backup codes.
+                <br />
+                Save them before proceeding.
+              </>
+            ) : (
+              <>
+                First-time setup requires
+                <br />
+                Google Authenticator
+              </>
+            )}
           </motion.p>
         </div>
       </div>
@@ -162,7 +231,7 @@ export default function Setup2FAScreen() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          {/* Step indicator - 2-step flow */}
+          {/* Step indicator - 3-step flow */}
           <div className="flex items-center justify-center gap-2 mb-8">
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
@@ -171,17 +240,29 @@ export default function Setup2FAScreen() {
                   : "bg-[#22C55E] text-white"
               }`}
             >
-              {currentStep === "verify" ? "✓" : "1"}
+              {currentStep !== "qr" ? "✓" : "1"}
             </div>
-            <div className="w-12 h-0.5 bg-[#E5E5E5] rounded-full" />
+            <div className="w-8 h-0.5 bg-[#E5E5E5] rounded-full" />
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                 currentStep === "verify"
                   ? "bg-[#E8436E] text-white"
+                  : currentStep === "backup_codes"
+                  ? "bg-[#22C55E] text-white"
                   : "bg-[#E5E5E5] text-[#A3A3A3]"
               }`}
             >
-              2
+              {currentStep === "backup_codes" ? "✓" : "2"}
+            </div>
+            <div className="w-8 h-0.5 bg-[#E5E5E5] rounded-full" />
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                currentStep === "backup_codes"
+                  ? "bg-[#E8436E] text-white"
+                  : "bg-[#E5E5E5] text-[#A3A3A3]"
+              }`}
+            >
+              3
             </div>
           </div>
 
@@ -205,7 +286,7 @@ export default function Setup2FAScreen() {
                       New Authenticator Setup
                     </h4>
                     <p className="text-xs text-[#1E40AF] leading-relaxed">
-                      A new authenticator setup has been created. Please remove the old entry from your Google Authenticator app to avoid confusion. Only the newly scanned entry will work.
+                      A new authenticator setup has been created for your account. Please scan this code in your Google Authenticator app.
                     </p>
                   </div>
                 </div>
@@ -219,7 +300,7 @@ export default function Setup2FAScreen() {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ type: "spring" }}
-                      className="bg-white p-4 rounded-2xl"
+                      className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm"
                     >
                       <img
                         src={qrCodeUrl}
@@ -255,54 +336,44 @@ export default function Setup2FAScreen() {
 
               {/* Manual Setup Section */}
               <AnimatePresence>
-              {showManual && manualSecret && (
-                <motion.div
-                  key="manual-setup"
-                  initial={{ opacity: 0, maxHeight: 0 }}
-                  animate={{ opacity: 1, maxHeight: 500 }}
-                  exit={{ opacity: 0, maxHeight: 0 }}
-                  className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 mb-6 overflow-hidden"
-                >
-                  <h3 className="font-semibold text-[#171717] mb-3 text-sm">
-                    Manual Setup Instructions
-                  </h3>
-                  <ol className="text-xs text-[#525252] space-y-1.5 mb-4 list-decimal list-inside">
-                    <li>Open <strong>Google Authenticator</strong> app</li>
-                    <li>Tap the <strong>+</strong> button to add a new account</li>
-                    <li>Select <strong>Enter a setup key</strong></li>
-                    <li>Paste or type the secret key below</li>
-                    <li>Account: <strong>Sofiya Bangles</strong></li>
-                    <li>Key type: <strong>Time-based</strong></li>
-                  </ol>
-                  <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-lg p-3 mb-2">
-                    <code className="flex-1 text-xs font-mono text-[#171717] break-all select-all">
-                      {manualSecret}
-                    </code>
-                    <button
-                      onClick={() => copySecret(manualSecret)}
-                      className="flex-shrink-0 p-1.5 rounded-lg hover:bg-[#F1F5F9] transition-colors"
-                      title="Copy secret key"
-                    >
-                      {copied ? (
-                        <Check className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <Copy className="w-4 h-4 text-[#64748B]" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-[#94A3B8] mt-1">
-                    This key will only be shown once. Keep it secure.
-                  </p>
-                </motion.div>
-              )}
+                {showManual && manualSecret && (
+                  <motion.div
+                    key="manual-setup"
+                    initial={{ opacity: 0, maxHeight: 0 }}
+                    animate={{ opacity: 1, maxHeight: 500 }}
+                    exit={{ opacity: 0, maxHeight: 0 }}
+                    className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 mb-6 overflow-hidden"
+                  >
+                    <h3 className="font-semibold text-[#171717] mb-3 text-sm">
+                      Manual Setup Instructions
+                    </h3>
+                    <ol className="text-xs text-[#525252] space-y-1.5 mb-4 list-decimal list-inside">
+                      <li>Open <strong>Google Authenticator</strong> app</li>
+                      <li>Tap the <strong>+</strong> button to add a new account</li>
+                      <li>Select <strong>Enter a setup key</strong></li>
+                      <li>Paste or type the secret key below</li>
+                      <li>Account: <strong>Sofiya Bangles</strong></li>
+                      <li>Key type: <strong>Time-based</strong></li>
+                    </ol>
+                    <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-lg p-3 mb-2">
+                      <code className="flex-1 text-xs font-mono text-[#171717] break-all select-all">
+                        {manualSecret}
+                      </code>
+                      <button
+                        onClick={() => copySecret(manualSecret)}
+                        className="flex-shrink-0 p-1.5 rounded-lg hover:bg-[#F1F5F9] transition-colors"
+                        title="Copy secret key"
+                      >
+                        {copied ? (
+                          <Check className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-[#64748B]" />
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
               </AnimatePresence>
-
-              {/* If no secret yet (shouldn't happen, but just in case) */}
-              {showManual && !manualSecret && (
-                <p className="text-xs text-amber-600 mb-4">
-                  Secret key not available. Please regenerate the QR code.
-                </p>
-              )}
 
               {qrExpired && (
                 <motion.div
@@ -351,7 +422,7 @@ export default function Setup2FAScreen() {
                   Verify OTP
                 </h2>
                 <p className="text-[#737373]">
-                  Enter the 6-digit code from Google Authenticator to complete
+                  Enter the 6-digit code from Google Authenticator to confirm
                   setup
                 </p>
               </div>
@@ -408,7 +479,7 @@ export default function Setup2FAScreen() {
                 ) : (
                   <>
                     <Shield className="w-5 h-5" />
-                    Complete Setup
+                    Verify Authenticator Code
                   </>
                 )}
               </button>
@@ -422,7 +493,100 @@ export default function Setup2FAScreen() {
             </>
           )}
 
+          {currentStep === "backup_codes" && (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-rose-50 text-[#E8436E] rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <KeyRound className="w-6 h-6" />
+                </div>
+                <h2 className="text-2xl font-bold text-[#171717] mb-1">
+                  Backup Recovery Codes
+                </h2>
+                <p className="text-xs text-[#737373]">
+                  Save these 10 one-time recovery codes now. They will{" "}
+                  <strong className="text-red-600">NEVER</strong> be displayed again!
+                </p>
+              </div>
 
+              {/* Warning Alert */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 mb-5 flex gap-3 items-start">
+                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  If you lose your device or cannot access Google Authenticator, each backup code can be used <strong>once</strong> to sign in to your SuperAdmin account.
+                </p>
+              </div>
+
+              {/* Backup Codes Grid: 2 columns of 5 */}
+              <div className="bg-[#F8FAFC] border border-slate-200 rounded-2xl p-4 mb-4">
+                <div className="grid grid-cols-2 gap-2.5">
+                  {backupCodes.map((code, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-white border border-slate-200/80 rounded-xl px-3 py-2 flex items-center justify-between"
+                    >
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {idx + 1}.
+                      </span>
+                      <span className="font-mono text-xs font-bold tracking-wider text-slate-800 select-all">
+                        {code}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons: Copy All & Download */}
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <button
+                  onClick={copyAllBackupCodes}
+                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
+                >
+                  {copiedBackupCodes ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="text-emerald-600">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 text-slate-500" />
+                      <span>Copy All Codes</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={downloadBackupCodes}
+                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
+                >
+                  <Download className="w-4 h-4 text-slate-500" />
+                  <span>Download .txt</span>
+                </button>
+              </div>
+
+              {/* Mandatory Checkbox Acknowledgment */}
+              <label className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer mb-5 hover:bg-slate-100/80 transition">
+                <input
+                  type="checkbox"
+                  checked={acknowledgedBackup}
+                  onChange={(e) => setAcknowledgedBackup(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#E8436E] focus:ring-[#E8436E]"
+                />
+                <span className="text-xs text-slate-700 font-medium leading-relaxed">
+                  I have securely saved these 10 recovery codes. I understand that each code is single-use and cannot be retrieved later.
+                </span>
+              </label>
+
+              {/* Finish Setup Button */}
+              <button
+                onClick={handleFinishSetup}
+                disabled={!acknowledgedBackup}
+                className="w-full gradient-primary text-white font-semibold py-3.5 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-[#E8436E]/25 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+                Continue to Dashboard
+              </button>
+            </>
+          )}
         </motion.div>
       </div>
     </div>

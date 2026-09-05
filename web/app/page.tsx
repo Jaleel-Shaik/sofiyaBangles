@@ -35,6 +35,13 @@ export default function HomePage() {
     }
   }, [isAuthenticated, loginStep, isLoading, accessDenied, router]);
 
+  // Route to /2fa-setup when 2FA setup is required
+  useEffect(() => {
+    if (is2FAPending && setupRequired) {
+      router.push("/2fa-setup");
+    }
+  }, [is2FAPending, setupRequired, router]);
+
   // Global loading (app startup / token validation)
   if (isLoading) {
     return (
@@ -57,7 +64,14 @@ export default function HomePage() {
   }
 
   if (is2FAPending && setupRequired) {
-    return <Setup2FAScreen />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#E8436E] mx-auto mb-3" />
+          <p className="text-sm text-[#A3A3A3]">Redirecting to 2FA setup...</p>
+        </div>
+      </div>
+    );
   }
 
   if (is2FAPending && !setupRequired) {

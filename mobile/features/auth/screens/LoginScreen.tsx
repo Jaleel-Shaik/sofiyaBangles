@@ -10,6 +10,7 @@ import {
   Vibration,
   Keyboard,
   useWindowDimensions,
+  AppState,
 } from "react-native";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { router } from "expo-router";
@@ -48,6 +49,13 @@ interface OTPVerifyProps {
   onVerify: () => void;
   onBack: () => void;
   otpTimer: number;
+  useBackupCode: boolean;
+  setUseBackupCode: (val: boolean) => void;
+  backupCode: string;
+  setBackupCode: (val: string) => void;
+  onVerifyBackup: () => void;
+  isLocked: boolean;
+  lockoutMessage: string;
 }
 
 interface QRSetupProps {
@@ -297,6 +305,13 @@ const OTPStep_Verify = ({
   onVerify,
   onBack,
   otpTimer,
+  useBackupCode,
+  setUseBackupCode,
+  backupCode,
+  setBackupCode,
+  onVerifyBackup,
+  isLocked,
+  lockoutMessage,
 }: OTPVerifyProps) => {
   const initialDigits = otpCode.padEnd(6, "").split("").slice(0, 6);
   const { height: screenHeight } = useWindowDimensions();
@@ -388,7 +403,7 @@ const OTPStep_Verify = ({
                 className={`${isSmallScreen ? "w-14 h-14" : "w-20 h-20"} bg-gradient-to-br from-[#FF1F4B]/15 to-[#FF1F4B]/5 rounded-[20px] items-center justify-center`}
               >
                 <Ionicons
-                  name="shield-checkmark"
+                  name={useBackupCode ? "key" : "shield-checkmark"}
                   size={isSmallScreen ? 28 : 36}
                   color="#FF1F4B"
                 />
@@ -400,92 +415,350 @@ const OTPStep_Verify = ({
             className={`${isSmallScreen ? "text-xl" : "text-2xl"} font-extrabold text-slate-800 text-center mb-2`}
             style={{ letterSpacing: -0.5 }}
           >
-            Welcome back
+            {useBackupCode ? "Recovery Code Sign In" : "Welcome back"}
           </Text>
           <Text className="text-slate-500 text-sm text-center mb-5 leading-5 px-4">
-            Enter the 6-digit verification code from your authenticator app.
+            {useBackupCode
+              ? "Enter one of your single-use backup recovery codes."
+              : "Enter the 6-digit verification code from your authenticator app."}
           </Text>
 
-          {/* OTP Input */}
-          <View
-            className="bg-white rounded-[24px] px-5 pt-5 pb-5 shadow-sm mb-3"
-            style={{
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.06,
-              shadowRadius: 12,
-              elevation: 4,
-            }}
-          >
-            <View className="items-center mb-3">
-              <Text className="text-[11px] font-bold text-slate-400 tracking-[0.24em] uppercase">
-                Authentication Code
-              </Text>
-            </View>
-            <OTPDigitInput
-              initialDigits={initialDigits}
-              onDigitsChange={(d) => setOtpCode(d.join("").slice(0, 6))}
-              onComplete={onVerify}
-              error={otpError}
-              setError={setOtpError}
-              disabled={loading}
-            />
-            {otpError ? null : (
-              <View className="flex-row items-center justify-center mt-3 gap-1.5">
-                {progressDots.map((anim, i) => (
-                  <Animated.View
-                    key={i}
-                    style={{ opacity: anim }}
-                    className="w-1.5 h-1.5 rounded-full bg-rose-300"
-                  />
-                ))}
+          {/* Lockout Banner */}
+          {isLocked && (
+            <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4 flex-row items-start gap-2.5">
+              <Ionicons name="lock-closed" size={18} color="#dc2626" style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-red-900 font-bold text-xs mb-1">
+                  Account Temporarily Locked
+                </Text>
+                <Text className="text-red-700 text-xs leading-relaxed">
+                  {lockoutMessage || "Too many failed attempts. Your account has been locked for 15 minutes."}
+                </Text>
               </View>
-            )}
-          </View>
+            </View>
+          )}
 
-          {otpError ? (
-            <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3 flex-row items-start gap-2.5">
-              <Ionicons
-                name="alert-circle"
-                size={16}
-                color="#dc2626"
-                style={{ marginTop: 1 }}
+          {/* OTP Input or Backup Input */}
+          {!useBackupCode ? (
+            <>
+              <View
+                className="bg-white rounded-[24px] px-5 pt-5 pb-5 shadow-sm mb-3"
+                style={{
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 12,
+                  elevation: 4,
+                }}
+              >
+                <View className="items-center mb-3">
+                  <Text className="text-[11px] font-bold text-slate-400 tracking-[0.24em] uppercase">
+                    Authentication Code
+                  </Text>
+                </View>
+                <OTPDigitInput
+                  initialDigits={initialDigits}
+                  onDigitsChange={(d) => setOtpCode(d.join("").slice(0, 6))}
+                  onComplete={onVerify}
+                  error={otpError}
+                  setError={setOtpError}
+                  disabled={loading || isLocked}
+                />
+                {otpError ? null : (
+                  <View className="flex-row items-center justify-center mt-3 gap-1.5">
+                    {progressDots.map((anim, i) => (
+                      <Animated.View
+                        key={i}
+                        style={{ opacity: anim }}
+                        className="w-1.5 h-1.5 rounded-full bg-rose-300"
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {otpError ? (
+                <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3 flex-row items-start gap-2.5">
+                  <Ionicons
+                    name="alert-circle"
+                    size={16}
+                    color="#dc2626"
+                    style={{ marginTop: 1 }}
+                  />
+                  <Text className="text-red-600 text-xs flex-1 leading-5">
+                    {otpError}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Timer */}
+              <View className="flex-row items-center justify-center mb-4 gap-2 rounded-full bg-rose-50 px-3 py-2 self-center">
+                <View className="w-6 h-6 bg-white rounded-full items-center justify-center shadow-sm">
+                  <Ionicons name="time-outline" size={13} color="#e11d48" />
+                </View>
+                <Text className="text-rose-500 text-xs font-semibold">
+                  Code refreshes in{" "}
+                  <Text className="font-extrabold">{otpTimer}s</Text>
+                </Text>
+              </View>
+
+              {/* Verify Button */}
+              <Button
+                title="Verify & Sign In"
+                onPress={onVerify}
+                loading={loading}
+                icon={<Ionicons name="shield-checkmark" size={20} color="#fff" />}
+                iconPosition="left"
+                disabled={loading || isLocked || otpCode.length !== 6}
+                className="shadow-lg bg-[#FF1F4B] rounded-[18px] h-14"
+                style={{
+                  shadowColor: "#FF1F4B",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.28,
+                  shadowRadius: 10,
+                  elevation: 8,
+                }}
               />
-              <Text className="text-red-600 text-xs flex-1 leading-5">
-                {otpError}
-              </Text>
-            </View>
-          ) : null}
+            </>
+          ) : (
+            <>
+              {/* Backup Code Input */}
+              <View
+                className="bg-white rounded-[24px] px-5 pt-5 pb-5 shadow-sm mb-3"
+                style={{
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 12,
+                  elevation: 4,
+                }}
+              >
+                <View className="items-center mb-3">
+                  <Text className="text-[11px] font-bold text-slate-400 tracking-[0.24em] uppercase">
+                    Backup Recovery Code
+                  </Text>
+                </View>
+                <TextInput
+                  value={backupCode}
+                  onChangeText={(val) => {
+                    setBackupCode(val);
+                    setOtpError("");
+                  }}
+                  placeholder="e.g. ABCD-1234"
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  editable={!loading && !isLocked}
+                  className="bg-slate-50 border border-rose-200 rounded-2xl px-4 py-3.5 text-center text-lg font-mono font-bold text-slate-800 tracking-widest uppercase"
+                />
+                <Text className="text-slate-400 text-[11px] text-center mt-2">
+                  Case-insensitive. Dashes are optional.
+                </Text>
+              </View>
 
-          {/* Timer */}
-          <View className="flex-row items-center justify-center mb-4 gap-2 rounded-full bg-rose-50 px-3 py-2 self-center">
-            <View className="w-6 h-6 bg-white rounded-full items-center justify-center shadow-sm">
-              <Ionicons name="time-outline" size={13} color="#e11d48" />
-            </View>
-            <Text className="text-rose-500 text-xs font-semibold">
-              Code refreshes in{" "}
-              <Text className="font-extrabold">{otpTimer}s</Text>
+              {otpError ? (
+                <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3 flex-row items-start gap-2.5">
+                  <Ionicons
+                    name="alert-circle"
+                    size={16}
+                    color="#dc2626"
+                    style={{ marginTop: 1 }}
+                  />
+                  <Text className="text-red-600 text-xs flex-1 leading-5">
+                    {otpError}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Verify Backup Code Button */}
+              <Button
+                title="Verify Recovery Code"
+                onPress={onVerifyBackup}
+                loading={loading}
+                icon={<Ionicons name="key" size={20} color="#fff" />}
+                iconPosition="left"
+                disabled={loading || isLocked || !backupCode.trim()}
+                className="shadow-lg bg-[#FF1F4B] rounded-[18px] h-14"
+                style={{
+                  shadowColor: "#FF1F4B",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.28,
+                  shadowRadius: 10,
+                  elevation: 8,
+                }}
+              />
+            </>
+          )}
+
+          {/* Toggle Between Modes */}
+          <TouchableOpacity
+            onPress={() => {
+              setUseBackupCode(!useBackupCode);
+              setOtpError("");
+            }}
+            className="mt-5 items-center py-2 active:opacity-70"
+          >
+            <Text className="text-xs font-bold text-[#FF1F4B]">
+              {useBackupCode
+                ? "← Use Google Authenticator instead"
+                : "Lost your device? Use Backup Recovery Code →"}
             </Text>
-          </View>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAwareScrollView>
+    </SafeAreaView>
+  );
+};
 
-          {/* Verify Button */}
-          <Button
-            title="Verify & Sign In"
-            onPress={onVerify}
-            loading={loading}
-            icon={<Ionicons name="shield-checkmark" size={20} color="#fff" />}
-            iconPosition="left"
-            disabled={loading}
-            className="shadow-lg bg-[#FF1F4B] rounded-[18px] h-14"
+// ─── Backup Codes Mandatory Acknowledgment Step ─────────────
+interface BackupCodesStepProps {
+  codes: string[];
+  onFinish: () => void;
+  loading: boolean;
+}
+
+const BackupCodesStep = ({
+  codes,
+  onFinish,
+  loading,
+}: BackupCodesStepProps) => {
+  const [copied, setCopied] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const { height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isSmallScreen = screenHeight < 600;
+
+  const handleCopyAll = async () => {
+    if (!codes.length) return;
+    const formatted = `SOFIYA BANGLES - 2FA BACKUP RECOVERY CODES\nGenerated: ${new Date().toISOString()}\n\nEach code is single-use only:\n\n${codes.map((c, i) => `${i + 1}. ${c}`).join("\n")}`;
+    try {
+      await Clipboard.setStringAsync(formatted);
+      setCopied(true);
+      if (Platform.OS !== "web") {
+        import("expo-haptics")
+          .then((mod) => mod.notificationAsync(mod.NotificationFeedbackType.Success))
+          .catch(() => {});
+      }
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      Alert.alert("Error", "Failed to copy backup codes.");
+    }
+  };
+
+  return (
+    <SafeAreaView className="flex-1" style={{ backgroundColor: "#FFF0F3" }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 24,
+          paddingTop: isSmallScreen ? 12 : 28,
+          paddingBottom: insets.bottom + 24,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <StepProgress current={2} total={2} />
+
+        <View className="items-center mb-5">
+          <View
+            className="w-20 h-20 bg-white rounded-3xl items-center justify-center shadow-md mb-3"
             style={{
               shadowColor: "#FF1F4B",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.28,
-              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
               elevation: 8,
             }}
-          />
+          >
+            <View className="w-16 h-16 bg-rose-50 rounded-2xl items-center justify-center">
+              <Ionicons name="key" size={28} color="#FF1F4B" />
+            </View>
+          </View>
+          <Text className="text-2xl font-extrabold text-slate-800 text-center mb-1">
+            Save Recovery Codes
+          </Text>
+          <Text className="text-slate-500 text-xs text-center px-4 leading-5">
+            Save these 10 recovery codes now. They will{" "}
+            <Text className="text-red-500 font-bold">NEVER</Text> be displayed again!
+          </Text>
         </View>
+
+        {/* Warning card */}
+        <View className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 mb-4 flex-row items-start gap-2.5">
+          <Ionicons name="warning-outline" size={18} color="#d97706" style={{ marginTop: 1 }} />
+          <Text className="text-amber-800 text-xs flex-1 leading-5">
+            Each recovery code can only be used once if you lose access to Google Authenticator.
+          </Text>
+        </View>
+
+        {/* 2-column grid */}
+        <View className="bg-white rounded-3xl p-4 shadow-sm mb-4 border border-rose-100">
+          <View className="flex-row flex-wrap justify-between">
+            {codes.map((code, idx) => (
+              <View
+                key={idx}
+                className="w-[48%] bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 mb-2 flex-row items-center justify-between"
+              >
+                <Text className="text-[10px] font-bold text-slate-400">{idx + 1}.</Text>
+                <Text className="font-mono text-xs font-bold text-slate-800 select-all tracking-wider">
+                  {code}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Copy All button */}
+        <TouchableOpacity
+          onPress={handleCopyAll}
+          className={`py-3 px-4 rounded-xl border mb-4 flex-row items-center justify-center gap-2 ${
+            copied ? "bg-emerald-50 border-emerald-300" : "bg-white border-rose-200"
+          }`}
+        >
+          <Ionicons
+            name={copied ? "checkmark-circle" : "copy-outline"}
+            size={18}
+            color={copied ? "#16a34a" : "#FF1F4B"}
+          />
+          <Text className={`text-xs font-bold ${copied ? "text-emerald-700" : "text-[#FF1F4B]"}`}>
+            {copied ? "Codes Copied to Clipboard!" : "Copy All 10 Codes"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Acknowledgment Checkbox */}
+        <TouchableOpacity
+          onPress={() => setAcknowledged(!acknowledged)}
+          className="flex-row items-start gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 mb-5"
+          activeOpacity={0.8}
+        >
+          <View
+            className={`w-5 h-5 rounded-md border items-center justify-center mt-0.5 ${
+              acknowledged ? "bg-[#FF1F4B] border-[#FF1F4B]" : "border-slate-300 bg-slate-50"
+            }`}
+          >
+            {acknowledged && <Ionicons name="checkmark" size={14} color="#fff" />}
+          </View>
+          <Text className="text-xs text-slate-700 font-medium flex-1 leading-5">
+            I have securely saved these 10 recovery codes. I understand that each code is single-use and cannot be retrieved later.
+          </Text>
+        </TouchableOpacity>
+
+        {/* Continue to Dashboard Button */}
+        <Button
+          title="Continue to Dashboard"
+          onPress={onFinish}
+          disabled={!acknowledged || loading}
+          loading={loading}
+          icon={<Ionicons name="arrow-forward" size={20} color="#fff" />}
+          iconPosition="right"
+          className="shadow-lg bg-[#FF1F4B] rounded-[18px] h-14"
+          style={{
+            shadowColor: "#FF1F4B",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.28,
+            shadowRadius: 10,
+            elevation: 8,
+          }}
+        />
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
@@ -869,9 +1142,59 @@ export default function LoginScreen() {
   const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
   const [navigationReady, setNavigationReady] = useState(false);
 
+  // 2FA Challenge & Backup State
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [challengeExpiresAt, setChallengeExpiresAt] = useState<string | null>(null);
+  const [useBackupCode, setUseBackupCode] = useState(false);
+  const [backupCode, setBackupCode] = useState("");
+  const [setupBackupCodes, setSetupBackupCodes] = useState<string[]>([]);
+  const pendingAuthSessionRef = useRef<any>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutMessage, setLockoutMessage] = useState("");
+
   useEffect(() => {
     setNavigationReady(true);
   }, []);
+
+  // Background / Resume Lifecycle Check for 10-minute 2FA challenge expiry
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active" && (authStep === "qr_setup" || authStep === "otp_verify" || authStep === "backup_codes")) {
+        if (challengeExpiresAt) {
+          const expTime = new Date(challengeExpiresAt).getTime();
+          if (!Number.isNaN(expTime) && Date.now() >= expTime) {
+            Alert.alert(
+              "Session Expired",
+              "Your 2FA session has expired. Please sign in again.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    setAuthStep("login");
+                    setOtpCode("");
+                    setOtpError("");
+                    setOtpPendingToken("");
+                    setSetupOtpCode("");
+                    setQrCodeUrl("");
+                    setManualSecret("");
+                    setChallengeId(null);
+                    setChallengeExpiresAt(null);
+                    setUseBackupCode(false);
+                    setBackupCode("");
+                    setIsLocked(false);
+                    setLockoutMessage("");
+                    clear2faPending();
+                  },
+                },
+              ]
+            );
+          }
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [authStep, challengeExpiresAt, clear2faPending]);
 
   // Deferred navigation
   useEffect(() => {
@@ -929,6 +1252,14 @@ export default function LoginScreen() {
     setQrCodeUrl("");
     setManualSecret("");
     setQrExpired(false);
+    setChallengeId(null);
+    setChallengeExpiresAt(null);
+    setUseBackupCode(false);
+    setBackupCode("");
+    setSetupBackupCodes([]);
+    setIsLocked(false);
+    setLockoutMessage("");
+    pendingAuthSessionRef.current = null;
     clear2faPending();
   }, [forceLogout, clear2faPending]);
 
@@ -966,15 +1297,42 @@ export default function LoginScreen() {
   }, [authStep]);
 
   const handleVerify2FA = async () => {
-    if (loading) return;
-    if (!otpCode.trim() || otpCode.length !== 6) {
+    if (loading || isLocked) return;
+    if (!useBackupCode && (!otpCode.trim() || otpCode.length !== 6)) {
       setOtpError("Please enter a 6-digit code.");
+      return;
+    }
+    if (useBackupCode && !backupCode.trim()) {
+      setOtpError("Please enter a backup recovery code.");
       return;
     }
     setOtpError("");
     setLoading(true);
     try {
-      const result = await verify2FAOtp(otpPendingToken, otpCode);
+      let result;
+      if (useBackupCode) {
+        const sanitized = backupCode.replace(/[\s-]/g, "").toUpperCase();
+        result = await verify2FAOtp({
+          challengeId: challengeId || undefined,
+          challenge_id: challengeId || undefined,
+          email: email || undefined,
+          otp: sanitized,
+          otp_code: sanitized,
+          useBackupCode: true,
+          use_backup_code: true,
+          otp_pending_token: otpPendingToken || undefined,
+        });
+      } else {
+        result = await verify2FAOtp({
+          challengeId: challengeId || undefined,
+          challenge_id: challengeId || undefined,
+          email: email || undefined,
+          otp: otpCode,
+          otp_code: otpCode,
+          otp_pending_token: otpPendingToken || undefined,
+        });
+      }
+
       const responseData = result?.data || result;
       if (responseData?.access_token && responseData?.user) {
         const {
@@ -997,10 +1355,25 @@ export default function LoginScreen() {
       const responseData = err.response?.data;
       const code = responseData?.code;
       const msg = responseData?.message || err.message || "";
+      const status = err.response?.status;
 
       if (code === "PLATFORM_ACCESS_DENIED_SUPER_ADMIN_MOBILE" || code === "PLATFORM_ACCESS_DENIED") {
         await forceLogout();
         setShowSuperAdminModal(true);
+        setLoading(false);
+        return;
+      }
+
+      if (
+        status === 423 ||
+        code === "ACCOUNT_LOCKED_15_MINUTES" ||
+        msg.includes("locked") ||
+        msg.includes("15 minutes")
+      ) {
+        setIsLocked(true);
+        setLockoutMessage(msg || "Account locked for 15 minutes due to too many failed attempts.");
+        setOtpError(msg || "Account locked for 15 minutes.");
+        Alert.alert("Account Locked", msg || "Please try again in 15 minutes.");
         setLoading(false);
         return;
       }
@@ -1017,6 +1390,8 @@ export default function LoginScreen() {
                 setOtpCode("");
                 setOtpError("");
                 setOtpPendingToken("");
+                setChallengeId(null);
+                setChallengeExpiresAt(null);
                 clear2faPending();
               },
             },
@@ -1026,14 +1401,7 @@ export default function LoginScreen() {
         return;
       }
 
-      setOtpError(msg || "Invalid OTP.");
-      if (
-        msg.includes("locked") ||
-        msg.includes("15 minutes") ||
-        code === "ACCOUNT_LOCKED_15_MINUTES"
-      ) {
-        Alert.alert("Account Locked", "Please try again in 15 minutes.");
-      }
+      setOtpError(msg || "Invalid OTP or backup recovery code.");
       setOtpCode("");
     } finally {
       setLoading(false);
@@ -1051,9 +1419,26 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const result = await verify2FAOtp(setupToken, setupOtpCode);
+      const result = await verify2FAOtp({
+        challengeId: challengeId || undefined,
+        challenge_id: challengeId || undefined,
+        email: email || undefined,
+        otp: setupOtpCode,
+        otp_code: setupOtpCode,
+        otp_pending_token: setupToken || undefined,
+      });
       const responseData = result?.data || result;
       if (responseData?.access_token && responseData?.user) {
+        const codes = responseData.backupCodes || responseData.backup_codes || [];
+        if (codes.length > 0) {
+          // Mandatory Backup Codes Acknowledgment Screen
+          setSetupBackupCodes(codes);
+          pendingAuthSessionRef.current = responseData;
+          setAuthStep("backup_codes");
+          setLoading(false);
+          return;
+        }
+
         const {
           user: u,
           access_token,
@@ -1102,6 +1487,8 @@ export default function LoginScreen() {
                 setQrCodeUrl("");
                 setManualSecret("");
                 setQrExpired(false);
+                setChallengeId(null);
+                setChallengeExpiresAt(null);
                 clear2faPending();
               },
             },
@@ -1114,6 +1501,28 @@ export default function LoginScreen() {
       Alert.alert("Verification Failed", msg);
       setSetupOtpCode("");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinishBackupCodes = async () => {
+    if (!pendingAuthSessionRef.current) return;
+    setLoading(true);
+    try {
+      const {
+        user: u,
+        access_token,
+        refresh_token,
+        session_id,
+      } = pendingAuthSessionRef.current;
+      if (session_id)
+        await SecureStore.setItemAsync("session_id", session_id);
+      await login(u, access_token, refresh_token);
+      clear2faPending();
+      setLoading(false);
+      navigateAfterLogin();
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to complete authentication.");
       setLoading(false);
     }
   };
@@ -1176,23 +1585,31 @@ export default function LoginScreen() {
       return true;
     }
 
+    const cid = data?.challengeId || data?.challenge_id || null;
+    const exp = data?.expiresAt || data?.expires_at || null;
+    if (cid) setChallengeId(cid);
+    if (exp) setChallengeExpiresAt(exp);
+
+    const isSetup = Boolean(data?.isTotpSetupRequired ?? data?.setup_required);
+    const isOtp = Boolean(data?.requiresOtp ?? data?.require_otp ?? data?.otp_pending_token);
+
     // Case 2: First login - need to set up 2FA with QR code
-    if (data?.setup_required) {
-      setQrCodeUrl(data?.qr_code_url || "");
+    if (isSetup) {
+      setQrCodeUrl(data?.qrCodeUrl || data?.qr_code_url || "");
       setManualSecret(data?.secret || "");
       setSetupToken(data?.otp_pending_token || "");
       setAuthStep("qr_setup");
       set2faPending({
         otp_pending_token: data?.otp_pending_token,
         setup_required: true,
-        qr_code_url: data?.qr_code_url,
+        qr_code_url: data?.qrCodeUrl || data?.qr_code_url,
       });
       return true;
     }
 
     // Case 3: 2FA already enabled - need OTP verification
-    if (data?.otp_pending_token) {
-      setOtpPendingToken(data.otp_pending_token);
+    if (isOtp) {
+      setOtpPendingToken(data.otp_pending_token || "");
       setAuthStep("otp_verify");
       set2faPending({
         otp_pending_token: data.otp_pending_token,
@@ -1377,11 +1794,22 @@ export default function LoginScreen() {
           loading={loading}
           onVerify={handleVerify2FA}
           otpTimer={otpTimer}
+          useBackupCode={useBackupCode}
+          setUseBackupCode={setUseBackupCode}
+          backupCode={backupCode}
+          setBackupCode={setBackupCode}
+          onVerifyBackup={handleVerify2FA}
+          isLocked={isLocked}
+          lockoutMessage={lockoutMessage}
           onBack={() => {
             setAuthStep("login");
             setOtpCode("");
             setOtpError("");
             setOtpPendingToken("");
+            setUseBackupCode(false);
+            setBackupCode("");
+            setIsLocked(false);
+            setLockoutMessage("");
             clear2faPending();
           }}
         />
@@ -1404,6 +1832,12 @@ export default function LoginScreen() {
             setQrExpired(false);
             clear2faPending();
           }}
+        />
+      ) : authStep === "backup_codes" ? (
+        <BackupCodesStep
+          codes={setupBackupCodes}
+          onFinish={handleFinishBackupCodes}
+          loading={loading}
         />
       ) : (
         <KeyboardAwareScrollView

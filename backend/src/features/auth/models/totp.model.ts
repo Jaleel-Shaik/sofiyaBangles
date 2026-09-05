@@ -105,33 +105,47 @@ export const markOtpTokenAsUsedModel = async (userId: string, token: string): Pr
  * Creates a pending login challenge after the password is verified.
  * The challenge is temporary and is hard-deleted after verification
  * or by the periodic cleanup job once it expires.
+ * Expiry is strictly set to 10 minutes (or custom ttlMs).
  */
 export const createLoginChallengeModel = async (data: {
   userId: string;
+  email?: string;
   userType: UserType;
   deviceInfo: DeviceInformation;
   correlationId?: string;
+  isTotpSetupRequired?: boolean;
   ttlMs?: number;
 }): Promise<LoginChallenge> => {
   const id = uuidv4();
   const now = new Date();
-  const ttl = data.ttlMs || env.LOGIN_CHALLENGE_TTL_MS;
+  const ttl = data.ttlMs || 10 * 60 * 1000; // 10 minutes lifetime
+  const expiresAt = new Date(now.getTime() + ttl).toISOString();
+  const createdAt = now.toISOString();
 
   const challenge: LoginChallenge = {
     id,
+    challengeId: id,
     user_id: data.userId,
+    userId: data.userId,
+    email: data.email || "",
     user_type: data.userType,
     otp_type: "TOTP",
     // One-time nonce binding this challenge to the issued pending token.
     otp_hash: crypto.createHash("sha256").update(uuidv4()).digest("hex"),
-    status: "PENDING",
-    expires_at: new Date(now.getTime() + ttl).toISOString(),
-    created_at: now.toISOString(),
+    status: "OTP_PENDING",
+    expires_at: expiresAt,
+    expiresAt: expiresAt,
+    created_at: createdAt,
+    createdAt: createdAt,
     verified_at: null,
     failed_attempts: 0,
+    failedAttempts: 0,
     correlation_id: data.correlationId || "",
     ip_address: data.deviceInfo.ip_address || "",
+    ipAddress: data.deviceInfo.ip_address || "",
     device_info: data.deviceInfo,
+    deviceInfo: data.deviceInfo,
+    isTotpSetupRequired: data.isTotpSetupRequired ?? false,
   };
 
   await db.collection("login_challenges").doc(id).set(challenge);
@@ -142,15 +156,29 @@ export const findLoginChallengeModel = async (
   challengeId: string,
 ): Promise<LoginChallenge | null> => {
   const doc = await db.collection("login_challenges").doc(challengeId).get();
-  if (!doc.exists) return null;
-  return doc.data() as LoginChallenge;
+  if (doc.exists) return doc.data() as LoginChallenge;
+
+  // Fallback query if id was stored in field
+  const snap = await db.collection("login_challenges").where("challengeId", "==", challengeId).limit(1).get();
+  if (!snap.empty) return snap.docs[0].data() as LoginChallenge;
+
+  return null;
 };
 
 export const updateLoginChallengeModel = async (
   challengeId: string,
-  data: Partial<Pick<LoginChallenge, "status" | "verified_at" | "failed_attempts">>,
+  data: Partial<LoginChallenge>,
 ): Promise<void> => {
-  await db.collection("login_challenges").doc(challengeId).update(data);
+  const updateData: Record<string, unknown> = { ...data };
+  if (data.status) updateData.status = data.status;
+  if (data.failed_attempts !== undefined || data.failedAttempts !== undefined) {
+    const attempts = data.failedAttempts ?? data.failed_attempts;
+    updateData.failed_attempts = attempts;
+    updateData.failedAttempts = attempts;
+  }
+  if (data.verified_at !== undefined) updateData.verified_at = data.verified_at;
+
+  await db.collection("login_challenges").doc(challengeId).set(updateData, { merge: true });
 };
 
 export const deleteLoginChallengeModel = async (
@@ -158,6 +186,87 @@ export const deleteLoginChallengeModel = async (
 ): Promise<void> => {
   await db.collection("login_challenges").doc(challengeId).delete();
 };
+
+/**
+ * Stores temporary encrypted TOTP secret during first-time setup
+ */
+export const updateProfilePendingSecret = async (
+  userId: string,
+  encryptedSecret: string
+): Promise<void> => {
+  const identity = await findIdentityByIdModel(userId);
+  if (!identity) return;
+  await updateIdentityModel(userId, identity.user_type, {
+    pendingTwoFactorSecretEncrypted: encryptedSecret,
+  });
+};
+
+/**
+ * Activates 2FA after first-time setup success and stores 10 hashed backup codes
+ */
+export const activateProfile2FA = async (
+  userId: string,
+  encryptedSecret: string,
+  backupCodesHash: string[]
+): Promise<void> => {
+  const identity = await findIdentityByIdModel(userId);
+  if (!identity) return;
+  const now = nowISTISO();
+  await updateIdentityModel(userId, identity.user_type, {
+    two_fa_secret: encryptedSecret,
+    twoFactorSecretEncrypted: encryptedSecret,
+    pendingTwoFactorSecretEncrypted: null,
+    is_2fa_enabled: true,
+    twoFactorEnabled: true,
+    two_fa_updated_at: now,
+    twoFactorEnabledAt: now,
+    backupCodesHash,
+    failedOtpAttempts: 0,
+    accountLockedUntil: null,
+  });
+};
+
+/**
+ * Consumes a single-use backup recovery code by removing its hash
+ */
+export const consumeBackupCodeModel = async (
+  userId: string,
+  matchedHash: string
+): Promise<void> => {
+  const identity = await findIdentityByIdModel(userId);
+  if (!identity) return;
+  const currentHashes = identity.profile.backupCodesHash || [];
+  const updatedHashes = currentHashes.filter((h) => h !== matchedHash);
+  await updateIdentityModel(userId, identity.user_type, {
+    backupCodesHash: updatedHashes,
+    failedOtpAttempts: 0,
+  });
+};
+
+/**
+ * Locks an account for 15 minutes after 5 consecutive failed OTP attempts
+ */
+export const lockAccountForBruteForceModel = async (
+  userId: string,
+  challengeId: string
+): Promise<string> => {
+  const identity = await findIdentityByIdModel(userId);
+  const lockTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  if (identity) {
+    const currentFailed = (identity.profile.failedOtpAttempts || 0) + 1;
+    await updateIdentityModel(userId, identity.user_type, {
+      failedOtpAttempts: currentFailed,
+      accountLockedUntil: lockTime,
+    });
+  }
+  await updateLoginChallengeModel(challengeId, {
+    status: "LOCKED",
+    failedAttempts: 5,
+    failed_attempts: 5,
+  });
+  return lockTime;
+};
+
 
 // ─── Refresh Tokens (temporary) ────────────────────────────
 

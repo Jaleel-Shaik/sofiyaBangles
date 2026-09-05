@@ -116,7 +116,16 @@ export default function AdminDashboard() {
         >
           <View className="flex-row justify-between items-center">
             <View className="flex-1">
-              <Text className="text-primary font-medium text-xs uppercase tracking-wider mb-0.5">Admin Panel</Text>
+              <View className="flex-row items-center mb-0.5">
+                <Text className="text-primary font-medium text-xs uppercase tracking-wider mr-2">
+                  {user?.role === 'super_admin' ? 'SuperAdmin Hub' : 'Admin Panel'}
+                </Text>
+                {user?.role === 'super_admin' && (
+                  <View className="bg-rose-600 px-2 py-0.5 rounded-full">
+                    <Text className="text-[10px] font-bold text-white">70/30 Active</Text>
+                  </View>
+                )}
+              </View>
               <Text className="text-xl font-bold text-text-primary mt-0.5" numberOfLines={1}>
                 Welcome, {user?.full_name?.split(' ')[0] || 'Admin'}
               </Text>
