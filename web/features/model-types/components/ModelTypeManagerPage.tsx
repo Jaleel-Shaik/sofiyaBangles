@@ -1,11 +1,10 @@
-import { api } from "@/src/lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Edit, Trash2, Layers, X, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { type ModelType } from "@/src/lib/api";
+import { api, type ModelType } from "@/src/lib/api";
 
 export default function ModelTypesPage() {
   const [modelTypes, setModelTypes] = useState<ModelType[]>([]);

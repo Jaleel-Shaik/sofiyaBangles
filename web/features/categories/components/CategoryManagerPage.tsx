@@ -1,11 +1,10 @@
-import { api } from "@/src/lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Edit, Trash2, FolderOpen, X, Loader2, Layers } from "lucide-react";
 import toast from "react-hot-toast";
-import { type Category, type ModelType } from "@/src/lib/api";
+import { api, type Category, type ModelType } from "@/src/lib/api";
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);

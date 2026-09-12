@@ -47,7 +47,7 @@ router.post("/verify-otp", validate(verifyOtpSchema), verifyOtp);
 router.post("/firebase-login", validate(firebaseLoginSchema), firebaseLoginController);
 
 // Password migration for Firebase Auth users
-router.post("/set-password", authenticate, validate(setPasswordSchema), setPasswordController);
+router.post("/set-password", validate(setPasswordSchema), setPasswordController);
 
 // Protected routes
 router.post("/logout", authenticate, logoutController);

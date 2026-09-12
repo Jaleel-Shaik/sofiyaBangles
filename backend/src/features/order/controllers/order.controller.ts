@@ -115,7 +115,11 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
 
 export const createReview = async (req: AuthRequest, res: Response) => {
   try {
-    const { productId, rating, comment, damageDetails } = req.body;
+    const productId = req.body.productId || req.body.product_id;
+    const rating = Number(req.body.rating);
+    const comment = req.body.comment;
+    const damageDetails = req.body.damageDetails || req.body.damage_details;
+
     const review = await OrderService.createReview(
       req.user!.userId,
       productId,

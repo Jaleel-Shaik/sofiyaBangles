@@ -13,8 +13,31 @@ import sizePreferenceRoutes from "../features/size-preference/routes/sizePrefere
 import orderRoutes from "../features/order/routes/order.routes";
 import superAdminRoutes from "../features/super-admin/routes/superAdmin.routes";
 
+import { authenticate, optionalAuthenticate } from "../shared/middlewares/auth.middleware";
+import { validate } from "../shared/middlewares/validate.middleware";
+import { getProductReviews, createReview } from "../features/order/controllers/order.controller";
+import { createReviewSchema } from "../features/order/validations/order.validation";
+import { getAllModelTypes } from "../features/model-type/controllers/modelType.controller";
+import { getSizePreferences } from "../features/size-preference/controllers/sizePreference.controller";
+
 const apiRouter = Router();
 
+// Compatibility alias: /api/categories/models -> model types
+apiRouter.get("/categories/models", getAllModelTypes);
+
+// Compatibility alias: /api/users/favorites -> favoriteRoutes
+apiRouter.use("/users/favorites", favoriteRoutes);
+
+// Compatibility alias: /api/users/preferences -> size preferences
+apiRouter.get("/users/preferences", authenticate, getSizePreferences);
+
+// Compatibility alias: /api/reviews -> product reviews
+const reviewCompatRouter = Router();
+reviewCompatRouter.get("/:productId", optionalAuthenticate, getProductReviews);
+reviewCompatRouter.post("/", authenticate, validate(createReviewSchema), createReview);
+apiRouter.use("/reviews", reviewCompatRouter);
+
+// Core feature routers
 apiRouter.use("/auth", authRoutes);
 apiRouter.use("/products", productRoutes);
 apiRouter.use("/categories", categoryRoutes);

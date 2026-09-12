@@ -24,11 +24,14 @@ export const zJsonArray = z
   .union([z.array(z.any()), z.string()])
   .transform((val) => {
     if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (!trimmed) return [];
       try {
-        return JSON.parse(val);
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed : [String(parsed)];
       } catch {
-        return [];
+        return [trimmed];
       }
     }
-    return val;
+    return Array.isArray(val) ? val : [val];
   });

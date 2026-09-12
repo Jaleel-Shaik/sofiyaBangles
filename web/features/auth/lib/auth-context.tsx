@@ -1,4 +1,3 @@
-import { api } from "@/src/lib/api";
 "use client";
 
 import {
@@ -10,6 +9,7 @@ import {
   ReactNode,
 } from "react";
 import {
+  api,
   type User,
   type LoginResponse,
   type Verify2FAResponse,

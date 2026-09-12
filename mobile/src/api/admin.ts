@@ -203,7 +203,7 @@ export const deleteCategory = async (categoryId: string) => {
 
 export const broadcastNotification = async (notificationData: any) => {
   try {
-    const res = await apiClient.post('/notifications', notificationData);
+    const res = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.BROADCAST, notificationData);
     return res.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.message || error.message || 'Failed to send notification');

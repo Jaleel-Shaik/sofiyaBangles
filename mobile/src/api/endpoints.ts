@@ -39,8 +39,20 @@ export const API_ENDPOINTS = {
   USERS: {
     BASE: '/users',
     BY_ID: (id: string) => `/users/${id}`,
-    FAVORITES: '/users/favorites',
-    FAVORITE_BY_ID: (productId: string) => `/users/favorites/${productId}`,
+  },
+  FAVORITES: {
+    BASE: '/favorites',
+    BY_ID: (productId: string) => `/favorites/${productId}`,
+  },
+  SIZE_PREFERENCES: {
+    BASE: '/size-preferences',
+    BY_ID: (id: string) => `/size-preferences/${id}`,
+  },
+  NOTIFICATIONS: {
+    BASE: '/notifications',
+    BROADCAST: '/notifications/broadcast',
+    UNREAD_COUNT: '/notifications/unread-count',
+    MARK_READ: (id: string) => `/notifications/${id}/read`,
   },
   ORDERS: {
     BASE: '/orders',

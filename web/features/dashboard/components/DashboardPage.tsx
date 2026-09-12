@@ -1,4 +1,3 @@
-import { api } from "@/src/lib/api";
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -15,7 +14,7 @@ import {
   ShieldCheck,
   ArrowUpRight,
 } from "lucide-react";
-import { type Product, type AnalyticsOverview, type Category, type ModelType } from "@/src/lib/api";
+import { api, type Product, type AnalyticsOverview, type Category, type ModelType } from "@/src/lib/api";
 import Link from "next/link";
 
 export default function DashboardPage() {

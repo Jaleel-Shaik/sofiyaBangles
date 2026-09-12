@@ -83,6 +83,14 @@ export const PRODUCTION_FALLBACK_URL = "https://api.sofiyabangles.com/api";
  *   Development (__DEV__): auto-detected Metro IP → env var → platform default
  */
 export function resolveApiBaseUrlSync(): ApiConfig {
+  // In development, prioritize Metro's dynamic host so switching WiFi/locations works automatically
+  if (__DEV__) {
+    const metroHost = detectHostFromMetro();
+    if (metroHost) {
+      return { url: buildUrl(metroHost), source: "auto-detect" };
+    }
+  }
+
   const envUrl = getEnvApiUrl();
   if (envUrl) {
     return { url: normalizeUrl(envUrl), source: "env" };
@@ -91,11 +99,6 @@ export function resolveApiBaseUrlSync(): ApiConfig {
   // In production builds, never fallback to unencrypted LAN or loopback
   if (!__DEV__) {
     return { url: PRODUCTION_FALLBACK_URL, source: "default" };
-  }
-
-  const metroHost = detectHostFromMetro();
-  if (metroHost) {
-    return { url: buildUrl(metroHost), source: "auto-detect" };
   }
 
   if (Platform.OS === "android") {

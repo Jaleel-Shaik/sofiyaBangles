@@ -7,9 +7,15 @@ import { createAuditLogModel } from "../../../shared/models/audit.model";
 export const createOrderModel = async (input: {
   userId: string;
   items: {
-    productId: string;
+    productId?: string;
+    product_id?: string;
     variantId?: string | null;
+    variant_id?: string | null;
     quantity: number;
+    price?: number;
+    product_name?: string;
+    size?: string;
+    image_url?: string | null;
   }[];
   shippingAddressSnapshot?: any;
 }): Promise<Order> => {
@@ -21,33 +27,40 @@ export const createOrderModel = async (input: {
   
   // Doing reads first for the transaction equivalent (using batch later)
   for (const item of input.items) {
-    const pDoc = await db.collection("products").doc(item.productId).get();
+    const prodId = item.productId || item.product_id;
+    if (!prodId) {
+      throw new Error("PRODUCT_ID_REQUIRED");
+    }
+    const variantId = item.variantId || item.variant_id || null;
+    const itemQuantity = Number(item.quantity) || 1;
+
+    const pDoc = await db.collection("products").doc(prodId).get();
     if (!pDoc.exists) {
-      throw new Error(`PRODUCT_NOT_FOUND: ${item.productId}`);
+      throw new Error(`PRODUCT_NOT_FOUND: ${prodId}`);
     }
     const pData = pDoc.data() as Product;
     if (pData.is_active === false) {
-      throw new Error(`PRODUCT_NOT_AVAILABLE: ${item.productId}`);
+      throw new Error(`PRODUCT_NOT_AVAILABLE: ${prodId}`);
     }
 
-    let itemPrice = pData.price;
+    let itemPrice = Number(item.price) || pData.price;
     let skuSnapshot = null;
 
-    if (item.variantId) {
-      const vDoc = await db.collection("product_variants").doc(item.variantId).get();
+    if (variantId) {
+      const vDoc = await db.collection("product_variants").doc(variantId).get();
       if (!vDoc.exists) {
-        throw new Error(`VARIANT_NOT_FOUND: ${item.variantId}`);
+        throw new Error(`VARIANT_NOT_FOUND: ${variantId}`);
       }
       const vData = vDoc.data() as ProductVariant;
       itemPrice = vData.price;
       skuSnapshot = vData.sku || null;
       
-      if (vData.quantity < item.quantity) {
-         throw new Error(`INSUFFICIENT_STOCK_FOR_VARIANT: ${item.variantId}`);
+      if (vData.quantity < itemQuantity) {
+         throw new Error(`INSUFFICIENT_STOCK_FOR_VARIANT: ${variantId}`);
       }
     } else {
-      if (pData.quantity < item.quantity) {
-         throw new Error(`INSUFFICIENT_STOCK_FOR_PRODUCT: ${item.productId}`);
+      if (pData.quantity < itemQuantity) {
+         throw new Error(`INSUFFICIENT_STOCK_FOR_PRODUCT: ${prodId}`);
       }
     }
 
@@ -59,18 +72,18 @@ export const createOrderModel = async (input: {
       }
     }
 
-    const itemSubtotal = itemPrice * item.quantity;
+    const itemSubtotal = itemPrice * itemQuantity;
     subtotal += itemSubtotal;
 
     orderItemsData.push({
-      productId: item.productId,
-      variantId: item.variantId || null,
+      productId: prodId,
+      variantId: variantId,
       categoryId: pData.category_id,
       categoryNameSnapshot: catNameSnapshot,
       productNameSnapshot: pData.product_name,
       skuSnapshot: skuSnapshot,
       priceSnapshot: itemPrice,
-      quantity: item.quantity,
+      quantity: itemQuantity,
       subtotal: itemSubtotal
     });
   }

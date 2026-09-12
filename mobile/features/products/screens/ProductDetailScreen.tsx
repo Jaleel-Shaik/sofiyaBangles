@@ -75,8 +75,8 @@ export default function ProductDetailScreen() {
 
       if (data.model_type_id) {
         try {
-          const mRes = await apiClient.get(`/categories/models`);
-          const modelType = mRes.data.data?.find((m: any) => m.id === data.model_type_id);
+          const modelTypes = await api.modelTypes.getModelTypes();
+          const modelType = modelTypes?.find((m: any) => m.id === data.model_type_id);
           if (modelType) setProductModelTypeName(modelType.name);
         } catch (e) {}
       }
@@ -89,8 +89,8 @@ export default function ProductDetailScreen() {
 
   const fetchReviews = async () => {
     try {
-      const res = await apiClient.get(`/reviews/${id}`);
-      setReviews(res.data.data || []);
+      const reviews = await api.orders.getProductReviews(id as string);
+      setReviews(reviews || []);
     } catch (error) {
       console.log(error);
     }
@@ -99,10 +99,10 @@ export default function ProductDetailScreen() {
   const fetchPreferences = async () => {
     if (!token || !user) return;
     try {
-      const res = await apiClient.get("/users/preferences");
-      if (res.data?.data) {
-        setPreferences(res.data.data.standard_preferences || []);
-        const profiles = res.data.data.custom_profiles || [];
+      const prefs = await api.sizes.getSizePreferences(user.id);
+      if (prefs) {
+        setPreferences(prefs.filter((p: any) => !p.is_custom) || []);
+        const profiles = prefs.filter((p: any) => p.is_custom) || [];
         setCustomProfiles(profiles);
         if (profiles.length > 0) {
           setSelectedCustomProfileId(profiles[0].id);
@@ -161,16 +161,6 @@ export default function ProductDetailScreen() {
       : [product.image_url || "https://images.unsplash.com/photo-1611591437281-460bfbe1220a"];
   };
 
-  const createReview = async (data: {
-    productId: string;
-    rating: number;
-    comment: string | null;
-    damageDetails: string | null;
-  }) => {
-    const response = await apiClient.post("/reviews", data);
-    return response.data;
-  };
-
   const handleMarkBought = async () => {
     if (isOrdering || !product) return;
     try {
@@ -201,7 +191,7 @@ export default function ProductDetailScreen() {
     if (isReviewSubmitting || !product) return;
     try {
       setIsReviewSubmitting(true);
-      await createReview({
+      await api.orders.createReview({
         productId: product.id,
         rating: reviewRating,
         comment: reviewText.trim() || null,

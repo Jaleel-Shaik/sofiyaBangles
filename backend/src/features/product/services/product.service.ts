@@ -24,6 +24,7 @@ import { Product, ProductImage, ProductVariant } from "../../../shared/types";
 import { createAuditLogModel } from "../../../shared/models/audit.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.validation";
 import { v2 as cloudinary } from "cloudinary";
+import "multer"; // Fix for ts-node Express.Multer resolution
 
 export const createProductService = async (
   input: CreateProductInput,

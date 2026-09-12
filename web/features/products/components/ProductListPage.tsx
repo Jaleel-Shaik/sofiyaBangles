@@ -1,4 +1,3 @@
-import { api } from "@/src/lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +5,7 @@ import { motion } from "framer-motion";
 import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { type Product, type Category } from "@/src/lib/api";
+import { api, type Product, type Category } from "@/src/lib/api";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);

@@ -20,9 +20,15 @@ router.get("/", getNotifications);
 router.get("/unread-count", getUnreadCount);
 router.patch("/:id/read", markAsRead);
 
-// Admin routes
+// Admin routes (support both /broadcast and /)
 router.post(
   "/broadcast",
+  requireRole("admin", "super_admin"),
+  validate(broadcastNotificationSchema),
+  broadcastNotification,
+);
+router.post(
+  "/",
   requireRole("admin", "super_admin"),
   validate(broadcastNotificationSchema),
   broadcastNotification,

@@ -79,7 +79,7 @@ export const adminApi = {
     }
     if (data.standard_sizes) {
        formData.append('size_type', 'standard');
-       data.standard_sizes.forEach(s => formData.append('standard_sizes', s));
+       formData.append('standard_sizes', JSON.stringify(data.standard_sizes));
     } else {
        formData.append('size_type', 'none');
     }
@@ -97,7 +97,7 @@ export const adminApi = {
     }
     if (data.standard_sizes) {
        formData.append('size_type', 'standard');
-       data.standard_sizes.forEach(s => formData.append('standard_sizes', s));
+       formData.append('standard_sizes', JSON.stringify(data.standard_sizes));
     } else if (data.standard_sizes !== undefined) {
        formData.append('size_type', 'none');
     }
