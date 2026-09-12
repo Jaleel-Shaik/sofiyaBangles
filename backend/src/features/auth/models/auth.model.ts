@@ -1,4 +1,5 @@
 import { Profile } from "../../../shared/types";
+import { db } from "../../../shared/config/firebase";
 import {
   createIdentityModel,
   findIdentityByEmailModel,
@@ -53,4 +54,25 @@ export const updateProfileModel = async (
 
   const { password_hash, ...safeData } = updated;
   return safeData as Profile;
+};
+
+export const updatePasswordHashModel = async (userId: string, collection: string, password_hash: string) => {
+  await db.collection(collection).doc(userId).update({
+    password_hash,
+    updated_at: new Date().toISOString(),
+  });
+};
+
+export const getAdminOtpModel = async (email: string) => {
+  const docRef = db.collection("admin_otps").doc(email);
+  const doc = await docRef.get();
+  return doc.exists ? doc.data() : null;
+};
+
+export const setAdminOtpModel = async (email: string, otpData: any) => {
+  await db.collection("admin_otps").doc(email).set(otpData);
+};
+
+export const deleteAdminOtpModel = async (email: string) => {
+  await db.collection("admin_otps").doc(email).delete();
 };

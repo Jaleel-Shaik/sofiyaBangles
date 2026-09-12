@@ -21,7 +21,14 @@ import {
   disable2FAService,
   getUserSessionsService,
 } from "../services/totp.service";
-import { findProfileByEmailModel, findProfileByIdModel } from "../models/auth.model";
+import { 
+  findProfileByEmailModel, 
+  setAdminOtpModel, 
+  getAdminOtpModel, 
+  deleteAdminOtpModel, 
+  updatePasswordHashModel,
+  findIdentityByEmail
+} from "../models/auth.model";
 import { findIdentityByIdModel } from "../../../shared/models/identity.model";
 import { createAuditLogModel } from "../../../shared/models/audit.model";
 import {
@@ -274,12 +281,9 @@ export const sendOtp = async (req: AuthRequest, res: Response) => {
 
     // Verify user is an admin in the admins collection
     try {
-      const snapshot = await db.collection("admins")
-        .where("email", "==", normalizedEmail)
-        .limit(1)
-        .get();
-      if (!snapshot.empty) {
-        phoneNumber = snapshot.docs[0].data().phone;
+      const identity = await findIdentityByEmail(normalizedEmail);
+      if (identity && identity.user_type === "admin") {
+        phoneNumber = identity.profile.phone || undefined;
       }
     } catch (dbErr) {
       console.log("⚠️ Firestore read error while verifying admin email:", dbErr);
@@ -304,7 +308,7 @@ export const sendOtp = async (req: AuthRequest, res: Response) => {
 
     // Store OTP
     try {
-      await db.collection("admin_otps").doc(normalizedEmail).set({
+      await setAdminOtpModel(normalizedEmail, {
         otp,
         expiresAt,
         createdAt: new Date().toISOString()
@@ -366,10 +370,9 @@ export const verifyOtp = async (req: AuthRequest, res: Response) => {
 
     // 1. Try to read from Firestore safely
     try {
-      docRef = db.collection("admin_otps").doc(email);
-      const doc = await docRef.get();
-      if (doc.exists) {
-        firestoreOtpData = doc.data();
+      const otpDoc = await getAdminOtpModel(email);
+      if (otpDoc) {
+        firestoreOtpData = otpDoc;
       }
     } catch (dbErr) {
       console.log("⚠️ Firestore read failed, ignoring.");
@@ -397,7 +400,7 @@ export const verifyOtp = async (req: AuthRequest, res: Response) => {
     // 5. Clean up OTPs safely
     memoryOtps.delete(email);
     try {
-      if (docRef) await docRef.delete();
+      await deleteAdminOtpModel(email);
     } catch (dbErr) {
       console.log("⚠️ Firestore delete failed, ignored.");
     }
@@ -406,13 +409,10 @@ export const verifyOtp = async (req: AuthRequest, res: Response) => {
     let userData: any = null;
     let uid = email;
     try {
-      const profileSnapshot = await db.collection("admins")
-        .where("email", "==", email)
-        .limit(1)
-        .get();
-      if (!profileSnapshot.empty) {
-        userData = profileSnapshot.docs[0].data();
-        uid = profileSnapshot.docs[0].id;
+      const identity = await findIdentityByEmail(email);
+      if (identity && identity.user_type === "admin") {
+        userData = identity.profile;
+        uid = identity.profile.id;
       }
     } catch (dbErr) {
       console.log("⚠️ Firestore profile fetch failed:", dbErr);
@@ -1018,10 +1018,7 @@ export const setPasswordController = async (req: AuthRequest, res: Response) => 
     const password_hash = await bcrypt.hash(password, salt);
 
     const identity = await findIdentityByIdModel(profile.id);
-    await db.collection(identity?.collection || "users").doc(profile.id).update({
-      password_hash,
-      updated_at: nowISTISO(),
-    });
+    await updatePasswordHashModel(profile.id, identity?.collection || "users", password_hash);
 
     res.json({
       success: true,
