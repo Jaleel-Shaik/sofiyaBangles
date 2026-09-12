@@ -1,19 +1,19 @@
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import { createAuditLogModel } from "../../../shared/models/audit.model";
+import { insertAuditLogDb } from "../../../db/audit.db";
 import {
-  getAllAdminsModel,
-  getAdminByEmailModel,
-  getAdminByIdModel,
-  createAdminModel,
-  updateAdminModel,
-  deleteAdminModel,
-  AdminRecord,
-} from "../models/adminStaff.model";
+  getAllAdminsDb,
+  getAdminByEmailDb,
+  getAdminByIdDb,
+  insertAdminDb,
+  updateAdminDb,
+  deleteAdminDb,
+} from "../../../db/adminStaff.db";
+import { AdminRecord } from "../../../models/adminStaff.model";
 
 export class AdminStaffService {
   static async listAdmins() {
-    const admins = await getAllAdminsModel();
+    const admins = await getAllAdminsDb();
     return admins.map((data: AdminRecord) => ({
       id: data.id,
       full_name: data.full_name || "Admin",
@@ -39,7 +39,7 @@ export class AdminStaffService {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const existingAdmin = await getAdminByEmailModel(normalizedEmail);
+    const existingAdmin = await getAdminByEmailDb(normalizedEmail);
     
     if (existingAdmin) {
       throw new Error("ADMIN_EXISTS");
@@ -74,9 +74,9 @@ export class AdminStaffService {
       updated_at: now,
     };
 
-    await createAdminModel(adminId, newAdminData);
+    await insertAdminDb(adminId, newAdminData);
 
-    await createAuditLogModel({
+    await insertAuditLogDb({
       actor_id: actorId,
       action: "ADMIN_STAFF_CREATED",
       table_name: "admins",
@@ -92,7 +92,7 @@ export class AdminStaffService {
       throw new Error("INVALID_STATUS");
     }
 
-    const admin = await getAdminByIdModel(id);
+    const admin = await getAdminByIdDb(id);
     if (!admin) {
       throw new Error("ADMIN_NOT_FOUND");
     }
@@ -102,13 +102,13 @@ export class AdminStaffService {
     }
 
     const now = new Date().toISOString();
-    await updateAdminModel(id, {
+    await updateAdminDb(id, {
       isActive,
       is_active: isActive,
       updated_at: now,
     });
 
-    await createAuditLogModel({
+    await insertAuditLogDb({
       actor_id: actorId,
       action: isActive ? "ADMIN_STAFF_ACTIVATED" : "ADMIN_STAFF_DEACTIVATED",
       table_name: "admins",
@@ -121,7 +121,7 @@ export class AdminStaffService {
   }
 
   static async deleteAdmin(id: string, actorId: string) {
-    const admin = await getAdminByIdModel(id);
+    const admin = await getAdminByIdDb(id);
     if (!admin) {
       throw new Error("ADMIN_NOT_FOUND");
     }
@@ -130,9 +130,9 @@ export class AdminStaffService {
       throw new Error("CANNOT_DELETE_SUPERADMIN");
     }
 
-    await deleteAdminModel(id);
+    await deleteAdminDb(id);
 
-    await createAuditLogModel({
+    await insertAuditLogDb({
       actor_id: actorId,
       action: "ADMIN_STAFF_DELETED",
       table_name: "admins",

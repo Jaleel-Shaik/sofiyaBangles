@@ -1,27 +1,29 @@
 import { uploadMultipleToCloudinary } from "../../../shared/utils/cloudinary-upload";
 import {
-  createProductModel,
-  getProductsModel,
-  getAdminProductsModel,
-  getProductByIdModel,
-  updateProductModel,
-  deleteProductModel,
-  restoreProductModel,
-  deleteProductsByCategoryModel,
-  deleteFavoritesByProductModel,
-  deleteFavoritesByProductsModel,
-  deleteReviewsByProductModel,
-  nullifyNotificationProductRef,
-  searchProductsModel,
-  getRecommendedProductsModel,
-  getNewArrivalsModel,
-  generateNextProductCodeModel,
-} from "../models/product.model";
-import { getModelTypeByIdModel } from "../../model-type/models/modelType.model";
-import { getCategoryByIdModel } from "../../category/models/category.model";
+  generateNextProductSequenceDb,
+  insertProductWithRelationsDb,
+  getProductByIdDb,
+  getActiveProductsDb,
+  getAllAdminProductsDb,
+  updateProductWithRelationsDb,
+  updateProductDocDb,
+  softDeleteProductDb,
+  restoreProductDb,
+  deleteProductsByCategoryBatchDb,
+  getVariantsByProductDb,
+  getImagesByProductDb,
+  deleteFavoritesByProductDb,
+  deleteReviewsByProductDb,
+  nullifyNotificationProductRefDb,
+} from "../../../db/product.db";
+import { getCategoryByIdDb, getCategoriesDb } from "../../../db/category.db";
+import { getModelTypeByIdDb } from "../../../db/modelType.db";
+import { isFavoritedDb } from "../../../db/favorite.db";
+import { getSizePreferencesDb } from "../../../db/sizePreference.db";
+import { insertAuditLogDb } from "../../../db/audit.db";
 import { v4 as uuidv4 } from "uuid";
-import { Product, ProductImage, ProductVariant } from "../../../shared/types";
-import { createAuditLogModel } from "../../../shared/models/audit.model";
+import { Product, ProductImage, ProductVariant } from "../../../models/product.model";
+import { UserSizePreference } from "../../../models/sizePreference.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.validation";
 import { v2 as cloudinary } from "cloudinary";
 import "multer"; // Fix for ts-node Express.Multer resolution
@@ -39,21 +41,45 @@ interface VariantInput {
   [key: string]: unknown;
 }
 
+/**
+ * Domain filter for user size preferences.
+ */
+const applySizeFilter = (p: Product, prefs: UserSizePreference[]): boolean => {
+  if (!p.category_id) return true;
+  const pref = prefs.find((pr) => pr.category_id === p.category_id);
+  if (!pref) return true;
+
+  if (pref.is_custom) {
+    return p.accepts_custom_size === true;
+  } else {
+    if (p.has_variants) {
+      if (!p.variants || p.variants.length === 0) return false;
+      return p.variants.some(
+        (v) => v.size === pref.standard_size && v.quantity > 0
+      );
+    } else {
+      return true;
+    }
+  }
+};
+
+/**
+ * Service: Create a new product with relations (variants, images)
+ */
 export const createProductService = async (
   input: CreateProductInput,
   files: Express.Multer.File[] | undefined,
   actorId: string,
   actorRole?: 'admin' | 'super_admin',
 ) => {
-  // ── CENTRAL INTEGRITY RULE ─────────────────────────────────────
   // 1. Validate model_type exists
-  const mtDoc = await getModelTypeByIdModel(input.model_type_id);
+  const mtDoc = await getModelTypeByIdDb(input.model_type_id);
   if (!mtDoc) {
     throw new Error("MODEL_TYPE_NOT_FOUND");
   }
 
   // 2. Validate category exists and is active
-  const catDoc = await getCategoryByIdModel(input.category_id);
+  const catDoc = await getCategoryByIdDb(input.category_id);
   if (!catDoc || catDoc.is_active === false) {
     throw new Error("CATEGORY_NOT_FOUND");
   }
@@ -62,7 +88,6 @@ export const createProductService = async (
   if (catDoc.model_type_id !== input.model_type_id) {
     throw new Error("INVALID_MODEL_CATEGORY_RELATIONSHIP");
   }
-  // ────────────────────────────────────────────────────────────────
 
   let allImageUrls: string[] = [];
   
@@ -77,7 +102,7 @@ export const createProductService = async (
 
   let generatedCode = input.unique_code;
   if (!generatedCode) {
-    generatedCode = await generateNextProductCodeModel(input.model_type_id, mtDoc.name || "PRD");
+    generatedCode = await generateNextProductSequenceDb(input.model_type_id, mtDoc.name || "PRD");
   }
 
   const newId = uuidv4();
@@ -144,10 +169,10 @@ export const createProductService = async (
     });
   }
 
-  const product = await createProductModel(productData, variants, images);
+  const product = await insertProductWithRelationsDb(productData, variants, images);
 
   // Audit log
-  await createAuditLogModel({
+  await insertAuditLogDb({
     actor_id: actorId,
     action: "PRODUCT_CREATED",
     table_name: "products",
@@ -158,46 +183,131 @@ export const createProductService = async (
   return product;
 };
 
+/**
+ * Service: Query active products with size filtering, search, pagination, and category enrichment.
+ */
 export const getProductsService = async (options: {
   page?: number;
   limit?: number;
   categoryId?: string;
   search?: string;
   userId?: string;
-}) => {
+}): Promise<{ products: Product[]; total: number }> => {
   const page = Math.max(1, Math.floor(Number(options.page) || 1));
   const limit = Math.max(1, Math.min(100, Math.floor(Number(options.limit) || 20)));
 
-  return getProductsModel({
-    page,
-    limit,
-    categoryId: options.categoryId,
-    search: options.search,
-    userId: options.userId,
-  });
-};
+  let allProducts = await getActiveProductsDb(options.categoryId);
 
-export const getAdminProductsService = async (options: {
-  page?: number;
-  limit?: number;
-}) => {
-  const page = Math.max(1, Math.floor(Number(options.page) || 1));
-  const limit = Math.max(1, Math.min(100, Math.floor(Number(options.limit) || 20)));
-
-  return getAdminProductsModel({ page, limit });
-};
-
-export const getProductByIdService = async (id: string, userId?: string) => {
-  const product = await getProductByIdModel(id, userId);
-  if (!product) {
-    throw new Error("PRODUCT_NOT_FOUND");
+  let sizePreferences: UserSizePreference[] = [];
+  if (options.userId) {
+    sizePreferences = await getSizePreferencesDb(options.userId);
   }
-  return product;
+
+  if (sizePreferences.length > 0) {
+    allProducts = allProducts.filter((p) => applySizeFilter(p, sizePreferences));
+  }
+
+  allProducts.sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  if (options.search) {
+    const lowerSearch = options.search.toLowerCase();
+    allProducts = allProducts.filter(
+      (p) =>
+        (p.product_name && p.product_name.toLowerCase().includes(lowerSearch)) ||
+        (p.description && p.description.toLowerCase().includes(lowerSearch))
+    );
+  }
+
+  const total = allProducts.length;
+  const offset = (page - 1) * limit;
+  const paginatedProducts = allProducts.slice(offset, offset + limit);
+
+  const categories = await getCategoriesDb();
+  const categoryMap = new Map(categories.map((c) => [c.id, c.category_name]));
+
+  const productsWithDetails = await Promise.all(
+    paginatedProducts.map(async (p) => {
+      const category_name = p.category_id ? categoryMap.get(p.category_id) : undefined;
+      const is_favorited = options.userId ? await isFavoritedDb(options.userId, p.id) : false;
+      const variants = await getVariantsByProductDb(p.id);
+      const images = await getImagesByProductDb(p.id);
+
+      return { ...p, category_name, is_favorited, variants, images };
+    })
+  );
+
+  return { products: productsWithDetails, total };
 };
 
 /**
- * Extract Cloudinary public IDs from secure URLs so we can delete them.
- * Cloudinary URLs look like: https://res.cloudinary.com/.../v1234/sofiya_bangles/products/abc123.jpg
+ * Service: Query products for Admin dashboard with variants and images.
+ */
+export const getAdminProductsService = async (options: {
+  page?: number;
+  limit?: number;
+}): Promise<{ products: Product[]; total: number }> => {
+  const page = Math.max(1, Math.floor(Number(options.page) || 1));
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(options.limit) || 20)));
+
+  let allProducts = await getAllAdminProductsDb();
+  allProducts = allProducts.filter((p) => p.is_active !== false);
+
+  const total = allProducts.length;
+  const offset = (page - 1) * limit;
+  const products = allProducts.slice(offset, offset + limit);
+
+  const productsWithDetails = await Promise.all(
+    products.map(async (p) => {
+      const variants = await getVariantsByProductDb(p.id);
+      const images = await getImagesByProductDb(p.id);
+      return { ...p, variants, images };
+    })
+  );
+
+  return { products: productsWithDetails, total };
+};
+
+/**
+ * Service: Get single product by ID with full details.
+ */
+export const getProductByIdService = async (id: string, userId?: string): Promise<Product> => {
+  const product = await getProductByIdDb(id);
+  if (!product) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+
+  let category_name = undefined;
+  let model_type_id = product.model_type_id;
+
+  const categories = await getCategoriesDb();
+  const cat = categories.find((c) => c.id === product.category_id);
+  if (cat) {
+    category_name = cat.category_name;
+    if (!model_type_id) {
+      model_type_id = cat.model_type_id;
+    }
+  }
+
+  const is_favorited = userId ? await isFavoritedDb(userId, id) : false;
+  const variants = await getVariantsByProductDb(id);
+  const images = await getImagesByProductDb(id);
+
+  return {
+    ...product,
+    category_name,
+    model_type_id: model_type_id || "",
+    is_favorited,
+    variants,
+    images,
+  };
+};
+
+/**
+ * Extract Cloudinary public IDs from secure URLs.
  */
 const extractCloudinaryPublicIds = (imageUrls: string[]): string[] => {
   const publicIds: string[] = [];
@@ -220,7 +330,7 @@ const extractCloudinaryPublicIds = (imageUrls: string[]): string[] => {
 };
 
 /**
- * Delete images from Cloudinary. Non-blocking — logs errors instead of throwing.
+ * Delete images from Cloudinary. Non-blocking.
  */
 const cleanupCloudinaryImages = async (imageUrls: string[]) => {
   if (!imageUrls || imageUrls.length === 0) return;
@@ -235,24 +345,25 @@ const cleanupCloudinaryImages = async (imageUrls: string[]) => {
   }
 };
 
+/**
+ * Service: Update product details, relations, and manage Cloudinary image lifecycles.
+ */
 export const updateProductService = async (
   id: string,
   input: UpdateProductInput & { existing_images?: string | string[] },
   files: Express.Multer.File[] | undefined,
   actorId: string,
 ) => {
-  // Verify product exists
-  const existing = await getProductByIdModel(id);
+  const existing = await getProductByIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  // ── CENTRAL INTEGRITY RULE (UPDATE) ──────────────────────────
   const targetCategoryId = input.category_id || existing.category_id;
   const targetModelTypeId = input.model_type_id || existing.model_type_id;
 
   if (targetCategoryId && targetModelTypeId) {
-    const catDoc = await getCategoryByIdModel(targetCategoryId);
+    const catDoc = await getCategoryByIdDb(targetCategoryId);
     if (!catDoc || catDoc.is_active === false) {
       throw new Error("CATEGORY_NOT_FOUND");
     }
@@ -260,14 +371,14 @@ export const updateProductService = async (
       throw new Error("INVALID_MODEL_CATEGORY_RELATIONSHIP");
     }
   }
-  // ────────────────────────────────────────────────────────────────
 
   let imageUrls: string[] | undefined;
   if (files && files.length > 0) {
     imageUrls = await uploadMultipleToCloudinary(files);
   }
 
-  const existingImagesUrls: string[] = (existing.images || []).map((img: any) => typeof img === 'string' ? img : img.image_url);
+  const existingImagesList = await getImagesByProductDb(id);
+  const existingImagesUrls: string[] = existingImagesList.map((img) => img.image_url);
 
   const existingImages: string[] = input.existing_images !== undefined
     ? (Array.isArray(input.existing_images)
@@ -283,7 +394,7 @@ export const updateProductService = async (
 
   const { existing_images, ...restInput } = input;
   
-  const formattedImages = mergedImages.map((url, idx) => ({
+  const formattedImages: ProductImage[] = mergedImages.map((url, idx) => ({
     id: uuidv4(),
     product_id: id,
     image_url: url,
@@ -334,12 +445,15 @@ export const updateProductService = async (
     }
   }
 
-  const product = await updateProductModel(id, {
+  const product = await updateProductWithRelationsDb(id, {
     ...productFields,
     updated_by: actorId,
   }, formattedVariants, images !== undefined ? formattedImages : undefined);
 
-  // Identify old images that were replaced (non-blocking cleanup)
+  if (!product) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+
   if (existingImagesUrls.length > 0) {
     const removedImages = existingImagesUrls.filter(
       (imgUrl: string) => !mergedImages.includes(imgUrl)
@@ -351,8 +465,7 @@ export const updateProductService = async (
     }
   }
 
-  // Audit log
-  await createAuditLogModel({
+  await insertAuditLogDb({
     actor_id: actorId,
     action: "PRODUCT_UPDATED",
     table_name: "products",
@@ -364,20 +477,22 @@ export const updateProductService = async (
   return product;
 };
 
+/**
+ * Service: Update product inventory stock.
+ */
 export const updateStockService = async (
   id: string,
   quantity: number,
   actorId: string,
 ) => {
-  const existing = await getProductByIdModel(id);
+  const existing = await getProductByIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  const product = await updateProductModel(id, { quantity });
+  const product = await updateProductDocDb(id, { quantity });
 
-  // Audit log
-  await createAuditLogModel({
+  await insertAuditLogDb({
     actor_id: actorId,
     action: "STOCK_UPDATED",
     table_name: "products",
@@ -389,12 +504,15 @@ export const updateStockService = async (
   return product;
 };
 
+/**
+ * Service: Deduct inventory upon sale.
+ */
 export const sellProductService = async (
   id: string,
   quantity: number,
   actorId: string,
 ) => {
-  const existing = await getProductByIdModel(id);
+  const existing = await getProductByIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
@@ -402,9 +520,9 @@ export const sellProductService = async (
     throw new Error("INSUFFICIENT_STOCK");
   }
   const newQuantity = existing.quantity - quantity;
-  const product = await updateProductModel(id, { quantity: newQuantity });
+  const product = await updateProductDocDb(id, { quantity: newQuantity });
 
-  await createAuditLogModel({
+  await insertAuditLogDb({
     actor_id: actorId,
     action: "PRODUCT_SOLD",
     table_name: "products",
@@ -416,35 +534,34 @@ export const sellProductService = async (
   return product;
 };
 
+/**
+ * Service: Soft delete product and cascade cleanups.
+ */
 export const deleteProductService = async (id: string, actorId: string) => {
-  const existing = await getProductByIdModel(id);
+  const existing = await getProductByIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  // Soft-delete the product document
-  const deletedProduct = await deleteProductModel(id);
+  const deletedProduct = await softDeleteProductDb(id);
   if (!deletedProduct) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  // Cascade: delete orphaned favorite records
-  deleteFavoritesByProductModel(id).catch((err) =>
+  deleteFavoritesByProductDb(id).catch((err) =>
     console.error("Failed to cleanup favorites (non-fatal):", err)
   );
 
-  // Cascade: delete product reviews
-  deleteReviewsByProductModel(id).catch((err) =>
+  deleteReviewsByProductDb(id).catch((err) =>
     console.error("Failed to cleanup reviews (non-fatal):", err)
   );
 
-  // Cascade: nullify notification references to this product
-  nullifyNotificationProductRef(id).catch((err) =>
+  nullifyNotificationProductRefDb(id).catch((err) =>
     console.error("Failed to cleanup notification refs (non-fatal):", err)
   );
 
-  // Clean up Cloudinary images (non-blocking)
-  const existingImagesUrls = (existing.images || []).map((img: any) => typeof img === 'string' ? img : img.image_url);
+  const existingImagesList = await getImagesByProductDb(id);
+  const existingImagesUrls = existingImagesList.map((img) => img.image_url);
   const allImageUrls = [
     ...existingImagesUrls,
     ...(existing.image_url ? [existing.image_url] : []),
@@ -455,8 +572,7 @@ export const deleteProductService = async (id: string, actorId: string) => {
     );
   }
 
-  // Audit log
-  await createAuditLogModel({
+  await insertAuditLogDb({
     actor_id: actorId,
     action: "PRODUCT_DELETED",
     table_name: "products",
@@ -465,20 +581,25 @@ export const deleteProductService = async (id: string, actorId: string) => {
   });
 };
 
+/**
+ * Service: Restore soft-deleted product.
+ */
 export const restoreProductService = async (id: string, actorId: string) => {
-  const existing = await getProductByIdModel(id);
+  const existing = await getProductByIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
   if (existing.is_active) {
-    // Already active — idempotent
     return existing;
   }
 
-  const product = await restoreProductModel(id);
+  const product = await restoreProductDb(id);
+  if (!product) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
 
-  await createAuditLogModel({
+  await insertAuditLogDb({
     actor_id: actorId,
     action: "PRODUCT_RESTORED",
     table_name: "products",
@@ -490,19 +611,15 @@ export const restoreProductService = async (id: string, actorId: string) => {
 };
 
 /**
- * Hard-delete all products linked to a given category.
- * Called when a category is deleted (cascade).
- * Also cleans up Cloudinary images for the deleted products.
- * Returns the count of products that were cascade-deleted.
+ * Service: Cascade delete products by category.
  */
 export const deleteProductsByCategoryService = async (
   categoryId: string,
   actorId: string,
 ): Promise<number> => {
-  const deletedProducts = await deleteProductsByCategoryModel(categoryId);
+  const deletedProducts = await deleteProductsByCategoryBatchDb(categoryId);
 
   if (deletedProducts.length > 0) {
-    // Clean up Cloudinary images (non-blocking)
     const allImageUrls: string[] = [];
     for (const product of deletedProducts) {
       if (product.image_url) allImageUrls.push(product.image_url);
@@ -516,8 +633,7 @@ export const deleteProductsByCategoryService = async (
       );
     }
 
-    // Audit log for batch deletion
-    await createAuditLogModel({
+    await insertAuditLogDb({
       actor_id: actorId,
       action: "PRODUCTS_CASCADE_DELETED",
       table_name: "products",
@@ -529,41 +645,43 @@ export const deleteProductsByCategoryService = async (
   return deletedProducts.length;
 };
 
+/**
+ * Service: Search products.
+ */
 export const searchProductsService = async (query: string, limit?: number, userId?: string) => {
-  return searchProductsModel(query, limit, userId);
+  const res = await getProductsService({ page: 1, limit: limit || 20, search: query, userId });
+  return res.products;
 };
 
+/**
+ * Service: Recommended products.
+ */
 export const getRecommendedProductsService = async (options: {
   page?: number;
   limit?: number;
   search?: string;
   userId?: string;
 }) => {
-  const page = options.page || 1;
-  const limit = Math.min(options.limit || 20, 100);
-
-  return getRecommendedProductsModel({
-    page,
-    limit,
+  return getProductsService({
+    page: options.page || 1,
+    limit: Math.min(options.limit || 20, 100),
     search: options.search,
     userId: options.userId,
   });
 };
 
+/**
+ * Service: New arrivals.
+ */
 export const getNewArrivalsService = async (options: {
   daysAgo?: number;
   page?: number;
   limit?: number;
   userId?: string;
 }) => {
-  const page = options.page || 1;
-  const limit = Math.min(options.limit || 20, 100);
-  const daysAgo = options.daysAgo || 7;
-
-  return getNewArrivalsModel({
-    daysAgo,
-    page,
-    limit,
+  return getProductsService({
+    page: options.page || 1,
+    limit: Math.min(options.limit || 20, 100),
     userId: options.userId,
   });
 };

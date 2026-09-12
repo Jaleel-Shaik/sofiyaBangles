@@ -1,13 +1,18 @@
 import { Request, Response } from "express";
-import { getBusinessProfileModel, updateBusinessProfileModel } from "../models/settings.model";
-import { ApiResponse, BusinessProfile } from "../../../shared/types";
+import {
+  getBusinessProfileService,
+  updateBusinessProfileService,
+  uploadBusinessLogoService,
+} from "../services/settings.service";
+import { BusinessProfile } from "../../../models/settings.model";
+import { ApiResponse } from "../../../shared/types";
 
 export const getBusinessProfile = async (
   req: Request,
   res: Response<ApiResponse<BusinessProfile>>,
 ) => {
   try {
-    const profile = await getBusinessProfileModel();
+    const profile = await getBusinessProfileService();
     res.json({
       success: true,
       data: profile,
@@ -28,8 +33,7 @@ export const updateBusinessProfile = async (
 ) => {
   try {
     const data = req.body;
-    
-    const updatedProfile = await updateBusinessProfileModel(data);
+    const updatedProfile = await updateBusinessProfileService(data);
     
     res.json({
       success: true,
@@ -60,28 +64,7 @@ export const uploadBusinessLogo = async (
       return;
     }
 
-    const { v2: cloudinary } = require("cloudinary");
-    const streamifier = require("streamifier");
-    const { env } = require("../../shared/config/env");
-
-    cloudinary.config({
-      cloud_name: env.CLOUD_NAME,
-      api_key: env.CLOUD_API_KEY,
-      api_secret: env.CLOUD_API_SECRET,
-    });
-
-    const logoUrl: string = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: "sofiya_bangles/logos" },
-        (error: any, result: any) => {
-          if (result) resolve(result.secure_url);
-          else reject(error);
-        }
-      );
-      streamifier.createReadStream(file.buffer).pipe(stream);
-    });
-
-    const updatedProfile = await updateBusinessProfileModel({ logo_url: logoUrl });
+    const updatedProfile = await uploadBusinessLogoService(file);
 
     res.json({
       success: true,

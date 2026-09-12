@@ -261,14 +261,18 @@ export interface Order {
   status: "pending" | "confirmed" | "processing" | "shipped" | "out_for_delivery" | "delivered" | "completed" | "cancelled" | "return_requested" | "returned";
   payment_status: "pending" | "paid" | "failed" | "refunded" | "partially_refunded";
   subtotal: number;
-  discount: number;
-  shipping_amount: number;
-  tax_amount: number;
+  discount?: number;
+  shipping_amount?: number;
+  tax_amount?: number;
+  shipping_fee?: number;
+  discount_amount?: number;
   total_amount: number;
   shipping_address_snapshot?: Address | null;
   completed_at?: string | null;
   refunded_at?: string | null;
   refund_reason?: string | null;
+  notes?: string | null;
+  items?: OrderItem[];
   created_at: string;
   updated_at: string;
 }
@@ -282,6 +286,7 @@ export interface OrderItem {
   category_name_snapshot?: string;
   product_name_snapshot: string;
   sku_snapshot?: string | null;
+  size_snapshot?: string | null;
   price_snapshot: number;
   quantity: number;
   subtotal: number;

@@ -1,50 +1,24 @@
-import { db } from "../../../shared/config/firebase";
+/**
+ * Feature Model: AdminStaff
+ * Re-exports pure data models from src/models/adminStaff.model
+ * Re-exports database operations from src/db/adminStaff.db for backward-compatible module resolution.
+ */
 
-export interface AdminRecord {
-  id: string;
-  full_name?: string;
-  email?: string;
-  phone?: string | null;
-  role?: string;
-  isActive?: boolean;
-  is_active?: boolean;
-  twoFactorEnabled?: boolean;
-  is_2fa_enabled?: boolean;
-  created_at?: string | null;
-  updated_at?: string | null;
-  [key: string]: unknown;
-}
+export * from "../../../models/adminStaff.model";
+import {
+  getAllAdminsDb,
+  getAdminByEmailDb,
+  getAdminByIdDb,
+  insertAdminDb,
+  updateAdminDb,
+  deleteAdminDb,
+} from "../../../db/adminStaff.db";
 
-export const getAllAdminsModel = async (): Promise<AdminRecord[]> => {
-  const snapshot = await db.collection("admins").get();
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...(doc.data() as Record<string, unknown>),
-  }));
-};
-
-export const getAdminByEmailModel = async (email: string): Promise<AdminRecord | null> => {
-  const snapshot = await db.collection("admins").where("email", "==", email).limit(1).get();
-  if (snapshot.empty) return null;
-  const doc = snapshot.docs[0];
-  return { id: doc.id, ...(doc.data() as Record<string, unknown>) };
-};
-
-export const getAdminByIdModel = async (id: string): Promise<AdminRecord | null> => {
-  const doc = await db.collection("admins").doc(id).get();
-  if (!doc.exists) return null;
-  return { id: doc.id, ...(doc.data() as Record<string, unknown>) };
-};
-
-export const createAdminModel = async (adminId: string, adminData: Record<string, unknown>): Promise<Record<string, unknown>> => {
-  await db.collection("admins").doc(adminId).set(adminData);
-  return adminData;
-};
-
-export const updateAdminModel = async (id: string, updateData: Record<string, unknown>): Promise<void> => {
-  await db.collection("admins").doc(id).update(updateData);
-};
-
-export const deleteAdminModel = async (id: string): Promise<void> => {
-  await db.collection("admins").doc(id).delete();
+export {
+  getAllAdminsDb as getAllAdminsModel,
+  getAdminByEmailDb as getAdminByEmailModel,
+  getAdminByIdDb as getAdminByIdModel,
+  insertAdminDb as createAdminModel,
+  updateAdminDb as updateAdminModel,
+  deleteAdminDb as deleteAdminModel,
 };

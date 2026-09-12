@@ -1,18 +1,22 @@
-import { Profile } from "../../../shared/types";
-import { db } from "../../../shared/config/firebase";
-import {
-  createIdentityModel,
-  findIdentityByEmailModel,
-  findIdentityByIdModel,
-  updateIdentityModel,
-  IdentityRef,
-} from "../../../shared/models/identity.model";
-
 /**
- * Account storage is split across "users" and "admins" collections.
- * All CRUD goes through the shared identity model so the split stays
- * consistent everywhere.
+ * Feature Model: Auth & Identity
+ * Re-exports pure data models from src/models/auth.model
+ * Re-exports database operations from src/db/auth.db for backward-compatible module resolution.
  */
+
+export * from "../../../models/auth.model";
+import {
+  findIdentityByEmailDb,
+  findIdentityByIdDb,
+  insertIdentityDb,
+  updateIdentityDb,
+  updatePasswordHashDb,
+  getAdminOtpDb,
+  setAdminOtpDb,
+  deleteAdminOtpDb,
+} from "../../../db/auth.db";
+import { Profile } from "../../../shared/types";
+
 export const createProfileModel = async (data: {
   full_name: string;
   email: string;
@@ -21,58 +25,40 @@ export const createProfileModel = async (data: {
   role?: string;
   avatar_url?: string;
 }): Promise<Profile> => {
-  const ref = await createIdentityModel(data);
+  const ref = await insertIdentityDb(data);
   return ref.profile;
 };
 
-export const findProfileByEmailModel = async (
-  email: string,
-): Promise<Profile | null> => {
-  const identity = await findIdentityByEmailModel(email);
+export const findProfileByEmailModel = async (email: string): Promise<Profile | null> => {
+  const identity = await findIdentityByEmailDb(email);
   return identity ? identity.profile : null;
 };
 
-export const findProfileByIdModel = async (
-  id: string,
-): Promise<Profile | null> => {
-  const identity = await findIdentityByIdModel(id);
+export const findProfileByIdModel = async (id: string): Promise<Profile | null> => {
+  const identity = await findIdentityByIdDb(id);
   return identity ? identity.profile : null;
 };
 
-export const findIdentityByEmail = findIdentityByEmailModel;
-export const findIdentityById = findIdentityByIdModel;
+export const findIdentityByEmail = findIdentityByEmailDb;
+export const findIdentityById = findIdentityByIdDb;
 
 export const updateProfileModel = async (
   id: string,
   data: Partial<Pick<Profile, "full_name" | "phone" | "avatar_url" | "expo_push_token">>,
 ): Promise<Profile> => {
-  const identity = await findIdentityByIdModel(id);
+  const identity = await findIdentityByIdDb(id);
   if (!identity) throw new Error("USER_NOT_FOUND");
 
-  const updated = await updateIdentityModel(id, identity.user_type, data);
+  const updated = await updateIdentityDb(id, identity.user_type, data);
   if (!updated) throw new Error("USER_NOT_FOUND");
 
   const { password_hash, ...safeData } = updated;
   return safeData as Profile;
 };
 
-export const updatePasswordHashModel = async (userId: string, collection: string, password_hash: string) => {
-  await db.collection(collection).doc(userId).update({
-    password_hash,
-    updated_at: new Date().toISOString(),
-  });
-};
-
-export const getAdminOtpModel = async (email: string) => {
-  const docRef = db.collection("admin_otps").doc(email);
-  const doc = await docRef.get();
-  return doc.exists ? doc.data() : null;
-};
-
-export const setAdminOtpModel = async (email: string, otpData: any) => {
-  await db.collection("admin_otps").doc(email).set(otpData);
-};
-
-export const deleteAdminOtpModel = async (email: string) => {
-  await db.collection("admin_otps").doc(email).delete();
+export {
+  updatePasswordHashDb as updatePasswordHashModel,
+  getAdminOtpDb as getAdminOtpModel,
+  setAdminOtpDb as setAdminOtpModel,
+  deleteAdminOtpDb as deleteAdminOtpModel,
 };

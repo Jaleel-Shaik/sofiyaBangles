@@ -43,7 +43,7 @@ export const getAdminOrders = async (req: AuthRequest, res: Response) => {
     const status = req.query.status as string;
     const search = req.query.search as string;
 
-    const result = await OrderService.getAdminOrders({ page, limit, status, search });
+    const result = await OrderService.getAllAdminOrders({ page, limit, status, search });
 
     res.json({
       success: true,
@@ -122,10 +122,12 @@ export const createReview = async (req: AuthRequest, res: Response) => {
 
     const review = await OrderService.createReview(
       req.user!.userId,
-      productId,
-      rating,
-      comment,
-      damageDetails
+      {
+        productId,
+        rating,
+        comment,
+        customerName: req.body.customerName || req.body.customer_name,
+      }
     );
 
     res.status(201).json({ success: true, data: review });

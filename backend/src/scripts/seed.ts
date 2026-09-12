@@ -1,43 +1,43 @@
-import { createCategoryModel } from '../features/category/models/category.model';
+import { createCategoryService } from '../features/category/services/category.service';
 import { createProductService } from '../features/product/services/product.service';
 import { createProductSchema } from '../features/product/validations/product.validation';
-import { createModelTypeModel, getModelTypesModel } from '../features/model-type/models/modelType.model';
+import { createModelTypeService, getAllModelTypesService } from '../features/model-type/services/modelType.service';
 
 const seedData = async () => {
   try {
     console.log('Fetching or creating "bangles" model type...');
-    const modelTypes = await getModelTypesModel();
+    const modelTypes = await getAllModelTypesService();
     let banglesMT = modelTypes.find(mt => mt.name?.toLowerCase() === 'bangles');
     
     if (!banglesMT) {
       console.log('Creating "bangles" model type...');
-      banglesMT = await createModelTypeModel({ name: 'bangles' });
+      banglesMT = await createModelTypeService({ name: 'bangles' });
     }
     
     const model_type_id = banglesMT.id;
     console.log(`Using Model Type ID: ${model_type_id}`);
 
     console.log('Seeding categories...');
-    const bridal = await createCategoryModel({
+    const bridal = await createCategoryService({
       category_name: 'Bridal',
       image_url: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a',
       display_order: 1,
       model_type_id
-    });
+    }, undefined, 'seed-script');
 
-    const glass = await createCategoryModel({
+    const glass = await createCategoryService({
       category_name: 'Glass Bangles',
       image_url: 'https://images.unsplash.com/photo-1617038260897-41a1f14a8ca5',
       display_order: 2,
       model_type_id
-    });
+    }, undefined, 'seed-script');
 
-    const stone = await createCategoryModel({
+    const stone = await createCategoryService({
       category_name: 'Stone Studded',
       image_url: 'https://images.unsplash.com/photo-1588444837495-c6cfeb53f32d',
       display_order: 3,
       model_type_id
-    });
+    }, undefined, 'seed-script');
 
     console.log('Seeding products...');
     

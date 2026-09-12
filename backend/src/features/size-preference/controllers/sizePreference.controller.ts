@@ -2,15 +2,15 @@ import { Response } from "express";
 import { AuthRequest } from "../../../shared/types";
 import { getParam } from "../../../shared/utils/params";
 import {
-  getSizePreferencesModel,
-  createSizePreferenceModel,
-  updateSizePreferenceModel,
-  deleteSizePreferenceModel
-} from "../models/sizePreference.model";
+  getSizePreferencesService,
+  createSizePreferenceService,
+  updateSizePreferenceService,
+  deleteSizePreferenceService,
+} from "../services/sizePreference.service";
 
 export const getSizePreferences = async (req: AuthRequest, res: Response) => {
   try {
-    const preferences = await getSizePreferencesModel(req.user!.userId);
+    const preferences = await getSizePreferencesService(req.user!.userId);
     res.json({
       success: true,
       data: preferences,
@@ -26,9 +26,9 @@ export const getSizePreferences = async (req: AuthRequest, res: Response) => {
 
 export const createSizePreference = async (req: AuthRequest, res: Response) => {
   try {
-    const preference = await createSizePreferenceModel({
+    const preference = await createSizePreferenceService({
       ...req.body,
-      user_id: req.user!.userId
+      user_id: req.user!.userId,
     });
 
     res.status(201).json({
@@ -48,7 +48,7 @@ export const createSizePreference = async (req: AuthRequest, res: Response) => {
 export const updateSizePreference = async (req: AuthRequest, res: Response) => {
   try {
     const id = getParam(req, "id");
-    const preference = await updateSizePreferenceModel(id, req.user!.userId, req.body);
+    const preference = await updateSizePreferenceService(id, req.user!.userId, req.body);
 
     res.json({
       success: true,
@@ -75,7 +75,7 @@ export const updateSizePreference = async (req: AuthRequest, res: Response) => {
 export const deleteSizePreference = async (req: AuthRequest, res: Response) => {
   try {
     const id = getParam(req, "id");
-    await deleteSizePreferenceModel(id, req.user!.userId);
+    await deleteSizePreferenceService(id, req.user!.userId);
 
     res.json({
       success: true,

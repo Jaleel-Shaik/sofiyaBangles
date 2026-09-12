@@ -1,17 +1,17 @@
 import bcrypt from "bcryptjs";
 import {
-  createProfileModel,
-  findProfileByEmailModel,
-  findProfileByIdModel,
-  updateProfileModel,
-} from "../models/auth.model";
+  findIdentityByEmailDb,
+  findIdentityByIdDb,
+  insertIdentityDb,
+  updateIdentityDb,
+} from "../../../db/auth.db";
 import { generateToken } from "../../../shared/middlewares/auth.middleware";
 import { RegisterInput, LoginInput } from "../validations/auth.validation";
-import { createAuditLogModel } from "../../../shared/models/audit.model";
+import { insertAuditLogDb } from "../../../db/audit.db";
 
 export const registerService = async (input: RegisterInput) => {
   // Check if email already exists
-  const existing = await findProfileByEmailModel(input.email);
+  const existing = await findIdentityByEmailDb(input.email);
   if (existing) {
     throw new Error("EMAIL_EXISTS");
   }
@@ -22,13 +22,14 @@ export const registerService = async (input: RegisterInput) => {
 
   // Create profile with the provided role (user or admin)
   // super_admin is NOT allowed via public registration - only seeded by backend
-  const profile = await createProfileModel({
+  const identity = await insertIdentityDb({
     full_name: input.full_name,
     email: input.email,
     password_hash,
     phone: input.phone,
     role: input.role || "user",
   });
+  const profile = identity.profile;
 
   // Generate JWT
   const token = generateToken({
@@ -38,7 +39,7 @@ export const registerService = async (input: RegisterInput) => {
   });
 
   // Audit log
-  await createAuditLogModel({
+  await insertAuditLogDb({
     actor_id: profile.id,
     action: "USER_REGISTERED",
     table_name: profile.role === "admin" || profile.role === "super_admin" ? "admins" : "users",
@@ -52,10 +53,11 @@ export const registerService = async (input: RegisterInput) => {
 
 export const loginService = async (input: LoginInput) => {
   // Find user
-  const profile = await findProfileByEmailModel(input.email);
-  if (!profile) {
+  const identity = await findIdentityByEmailDb(input.email);
+  if (!identity) {
     throw new Error("INVALID_CREDENTIALS");
   }
+  const profile = identity.profile;
 
   if (!profile.is_active) {
     throw new Error("ACCOUNT_DISABLED");
@@ -86,16 +88,23 @@ export const loginService = async (input: LoginInput) => {
 };
 
 export const getMeService = async (userId: string) => {
-  const profile = await findProfileByIdModel(userId);
-  if (!profile) {
+  const identity = await findIdentityByIdDb(userId);
+  if (!identity) {
     throw new Error("USER_NOT_FOUND");
   }
-  return profile;
+  return identity.profile;
 };
 
 export const updateProfileService = async (
   userId: string,
   data: { full_name?: string; phone?: string; avatar_url?: string; expo_push_token?: string },
 ) => {
-  return updateProfileModel(userId, data);
+  const identity = await findIdentityByIdDb(userId);
+  if (!identity) throw new Error("USER_NOT_FOUND");
+
+  const updated = await updateIdentityDb(userId, identity.user_type, data);
+  if (!updated) throw new Error("USER_NOT_FOUND");
+
+  const { password_hash, ...safeData } = updated;
+  return safeData;
 };

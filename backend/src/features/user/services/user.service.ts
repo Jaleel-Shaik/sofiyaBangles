@@ -1,9 +1,9 @@
 import {
-  getAllUsersModel,
-  getUserByIdModel,
-  updateUserRoleModel,
-} from "../models/user.model";
-import { createAuditLogModel } from "../../../shared/models/audit.model";
+  queryUsersDb,
+  getUserByIdDb,
+  updateUserRoleDb,
+} from "../../../db/user.db";
+import { insertAuditLogDb } from "../../../db/audit.db";
 
 export const getAllUsersService = async (options: {
   page?: number;
@@ -14,11 +14,11 @@ export const getAllUsersService = async (options: {
   const page = options.page || 1;
   const limit = Math.min(options.limit || 20, 100);
 
-  return getAllUsersModel({ page, limit, role: options.role, search: options.search });
+  return queryUsersDb({ page, limit, role: options.role, search: options.search });
 };
 
 export const getUserByIdService = async (id: string) => {
-  const user = await getUserByIdModel(id);
+  const user = await getUserByIdDb(id);
   if (!user) {
     throw new Error("USER_NOT_FOUND");
   }
@@ -30,7 +30,7 @@ export const updateUserRoleService = async (
   role: string,
   actorId: string,
 ) => {
-  const existing = await getUserByIdModel(id);
+  const existing = await getUserByIdDb(id);
   if (!existing) {
     throw new Error("USER_NOT_FOUND");
   }
@@ -40,9 +40,9 @@ export const updateUserRoleService = async (
     throw new Error("INVALID_ROLE");
   }
 
-  const updated = await updateUserRoleModel(id, role);
+  const updated = await updateUserRoleDb(id, role);
 
-  await createAuditLogModel({
+  await insertAuditLogDb({
     actor_id: actorId,
     action: "USER_ROLE_CHANGED",
     table_name: role === "admin" || role === "super_admin" ? "admins" : "users",
