@@ -1,9 +1,10 @@
+import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/src/store/authStore';
-import { updateUserProfile } from '@/src/api/auth';
+
 import Header from '@/src/components/Header';
 
 const LANGUAGES = [
@@ -31,7 +32,7 @@ export default function LanguageScreen() {
         language: selectedLanguage
       };
       
-      await updateUserProfile(user.id, data);
+      await api.auth.updateUserProfile(user.id, data);
       await updateUser(data);
       
       Alert.alert('Success', 'Language preferences updated successfully!', [

@@ -1,10 +1,11 @@
+import type { BusinessProfile } from '@/src/api/settings';
+import { api } from "@/src/api";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { getBusinessProfile, updateBusinessProfile, BusinessProfile } from '@/src/api/settings';
 import { apiClient } from '@/src/api/client';
 
 export default function StoreProfileScreen() {
@@ -23,7 +24,7 @@ export default function StoreProfileScreen() {
 
   const fetchProfile = async () => {
     try {
-      const data = await getBusinessProfile();
+      const data = await api.settings.getBusinessProfile();
       setProfile(data);
       setForm(data);
     } catch {
@@ -45,7 +46,7 @@ export default function StoreProfileScreen() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const updated = await updateBusinessProfile(form);
+      const updated = await api.settings.updateBusinessProfile(form);
       setProfile(updated);
       Alert.alert("Success", "Store profile updated");
       setEditing(false);

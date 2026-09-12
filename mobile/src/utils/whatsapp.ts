@@ -1,5 +1,6 @@
+import { api } from "@/src/api";
 import { Linking, Share } from 'react-native';
-import { getBusinessProfile } from '../api/settings';
+
 import { getCachedApiBaseUrl } from '../api/config';
 
 // ─── Cache ────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ export async function getShopWhatsAppNumber(): Promise<string> {
   }
 
   try {
-    const profile = await getBusinessProfile();
+    const profile = await api.settings.getBusinessProfile();
     if (profile?.whatsapp_number) {
       cachedShopWhatsAppNumber = normalizeWhatsAppNumber(profile.whatsapp_number);
       return cachedShopWhatsAppNumber;

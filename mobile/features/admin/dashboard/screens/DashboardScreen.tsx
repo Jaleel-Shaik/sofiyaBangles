@@ -1,12 +1,14 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { getOverviewAnalytics, getAdminProducts } from '@/src/api/admin';
+
 import { getCategories, Category } from '@/src/api/categories';
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
-import { Product } from '@/src/api/products';
+
 import { useAuthStore } from '@/src/store/authStore';
 import { getCachedApiBaseUrl } from '@/src/api/config';
 
@@ -31,8 +33,8 @@ export default function AdminDashboard() {
     setConnectionError(false);
     try {
       const [data, productsData, cats, mts] = await Promise.all([
-        getOverviewAnalytics(selectedCategory || undefined, selectedModelType || undefined),
-        getAdminProducts(1, 5),
+        api.admin.getOverviewAnalytics(selectedCategory || undefined, selectedModelType || undefined),
+        api.admin.getAdminProducts(1, 5),
         getCategories(),
         getModelTypes()
       ]);
@@ -63,7 +65,7 @@ export default function AdminDashboard() {
   const updateFilteredStats = async () => {
     setStatsLoading(true);
     try {
-      const data = await getOverviewAnalytics(selectedCategory || undefined, selectedModelType || undefined);
+      const data = await api.admin.getOverviewAnalytics(selectedCategory || undefined, selectedModelType || undefined);
       setStats(data);
     } catch (err) {
       console.error("Failed to update stats", err);

@@ -1,3 +1,4 @@
+import { API_ENDPOINTS } from "./endpoints";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithCredential, GoogleAuthProvider, getIdToken } from '@react-native-firebase/auth';
 import { getFirestore, doc, getDoc, setDoc } from '@react-native-firebase/firestore';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';

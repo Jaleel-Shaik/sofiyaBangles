@@ -1,5 +1,6 @@
+import { api } from "@/src/api";
 import { create } from 'zustand';
-import { getFavorites, addFavorite, removeFavorite } from '../api/favorites';
+
 
 interface FavoriteStore {
   favoriteIds: string[];
@@ -14,7 +15,7 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
   initialized: false,
   fetchFavorites: async () => {
     try {
-      const favs = await getFavorites();
+      const favs = await api.favorites.getFavorites();
       // Only keep favorites that actually exist (backend filters deleted)
       const ids = favs
         .filter((f: any) => f && f.product_id)
@@ -37,14 +38,14 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
     if (isFav) {
       set({ favoriteIds: favoriteIds.filter(id => id !== productId) });
       try {
-        await removeFavorite(productId);
+        await api.favorites.removeFavorite(productId);
       } catch {
         set({ favoriteIds: [...favoriteIds] });
       }
     } else {
       set({ favoriteIds: [...favoriteIds, productId] });
       try {
-        await addFavorite(productId);
+        await api.favorites.addFavorite(productId);
       } catch {
         set({ favoriteIds: favoriteIds.filter(id => id !== productId) });
       }
@@ -52,7 +53,7 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
   },
   removeStaleFavorites: async () => {
     try {
-      const favs = await getFavorites();
+      const favs = await api.favorites.getFavorites();
       const validIds = new Set(
         favs
           .filter((f: any) => f && f.product_id)

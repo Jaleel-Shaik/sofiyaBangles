@@ -1,6 +1,8 @@
+import type { Category } from '@/src/api/categories';
+import { api } from "@/src/api";
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { useState, useCallback } from 'react';
-import { getCategories, Category } from '@/src/api/categories';
+
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '@/src/components/Header';
@@ -17,7 +19,7 @@ export default function CategoriesScreen() {
 
   const fetchCats = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
-    const data = await getCategories();
+    const data = await api.categories.getCategories();
     setCategories(data);
     setLoading(false);
     setRefreshing(false);

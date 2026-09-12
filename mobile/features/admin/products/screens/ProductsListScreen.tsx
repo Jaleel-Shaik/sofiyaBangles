@@ -1,11 +1,12 @@
+import type { Product } from '@/src/api/products';
+import type { Category } from '@/src/api/categories';
+import { api } from "@/src/api";
 import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, Image, TextInput, RefreshControl, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getCategories, Category } from '@/src/api/categories';
 import { getAdminProducts, deleteProduct } from '@/src/api/admin';
-import { Product } from '@/src/api/products';
 
 export default function ProductsListScreen() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function ProductsListScreen() {
     try {
       const [prodRes, cats] = await Promise.all([
         getAdminProducts(1, 100),
-        getCategories(),
+        api.categories.getCategories(),
       ]);
       setProducts(prodRes.products);
       setCategories(cats);

@@ -1,10 +1,10 @@
+import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, ScrollView, Alert, Image, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/src/store/authStore';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { updateUserProfile } from '@/src/api/auth';
 import { useState } from 'react';
 
 export default function AdminProfileScreen() {
@@ -32,7 +32,7 @@ export default function AdminProfileScreen() {
     }
     setSaving(true);
     try {
-      await updateUserProfile(user!.id, {
+      await api.auth.updateUserProfile(user!.id, {
         full_name: form.full_name.trim(),
         phone: form.phone.trim(),
       });
@@ -64,7 +64,7 @@ export default function AdminProfileScreen() {
     if (!pickerResult.canceled && pickerResult.assets[0].base64) {
       try {
         const base64Uri = `data:image/jpeg;base64,${pickerResult.assets[0].base64}`;
-        await updateUserProfile(user!.id, { avatar_url: base64Uri });
+        await api.auth.updateUserProfile(user!.id, { avatar_url: base64Uri });
         await updateUser({ avatar_url: base64Uri });
       } catch (error) {
         Alert.alert("Error", "Failed to update profile picture");

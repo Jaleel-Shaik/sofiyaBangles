@@ -1,3 +1,5 @@
+import type { Category } from '@/src/api/categories';
+import { api } from "@/src/api";
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, ActivityIndicator, Switch, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -6,9 +8,9 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import TextInputField from '@/src/components/TextInputField';
 import Button from '@/src/components/Button';
-import { getCategories, Category } from '@/src/api/categories';
+
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
-import { createProduct } from '@/src/api/admin';
+
 
 export default function AddProductScreen() {
   const router = useRouter();
@@ -58,7 +60,7 @@ export default function AddProductScreen() {
     const fetchCats = async () => {
       if (selectedModelType) {
         try {
-          const cats = await getCategories(selectedModelType);
+          const cats = await api.categories.getCategories(selectedModelType);
           setCategories(cats);
         } catch (error) {
           setCategories([]);
@@ -168,7 +170,7 @@ export default function AddProductScreen() {
 
     setLoading(true);
     try {
-      await createProduct({
+      await api.admin.createProduct({
         product_name: name,
         price: parseFloat(price),
         description,

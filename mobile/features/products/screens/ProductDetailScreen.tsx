@@ -1,3 +1,4 @@
+import { api } from "@/src/api";
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
@@ -18,7 +19,6 @@ import {
   shareProduct,
 } from "@/src/utils/whatsapp";
 import { useAuthStore } from "@/src/store/authStore";
-import { createOrder } from "@/src/api/orders";
 
 import { ProductImageGallery } from "../components/ProductImageGallery";
 import { ProductVariantSelector } from "../components/ProductVariantSelector";
@@ -176,7 +176,7 @@ export default function ProductDetailScreen() {
     try {
       setIsOrdering(true);
       const galleryImages = getGalleryImages();
-      await createOrder({
+      await api.orders.createOrder({
         items: [{
           product_id: product.id,
           product_name: product.product_name,

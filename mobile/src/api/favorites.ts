@@ -1,3 +1,4 @@
+import { API_ENDPOINTS } from "./endpoints";
 import { apiClient } from './client';
 
 export interface Favorite {
@@ -20,7 +21,7 @@ export const getFavorites = async () => {
 
 export const addFavorite = async (productId: string) => {
   try {
-    const res = await apiClient.post(`/favorites/${productId}`);
+    const res = await apiClient.post(API_ENDPOINTS.USERS.FAVORITE_BY_ID(productId));
     return res.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.message || error.message || 'Failed to add favorite');
@@ -29,7 +30,7 @@ export const addFavorite = async (productId: string) => {
 
 export const removeFavorite = async (productId: string) => {
   try {
-    const res = await apiClient.delete(`/favorites/${productId}`);
+    const res = await apiClient.delete(API_ENDPOINTS.USERS.FAVORITE_BY_ID(productId));
     return res.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.message || error.message || 'Failed to remove favorite');

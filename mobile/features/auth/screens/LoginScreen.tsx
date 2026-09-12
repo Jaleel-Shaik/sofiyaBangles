@@ -1,3 +1,4 @@
+import { api } from "@/src/api";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Alert, AppState } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,12 +11,6 @@ import {
 } from "@react-native-firebase/auth";
 
 import { useAuthStore } from "@/src/store/authStore";
-import {
-  firebaseLoginWithToken,
-  loginWith2FA,
-  verify2FAOtp,
-  register as registerApi,
-} from "@/src/api/auth";
 import { apiClient } from "@/src/api/client";
 import { getDashboardHref } from "@/src/utils/navigation";
 import SuperAdminRestriction from "@/src/components/SuperAdminRestriction";
@@ -231,7 +226,7 @@ export default function LoginScreen() {
       let result;
       if (useBackupCode) {
         const sanitized = backupCode.replace(/[\s-]/g, "").toUpperCase();
-        result = await verify2FAOtp({
+        result = await api.auth.verify2FAOtp({
           challengeId: challengeId || undefined,
           challenge_id: challengeId || undefined,
           email: email || undefined,
@@ -242,7 +237,7 @@ export default function LoginScreen() {
           otp_pending_token: otpPendingToken || undefined,
         });
       } else {
-        result = await verify2FAOtp({
+        result = await api.auth.verify2FAOtp({
           challengeId: challengeId || undefined,
           challenge_id: challengeId || undefined,
           email: email || undefined,
@@ -347,7 +342,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const result = await verify2FAOtp({
+      const result = await api.auth.verify2FAOtp({
         challengeId: challengeId || undefined,
         challenge_id: challengeId || undefined,
         email: email || undefined,
@@ -588,7 +583,7 @@ export default function LoginScreen() {
         }
 
         // Send Firebase token to backend
-        const fbResult = await firebaseLoginWithToken(firebaseToken);
+        const fbResult = await api.auth.firebaseLoginWithToken(firebaseToken);
         const handled = await processLoginResponse(fbResult);
         if (handled) {
           setLoading(false);
@@ -606,7 +601,7 @@ export default function LoginScreen() {
 
       // Strategy 2: Direct backend /auth/login (for web-registered users or as fallback)
       try {
-        const backendResult = await loginWith2FA(email, password);
+        const backendResult = await api.auth.loginWith2FA(email, password);
         const handled = await processLoginResponse(backendResult);
         if (handled) {
           setLoading(false);
@@ -627,7 +622,7 @@ export default function LoginScreen() {
             await apiClient.post("/auth/set-password", { email, password });
 
             // Retry /auth/login now that password_hash exists
-            const retryResult = await loginWith2FA(email, password);
+            const retryResult = await api.auth.loginWith2FA(email, password);
             const retryHandled = await processLoginResponse(retryResult);
             if (retryHandled) {
               setLoading(false);
@@ -646,7 +641,7 @@ export default function LoginScreen() {
               password,
             );
             const firebaseToken = await getIdToken(fbCredential.user);
-            const fbResult = await firebaseLoginWithToken(firebaseToken);
+            const fbResult = await api.auth.firebaseLoginWithToken(firebaseToken);
             const fbHandled = await processLoginResponse(fbResult);
             if (fbHandled) {
               setLoading(false);
@@ -707,7 +702,7 @@ export default function LoginScreen() {
     if (Object.keys(errs).length) return;
     setLoading(true);
     try {
-      await registerApi({
+      await api.auth.register({
         full_name: fullName,
         email,
         password,

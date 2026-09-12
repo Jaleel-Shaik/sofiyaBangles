@@ -1,6 +1,8 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getNewArrivals, Product } from '../api/products';
+
 
 export interface AppNotification {
   id: string;
@@ -46,7 +48,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
       const storedRead = await AsyncStorage.getItem('read_notifications');
       const parsedRead: string[] = storedRead ? JSON.parse(storedRead) : [];
 
-      const { products } = await getNewArrivals(7, 1, 20);
+      const { products } = await api.products.getNewArrivals(7, 1, 20);
       
       const dynamicNotifs: AppNotification[] = products.map((p: Product) => ({
         id: p.id,

@@ -1,10 +1,12 @@
+import type { ModelType } from '@/src/api/modelTypes';
+import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, RefreshControl } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getModelTypes, ModelType } from '@/src/api/modelTypes';
+
 import { createModelType, updateModelType, deleteModelType } from '@/src/api/admin';
 
 export default function ManageModelTypesScreen() {
@@ -27,7 +29,7 @@ export default function ManageModelTypesScreen() {
   const fetchModelTypes = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
-      const data = await getModelTypes();
+      const data = await api.modelTypes.getModelTypes();
       setModelTypes(data);
     } catch (e) {
       console.error(e);

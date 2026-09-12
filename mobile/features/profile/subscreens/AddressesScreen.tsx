@@ -1,9 +1,10 @@
+import { api } from "@/src/api";
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/src/store/authStore';
-import { updateUserProfile } from '@/src/api/auth';
+
 import Header from '@/src/components/Header';
 
 export default function AddressesScreen() {
@@ -22,7 +23,7 @@ export default function AddressesScreen() {
         address: address.trim()
       };
       
-      await updateUserProfile(user.id, data);
+      await api.auth.updateUserProfile(user.id, data);
       await updateUser(data);
       
       Alert.alert('Success', 'Address updated successfully!', [

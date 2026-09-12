@@ -1,9 +1,11 @@
+import type { BusinessProfile } from '@/src/api/settings';
+import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
-import { getBusinessProfile, BusinessProfile } from '@/src/api/settings';
+
 
 export default function AboutScreen() {
   const router = useRouter();
@@ -17,7 +19,7 @@ export default function AboutScreen() {
 
   const fetchProfile = async () => {
     try {
-      const data = await getBusinessProfile();
+      const data = await api.settings.getBusinessProfile();
       setProfile(data);
     } catch (error) {
       console.error("Failed to load business profile:", error);

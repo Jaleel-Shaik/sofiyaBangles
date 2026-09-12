@@ -1,7 +1,9 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import { View, Text, FlatList, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useState, useCallback } from 'react';
-import { getNewArrivals, Product } from '@/src/api/products';
+
 import ProductCard from '@/src/components/ProductCard';
 import Header from '@/src/components/Header';
 import FilterPill from '@/src/components/FilterPill';
@@ -25,7 +27,7 @@ export default function NewArrivalsScreen() {
     setLoading(true);
     setPage(1);
     try {
-      const response = await getNewArrivals(daysAgo, 1, 20);
+      const response = await api.products.getNewArrivals(daysAgo, 1, 20);
       setProducts(response.products);
       setHasMore(response.products.length >= 20);
     } catch (error) {
@@ -40,7 +42,7 @@ export default function NewArrivalsScreen() {
     setIsFetchingMore(true);
     const nextPage = page + 1;
     try {
-      const response = await getNewArrivals(daysAgo, nextPage, 20);
+      const response = await api.products.getNewArrivals(daysAgo, nextPage, 20);
       if (response.products.length > 0) {
         setProducts(prev => [...prev, ...response.products]);
         setPage(nextPage);

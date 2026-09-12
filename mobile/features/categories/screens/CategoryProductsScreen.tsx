@@ -1,8 +1,10 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useMemo } from 'react';
 import { useSizeStore } from '@/src/store/sizeStore';
-import { getProducts, Product } from '@/src/api/products';
+
 import ProductCard from '@/src/components/ProductCard';
 import Header from '@/src/components/Header';
 import SearchInput from '@/src/components/SearchInput';
@@ -38,7 +40,7 @@ export default function CategoryScreen() {
     setLoading(true);
     setPage(1);
     try {
-      const response = await getProducts(1, 20, categoryId, searchQuery.trim());
+      const response = await api.products.getProducts(1, 20, categoryId, searchQuery.trim());
       setProducts(response.products);
       setHasMore(response.products.length >= 20);
     } catch (error) {
@@ -53,7 +55,7 @@ export default function CategoryScreen() {
     setIsFetchingMore(true);
     const nextPage = page + 1;
     try {
-      const response = await getProducts(nextPage, 20, categoryId, searchQuery);
+      const response = await api.products.getProducts(nextPage, 20, categoryId, searchQuery);
       if (response.products.length > 0) {
         setProducts((prev) => [...prev, ...response.products]);
         setPage(nextPage);

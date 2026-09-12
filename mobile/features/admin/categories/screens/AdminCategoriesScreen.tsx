@@ -1,11 +1,13 @@
+import type { Category } from '@/src/api/categories';
+import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Image } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getCategories, Category } from '@/src/api/categories';
+
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
-import { createCategoryWithImage, createModelType, updateCategoryWithImage, deleteCategory } from '@/src/api/admin';
+
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ManageCategoriesScreen() {
@@ -29,7 +31,7 @@ export default function ManageCategoriesScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [cats, mts] = await Promise.all([getCategories(), getModelTypes()]);
+      const [cats, mts] = await Promise.all([api.categories.getCategories(), getModelTypes()]);
       setCategories(cats);
       setModelTypes(mts);
     } catch (e) {
@@ -79,7 +81,7 @@ export default function ManageCategoriesScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteCategory(catId);
+              await api.admin.deleteCategory(catId);
               await fetchData();
               Alert.alert('Success', 'Category deleted successfully.');
             } catch (error: any) {
@@ -122,7 +124,7 @@ export default function ManageCategoriesScreen() {
           return;
         }
 
-        const newModelType = await createModelType({ name: newModelName });
+        const newModelType = await api.admin.createModelType({ name: newModelName });
         finalModelTypeId = newModelType.id;
       } else {
         const standard_sizes = newModelStandardSizes.split(',').map(s => s.trim()).filter(s => s);
@@ -137,12 +139,12 @@ export default function ManageCategoriesScreen() {
       const standard_sizes = newModelStandardSizes.split(',').map(s => s.trim()).filter(s => s);
 
       if (editingCategoryId) {
-        await updateCategoryWithImage(
+        await api.admin.updateCategoryWithImage(
           editingCategoryId, name, imageUri || undefined, finalModelTypeId,
           'standard', standard_sizes, []
         );
       } else {
-        await createCategoryWithImage(
+        await api.admin.createCategoryWithImage(
           name, imageUri || undefined, finalModelTypeId,
           'standard', standard_sizes, []
         );

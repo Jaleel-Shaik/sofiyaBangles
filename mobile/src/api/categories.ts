@@ -1,3 +1,4 @@
+import { API_ENDPOINTS } from "./endpoints";
 import { apiClient } from './client';
 
 export interface Category {
@@ -14,7 +15,7 @@ export interface Category {
 
 export const getCategories = async (modelTypeId?: string) => {
   try {
-    const res = await apiClient.get('categories', { params: { model_type_id: modelTypeId } });
+    const res = await apiClient.get(API_ENDPOINTS.CATEGORIES.BASE, { params: { model_type_id: modelTypeId } });
     return res.data.data as Category[];
   } catch (error) {
     console.error('Error fetching categories', error);
@@ -24,7 +25,7 @@ export const getCategories = async (modelTypeId?: string) => {
 
 export const createCategory = async (categoryName: string): Promise<Category> => {
   try {
-    const res = await apiClient.post('/categories', { category_name: categoryName });
+    const res = await apiClient.post(API_ENDPOINTS.CATEGORIES.BASE, { category_name: categoryName });
     return res.data.data as Category;
   } catch (error: any) {
     console.error('Error creating category', error);

@@ -1,9 +1,11 @@
+import type { Category } from '@/src/api/categories';
+import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, TextInput, Image, RefreshControl } from 'react-native';
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSizeStore } from '@/src/store/sizeStore';
-import { getCategories, Category } from '@/src/api/categories';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -31,7 +33,7 @@ export default function SizePreferencesScreen() {
     if (!isRefresh) setInitialLoading(true);
     await fetchPreferences();
     try {
-      const cats = (await getCategories()) as Category[];
+      const cats = (await api.categories.getCategories()) as Category[];
       if (Array.isArray(cats)) {
         setCategories(cats);
       }

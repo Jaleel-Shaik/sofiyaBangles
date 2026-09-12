@@ -1,3 +1,5 @@
+import type { Category } from '@/src/api/categories';
+import { api } from "@/src/api";
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, ActivityIndicator, Switch, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -6,9 +8,9 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import TextInputField from '@/src/components/TextInputField';
 import Button from '@/src/components/Button';
-import { getCategories, Category } from '@/src/api/categories';
+
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
-import { updateProduct } from '@/src/api/admin';
+
 import { getProductById } from '@/src/api/products';
 
 export default function EditProductScreen() {
@@ -93,7 +95,7 @@ export default function EditProductScreen() {
     const fetchCats = async () => {
       if (selectedModelType) {
         try {
-          const cats = await getCategories(selectedModelType);
+          const cats = await api.categories.getCategories(selectedModelType);
           setCategories(cats);
         } catch (error) {
           setCategories([]);
@@ -202,7 +204,7 @@ export default function EditProductScreen() {
 
     setLoading(true);
     try {
-      await updateProduct(id as string, {
+      await api.admin.updateProduct(id as string, {
         product_name: name,
         price: parseFloat(price),
         description,

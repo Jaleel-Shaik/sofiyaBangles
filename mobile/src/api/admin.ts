@@ -1,3 +1,4 @@
+import { API_ENDPOINTS } from "./endpoints";
 import { apiClient } from './client';
 
 export const getAdminProducts = async (page = 1, limit = 10) => {
@@ -54,7 +55,7 @@ export const createProduct = async (productData: any, imageUris: string[] = []) 
         } as any);
       });
     }
-    const res = await apiClient.post('/products', formData, {
+    const res = await apiClient.post(API_ENDPOINTS.PRODUCTS.BASE, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return {
@@ -91,7 +92,7 @@ export const updateProduct = async (id: string, productData: any, imageUris: str
     } else {
       formData.append('existing_images', '');
     }
-    const res = await apiClient.put(`/products/${id}`, formData, {
+    const res = await apiClient.put(API_ENDPOINTS.PRODUCTS.BY_ID(id), formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return { success: true, id: res.data.data.id };
@@ -102,7 +103,7 @@ export const updateProduct = async (id: string, productData: any, imageUris: str
 
 export const sellProduct = async (id: string, quantity = 1) => {
   try {
-    const res = await apiClient.patch(`/products/${id}/sell`, { quantity });
+    const res = await apiClient.patch(API_ENDPOINTS.PRODUCTS.SELL(id), { quantity });
     return res.data.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.message || error.message || 'Failed to sell product');
@@ -111,7 +112,7 @@ export const sellProduct = async (id: string, quantity = 1) => {
 
 export const deleteProduct = async (id: string) => {
   try {
-    const res = await apiClient.delete(`/products/${id}`);
+    const res = await apiClient.delete(API_ENDPOINTS.PRODUCTS.BY_ID(id));
     return res.data.success;
   } catch (error: any) {
     throw new Error(error?.response?.data?.message || error.message || 'Failed to delete product');
@@ -145,7 +146,7 @@ export const createCategoryWithImage = async (
         name: `category_image.${extension}`,
       } as any);
     }
-    const res = await apiClient.post('/categories', formData, {
+    const res = await apiClient.post(API_ENDPOINTS.CATEGORIES.BASE, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return res.data.data;
@@ -211,7 +212,7 @@ export const broadcastNotification = async (notificationData: any) => {
 
 export const createModelType = async (modelTypeData: { name: string }) => {
   try {
-    const res = await apiClient.post('/model-types', modelTypeData);
+    const res = await apiClient.post(API_ENDPOINTS.MODEL_TYPES.BASE, modelTypeData);
     return res.data.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.message || error.message || 'Failed to create model type');
@@ -220,7 +221,7 @@ export const createModelType = async (modelTypeData: { name: string }) => {
 
 export const updateModelType = async (id: string, modelTypeData: { name: string }) => {
   try {
-    const res = await apiClient.put(`/model-types/${id}`, modelTypeData);
+    const res = await apiClient.put(API_ENDPOINTS.MODEL_TYPES.BY_ID(id), modelTypeData);
     return res.data.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.message || error.message || 'Failed to update model type');
@@ -229,7 +230,7 @@ export const updateModelType = async (id: string, modelTypeData: { name: string 
 
 export const deleteModelType = async (id: string) => {
   try {
-    const res = await apiClient.delete(`/model-types/${id}`);
+    const res = await apiClient.delete(API_ENDPOINTS.MODEL_TYPES.BY_ID(id));
     return res.data.data;
   } catch (error: any) {
     throw new Error(error?.response?.data?.message || error.message || 'Failed to delete model type');

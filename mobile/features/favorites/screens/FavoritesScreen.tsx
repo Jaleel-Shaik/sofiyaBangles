@@ -1,8 +1,10 @@
+import type { Favorite } from '@/src/api/favorites';
+import { api } from "@/src/api";
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getFavorites, Favorite } from '@/src/api/favorites';
+
 import { getCategories, Category } from '@/src/api/categories';
 import { useFavoriteStore } from '@/src/store/favoriteStore';
 import Header from '@/src/components/Header';
@@ -20,7 +22,7 @@ export default function FavoritesScreen() {
 
   const fetchFavoritesAndCats = async () => {
     const [favData, catData] = await Promise.all([
-      getFavorites(),
+      api.favorites.getFavorites(),
       getCategories()
     ]);
     setFavorites(favData);

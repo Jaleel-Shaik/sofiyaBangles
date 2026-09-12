@@ -1,3 +1,4 @@
+import { API_ENDPOINTS } from "./endpoints";
 import axios, { create } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { AppState, AppStateStatus, Platform } from 'react-native';
@@ -45,7 +46,7 @@ if (__DEV__) {
 // ─── Health Check ─────────────────────────────────────────
 export const checkServerConnection = async (): Promise<boolean> => {
   try {
-    await apiClient.get('/products', { timeout: 5000 });
+    await apiClient.get(API_ENDPOINTS.PRODUCTS.BASE, { timeout: 5000 });
     return true;
   } catch {
     return false;
@@ -168,12 +169,12 @@ apiClient.interceptors.response.use(
     const url = originalRequest?.url || '';
 
     // Skip refresh for auth endpoints to avoid loops
-    const isAuthRoute = url.includes('/auth/login') ||
-      url.includes('/auth/register') ||
-      url.includes('/auth/send-otp') ||
-      url.includes('/auth/verify-otp') ||
-      url.includes('/auth/verify-2fa') ||
-      url.includes('/auth/refresh-token');
+    const isAuthRoute = url.includes(API_ENDPOINTS.AUTH.LOGIN) ||
+      url.includes(API_ENDPOINTS.AUTH.REGISTER) ||
+      url.includes(API_ENDPOINTS.AUTH.SEND_OTP) ||
+      url.includes(API_ENDPOINTS.AUTH.VERIFY_OTP) ||
+      url.includes(API_ENDPOINTS.AUTH.VERIFY_2FA) ||
+      url.includes(API_ENDPOINTS.AUTH.REFRESH_TOKEN);
 
     // If 401 and not already retried and not an auth route
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {

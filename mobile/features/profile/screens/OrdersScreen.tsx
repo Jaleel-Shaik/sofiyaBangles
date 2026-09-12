@@ -1,3 +1,5 @@
+import type { Order, OrderItem } from '@/src/api/orders';
+import { api } from "@/src/api";
 import {
   View,
   Text,
@@ -11,7 +13,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { getUserOrders, Order, OrderItem } from "@/src/api/orders";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function OrdersScreen() {
@@ -23,7 +25,7 @@ export default function OrdersScreen() {
 
   const fetchOrders = async () => {
     try {
-      const data = await getUserOrders();
+      const data = await api.orders.getUserOrders();
       setOrders(data);
     } catch (error) {
     } finally {

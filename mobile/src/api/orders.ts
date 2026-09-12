@@ -1,3 +1,4 @@
+import { API_ENDPOINTS } from "./endpoints";
 import { apiClient } from "./client";
 
 export interface OrderItem {

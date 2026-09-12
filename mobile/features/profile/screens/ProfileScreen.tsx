@@ -1,3 +1,4 @@
+import { api } from "@/src/api";
 import {
   View,
   Text,
@@ -15,7 +16,7 @@ import {
 } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { updateUserProfile } from "@/src/api/auth";
+
 import { useState } from "react";
 
 export default function ProfileScreen() {
@@ -40,7 +41,7 @@ export default function ProfileScreen() {
     if (!pickerResult.canceled && pickerResult.assets[0].base64) {
       try {
         const base64Uri = `data:image/jpeg;base64,${pickerResult.assets[0].base64}`;
-        await updateUserProfile(user!.id, { avatar_url: base64Uri });
+        await api.auth.updateUserProfile(user!.id, { avatar_url: base64Uri });
         await updateUser({ avatar_url: base64Uri });
       } catch (error) {
         Alert.alert("Error", "Failed to update profile picture");

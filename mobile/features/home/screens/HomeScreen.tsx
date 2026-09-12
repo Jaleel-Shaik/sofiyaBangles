@@ -1,3 +1,5 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import {
   View,
   Text,
@@ -12,7 +14,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useFocusEffect } from "expo-router";
 import { useAuthStore } from "@/src/store/authStore";
 import { useSizeStore } from "@/src/store/sizeStore";
-import { getRecommendedProducts, Product } from "@/src/api/products";
+
 import { getCategories, Category } from "@/src/api/categories";
 import { getUserOrders } from "@/src/api/orders";
 import ProductCard from "@/src/components/ProductCard";
@@ -45,7 +47,7 @@ export default function HomeScreen() {
       setLoading(true);
       setPage(1);
       const [fetchedProductsResponse, fetchedCategories] = await Promise.all([
-        getRecommendedProducts(1, 50, searchQuery.trim()),
+        api.products.getRecommendedProducts(1, 50, searchQuery.trim()),
         getCategories(),
       ]);
       setProducts(fetchedProductsResponse.products);
@@ -64,7 +66,7 @@ export default function HomeScreen() {
     setIsFetchingMore(true);
     const nextPage = page + 1;
     try {
-      const response = await getRecommendedProducts(nextPage, 10, searchQuery);
+      const response = await api.products.getRecommendedProducts(nextPage, 10, searchQuery);
       if (response.products.length > 0) {
         setProducts((prev) => [...prev, ...response.products]);
         setPage(nextPage);

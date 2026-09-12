@@ -1,3 +1,4 @@
+import { API_ENDPOINTS } from "./endpoints";
 import { apiClient } from './client';
 
 export interface Product {
@@ -28,7 +29,7 @@ export interface Product {
 
 export const getProducts = async (page = 1, limit = 10, categoryId?: string, search?: string) => {
   try {
-    let url = `products?page=${page}&limit=${limit}`;
+    let url = `${API_ENDPOINTS.PRODUCTS.BASE}?page=${page}&limit=${limit}`;
     if (categoryId) url += `&category_id=${categoryId}`;
     if (search) url += `&search=${search}`;
 
@@ -44,7 +45,7 @@ export const getProducts = async (page = 1, limit = 10, categoryId?: string, sea
 
 export const getProductById = async (id: string) => {
   try {
-    const res = await apiClient.get(`products/${id}`);
+    const res = await apiClient.get(API_ENDPOINTS.PRODUCTS.BY_ID(id));
     return res.data?.data ?? null;
   } catch (error) {
     console.error(`Error fetching product ${id}`, error);
@@ -54,7 +55,7 @@ export const getProductById = async (id: string) => {
 
 export const getRecommendedProducts = async (page = 1, limit = 10, search?: string) => {
   try {
-    let url = `products/recommended?page=${page}&limit=${limit}`;
+    let url = `${API_ENDPOINTS.PRODUCTS.BASE}/recommended?page=${page}&limit=${limit}`;
     if (search) url += `&search=${search}`;
 
     const res = await apiClient.get(url);
@@ -69,7 +70,7 @@ export const getRecommendedProducts = async (page = 1, limit = 10, search?: stri
 
 export const getNewArrivals = async (daysAgo: number, page = 1, limit = 20) => {
   try {
-    let url = `products/new-arrivals?daysAgo=${daysAgo}&page=${page}&limit=${limit}`;
+    let url = `${API_ENDPOINTS.PRODUCTS.BASE}/new-arrivals?daysAgo=${daysAgo}&page=${page}&limit=${limit}`;
     const res = await apiClient.get(url);
     const payload = Array.isArray(res.data?.data) ? res.data.data : [];
     const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;

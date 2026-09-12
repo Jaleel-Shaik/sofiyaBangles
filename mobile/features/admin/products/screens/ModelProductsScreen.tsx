@@ -1,11 +1,11 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Image, TextInput } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Product } from '@/src/api/products';
 import { getCategories, Category } from '@/src/api/categories';
-import { getAdminProducts } from '@/src/api/admin';
 
 export default function CategoryProducts() {
   const { id } = useLocalSearchParams();
@@ -24,7 +24,7 @@ export default function CategoryProducts() {
         setLoading(true);
         try {
           const [allProductsRes, allCategories] = await Promise.all([
-            getAdminProducts(1, 100),
+            api.admin.getAdminProducts(1, 100),
             getCategories(),
           ]);
 

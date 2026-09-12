@@ -1,6 +1,8 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import { View, Text, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Product } from '../api/products';
+
 import Badge from './Badge';
 import { IMAGE_SIZES } from '../utils/screen';
 

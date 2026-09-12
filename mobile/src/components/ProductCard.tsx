@@ -1,7 +1,9 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import { View, Text, Image, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Product } from "../api/products";
+
 import { useFavoriteStore } from "../store/favoriteStore";
 
 interface ProductCardProps {

@@ -1,9 +1,10 @@
+import type { Product } from '@/src/api/products';
+import { api } from "@/src/api";
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { getProductById, Product } from '@/src/api/products';
 
 import { sellProduct, deleteProduct } from '@/src/api/admin';
 
@@ -27,7 +28,7 @@ export default function ProductDetailScreen() {
   const fetchProduct = async () => {
     setLoading(true);
     try {
-      const prod = await getProductById(id as string);
+      const prod = await api.products.getProductById(id as string);
       setProduct(prod);
     } catch (error) {
       console.error('Failed to load product', error);

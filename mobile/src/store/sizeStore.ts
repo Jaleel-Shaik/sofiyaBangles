@@ -1,5 +1,7 @@
+import type { UserSizePreference } from '@/src/api/sizes';
+import { api } from "@/src/api";
 import { create } from 'zustand';
-import { UserSizePreference, getSizePreferences, createSizePreference, updateSizePreference, deleteSizePreference } from '../api/sizes';
+
 import { useAuthStore } from './authStore';
 
 interface SizeState {
@@ -26,7 +28,7 @@ export const useSizeStore = create<SizeState>((set, get) => ({
     
     set({ loading: true, error: null });
     try {
-      const prefs = await getSizePreferences(user.id);
+      const prefs = await api.sizes.getSizePreferences(user.id);
       set({ preferences: prefs, loading: false });
     } catch (err: any) {
       set({ error: err.message, loading: false });
@@ -38,7 +40,7 @@ export const useSizeStore = create<SizeState>((set, get) => ({
     if (!user) throw new Error("Must be logged in to save sizes");
     
     try {
-      const newPref = await createSizePreference(user.id, data);
+      const newPref = await api.sizes.createSizePreference(user.id, data);
       set(state => ({
         preferences: [...state.preferences, newPref]
       }));
@@ -49,7 +51,7 @@ export const useSizeStore = create<SizeState>((set, get) => ({
 
   editPreference: async (id, data) => {
     try {
-      await updateSizePreference(id, data);
+      await api.sizes.updateSizePreference(id, data);
       set(state => ({
         preferences: state.preferences.map(p => 
           p.id === id ? { ...p, ...data, updated_at: new Date().toISOString() } : p
@@ -62,7 +64,7 @@ export const useSizeStore = create<SizeState>((set, get) => ({
 
   removePreference: async (id) => {
     try {
-      await deleteSizePreference(id);
+      await api.sizes.deleteSizePreference(id);
       set(state => ({
         preferences: state.preferences.filter(p => p.id !== id)
       }));
