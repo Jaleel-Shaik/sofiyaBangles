@@ -1,9 +1,11 @@
 import { env } from "./shared/config/env";
 import app from "./app";
 import { cleanupExpiredSessionsAndTokens } from "./features/auth/services/totp.service";
+
 const PORT = env.PORT || 5000;
 console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-app.listen(PORT, "0.0.0.0", () => {
+
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
 
@@ -25,14 +27,27 @@ setTimeout(() => {
   });
 }, 5000);
 
-process.on("SIGINT", () => {
+const gracefulShutdown = (signal: string) => {
+  console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
   clearInterval(cleanupInterval);
-  process.exit(0);
-});
 
-process.on("SIGTERM", () => {
-  clearInterval(cleanupInterval);
-  process.exit(0);
-});
+  server.close((err) => {
+    if (err) {
+      console.error("Error closing HTTP server:", err);
+      process.exit(1);
+    }
+    console.log("HTTP server closed. Exiting cleanly.");
+    process.exit(0);
+  });
+
+  // Force exit if hanging beyond 10 seconds
+  setTimeout(() => {
+    console.error("Forceful shutdown timeout reached. Exiting immediately.");
+    process.exit(1);
+  }, 10000).unref();
+};
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 export default app;

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   getCategories,
+  getCategoryById,
   getCategoryProducts,
   createCategory,
   updateCategory,
@@ -20,6 +21,7 @@ const router = Router();
 // Customer routes (publicly browsable)
 router.get("/", optionalAuthenticate, getCategories);
 router.get("/:id/products", optionalAuthenticate, getCategoryProducts);
+router.get("/:id", optionalAuthenticate, getCategoryById);
 
 // Admin routes
 router.post(

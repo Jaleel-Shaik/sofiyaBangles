@@ -7,81 +7,63 @@ import {
   deleteModelTypeService,
 } from "../services/modelType.service";
 import { getParam } from "../../../shared/utils/params";
+import { asyncHandler } from "../../../core/utils/async-handler";
+import { sendSuccess } from "../../../core/utils/response";
+import { NotFoundError, ConflictError, BadRequestError } from "../../../core/errors/app.error";
 
-export const getAllModelTypes = async (_req: Request, res: Response) => {
-  try {
-    const data = await getAllModelTypesService();
-    res.status(200).json({ success: true, data, message: "Model types fetched successfully" });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+export const getAllModelTypes = asyncHandler(async (_req: Request, res: Response) => {
+  const data = await getAllModelTypesService();
+  return sendSuccess(res, data, "Model types fetched successfully");
+});
 
-export const getModelTypeById = async (req: Request, res: Response) => {
-  try {
-    const id = getParam(req, "id");
-    const data = await getModelTypeByIdService(id);
-    if (!data) return res.status(404).json({ success: false, message: "Model type not found" });
-    res.status(200).json({ success: true, data, message: "Model type fetched successfully" });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+export const getModelTypeById = asyncHandler(async (req: Request, res: Response) => {
+  const id = getParam(req, "id");
+  const data = await getModelTypeByIdService(id);
+  if (!data) throw new NotFoundError("Model type not found");
+  return sendSuccess(res, data, "Model type fetched successfully");
+});
 
-export const createModelType = async (req: Request, res: Response) => {
+export const createModelType = asyncHandler(async (req: Request, res: Response) => {
+  const { name } = req.body;
   try {
-    const { name } = req.body;
-    
-    const data = await createModelTypeService({
-      name,
-    });
-    res.status(201).json({ success: true, data, message: "Model type created successfully" });
-  } catch (error: any) {
-    if (error.message === "MODEL_TYPE_ALREADY_EXISTS") {
-      res.status(409).json({ success: false, code: "MODEL_TYPE_ALREADY_EXISTS", message: "A model type with this name already exists." });
-      return;
+    const data = await createModelTypeService({ name });
+    return sendSuccess(res, data, { message: "Model type created successfully", statusCode: 201 });
+  } catch (err: any) {
+    if (err.message === "MODEL_TYPE_ALREADY_EXISTS") {
+      throw new ConflictError("A model type with this name already exists.", "MODEL_TYPE_ALREADY_EXISTS");
     }
-    res.status(400).json({ success: false, message: error.message });
+    throw err;
   }
-};
+});
 
-export const updateModelType = async (req: Request, res: Response) => {
+export const updateModelType = asyncHandler(async (req: Request, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const id = getParam(req, "id");
     const data = await updateModelTypeService(id, req.body);
-    res.status(200).json({ success: true, data, message: "Model type updated successfully" });
-  } catch (error: any) {
-    if (error.message === "MODEL_TYPE_ALREADY_EXISTS") {
-      res.status(409).json({ success: false, code: "MODEL_TYPE_ALREADY_EXISTS", message: "A model type with this name already exists." });
-      return;
+    return sendSuccess(res, data, "Model type updated successfully");
+  } catch (err: any) {
+    if (err.message === "MODEL_TYPE_ALREADY_EXISTS") {
+      throw new ConflictError("A model type with this name already exists.", "MODEL_TYPE_ALREADY_EXISTS");
     }
-    res.status(400).json({ success: false, message: error.message });
+    throw err;
   }
-};
+});
 
-export const deleteModelType = async (req: Request, res: Response) => {
+export const deleteModelType = asyncHandler(async (req: Request, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const id = getParam(req, "id");
     await deleteModelTypeService(id);
-    res.status(200).json({ success: true, message: "Model type deleted successfully" });
-  } catch (error: any) {
-    if (error.message === "MODEL_TYPE_NOT_FOUND") {
-      res.status(404).json({
-        success: false,
-        message: "Model type not found.",
-      });
-      return;
+    return sendSuccess(res, null, "Model type deleted successfully");
+  } catch (err: any) {
+    if (err.message === "MODEL_TYPE_NOT_FOUND") {
+      throw new NotFoundError("Model type not found.");
     }
-    if (error.message === "MODEL_HAS_DEPENDENCIES") {
-      res.status(409).json({
-        success: false,
-        code: "MODEL_HAS_DEPENDENCIES",
-        message: `Cannot delete "${error.modelName}" because it has ${error.categoryCount} category(ies) and ${error.productCount} product(s). Archive or reassign them first.`,
-        categoryCount: error.categoryCount,
-        productCount: error.productCount,
-      });
-      return;
+    if (err.message === "MODEL_HAS_DEPENDENCIES") {
+      throw new ConflictError(
+        `Cannot delete "${err.modelName}" because it has ${err.categoryCount} category(ies) and ${err.productCount} product(s). Archive or reassign them first.`,
+        "MODEL_HAS_DEPENDENCIES"
+      );
     }
-    res.status(400).json({ success: false, message: error.message });
+    throw err;
   }
-};
+});

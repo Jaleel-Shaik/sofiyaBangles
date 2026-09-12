@@ -28,6 +28,7 @@ import {
 import { getAllAdminOrdersDb, getOrderByIdDb, getOrderItemsDb } from "../../../db/order.db";
 import { getAdminProductsService } from "../../product/services/product.service";
 import { findIdentityByIdDb } from "../../../db/auth.db";
+import { NotFoundError, BadRequestError } from "../../../core/errors/app.error";
 
 export class SuperAdminService {
   /**
@@ -323,7 +324,7 @@ export class SuperAdminService {
   static async getSaleDetail(id: string) {
     const order = await getOrderByIdDb(id);
     if (!order) {
-      throw new Error("ORDER_NOT_FOUND");
+      throw new NotFoundError("Sale order not found.");
     }
 
     const items = await getOrderItemsDb(id);
@@ -377,7 +378,7 @@ export class SuperAdminService {
       await fetchProductAnalyticsRawDataDb(productId);
 
     if (!product) {
-      throw new Error("PRODUCT_NOT_FOUND");
+      throw new NotFoundError("Product not found.");
     }
 
     const completedLedger = ledger.filter((l: RevenueLedgerItem) => l.status === "completed" || l.transaction_type === "SALE");
@@ -532,17 +533,24 @@ export class SuperAdminService {
   }
 
   static async updateCommissionSettings(adminPct: number, superAdminPct: number, actorId: string): Promise<PlatformCommissionSettings> {
-    const updated = await setPlatformCommissionSettingsDb(adminPct, superAdminPct, actorId);
+    try {
+      const updated = await setPlatformCommissionSettingsDb(adminPct, superAdminPct, actorId);
 
-    await insertAuditLogDb({
-      actor_id: actorId,
-      action: "COMMISSION_SETTINGS_UPDATED",
-      table_name: "platform_settings",
-      record_id: "commission",
-      new_data: { admin_percentage: adminPct, super_admin_percentage: superAdminPct },
-    });
+      await insertAuditLogDb({
+        actor_id: actorId,
+        action: "COMMISSION_SETTINGS_UPDATED",
+        table_name: "platform_settings",
+        record_id: "commission",
+        new_data: { admin_percentage: adminPct, super_admin_percentage: superAdminPct },
+      });
 
-    return updated;
+      return updated;
+    } catch (err: any) {
+      if (err.message === "INVALID_COMMISSION_PERCENTAGE") {
+        throw new BadRequestError("Percentages must sum to exactly 100%.");
+      }
+      throw err;
+    }
   }
 
   /**

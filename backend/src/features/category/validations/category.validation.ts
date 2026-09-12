@@ -11,7 +11,7 @@ export const createCategorySchema = z.object({
   display_order: zStringNumber
     .pipe(z.number().int().min(0))
     .default(0),
-  model_type_id: z.string().min(1, "Model Type is required"),
+  model_type_id: z.string().optional().default("general"),
   size_type: z.enum(["none", "standard", "custom", "both"]).optional(),
   standard_sizes: zJsonArray.pipe(z.array(z.string())).optional(),
   custom_measurement_fields: zJsonArray.pipe(z.array(z.string())).optional(),

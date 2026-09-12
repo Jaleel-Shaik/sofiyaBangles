@@ -1,106 +1,61 @@
 import { Response } from "express";
 import { AuthRequest } from "../../../shared/types";
 import { getParam, getQuery } from "../../../shared/utils/params";
+import { asyncHandler } from "../../../core/utils/async-handler";
+import { sendSuccess } from "../../../core/utils/response";
 import {
   broadcastNotificationService,
   getUserNotificationsService,
-  markNotificationReadService,   
+  markNotificationReadService,
   getUnreadCountService,
-} from "../services/notification.service";   
+} from "../services/notification.service";
+import { NotFoundError } from "../../../core/errors/app.error";
 
-export const getNotifications = async (req: AuthRequest, res: Response) => {
+export const getNotifications = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const page = getQuery(req, "page");
+  const limit = getQuery(req, "limit");
+
+  const pageNum = Number(page) || 1;
+  const limitNum = Number(limit) || 20;
+
+  const result = await getUserNotificationsService(
+    req.user!.userId,
+    page ? pageNum : undefined,
+    limit ? limitNum : undefined
+  );
+
+  return sendSuccess(res, result.notifications, {
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total: result.total,
+      totalPages: Math.ceil(result.total / limitNum),
+    },
+  });
+});
+
+export const markAsRead = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const page = getQuery(req, "page");
-    const limit = getQuery(req, "limit");
-
-    const result = await getUserNotificationsService(
-      req.user!.userId,
-      page ? Number(page) : undefined,
-      limit ? Number(limit) : undefined,
-    );
-
-    res.json({
-      success: true,
-      data: result.notifications,
-      pagination: {
-        page: Number(page) || 1,
-        limit: Number(limit) || 20,
-        total: result.total,
-        totalPages: Math.ceil(result.total / (Number(limit) || 20)),
-      },
-    });
-  } catch (error: any) {
-    console.error("GetNotifications error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch notifications.",
-    });
-  }
-};
-
-export const markAsRead = async (req: AuthRequest, res: Response) => {
-  try {
-    const id = getParam(req, "id");
     const notification = await markNotificationReadService(id, req.user!.userId);
-
-    res.json({
-      success: true,
-      data: notification,
-      message: "Notification marked as read.",
-    });
-  } catch (error: any) {
-    if (error.message === "NOTIFICATION_NOT_FOUND") {
-      res.status(404).json({
-        success: false,
-        message: "Notification not found.",
-      });
-      return;
+    return sendSuccess(res, notification, "Notification marked as read.");
+  } catch (err: any) {
+    if (err.message === "NOTIFICATION_NOT_FOUND") {
+      throw new NotFoundError("Notification not found.");
     }
-    console.error("MarkAsRead error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to mark notification.",
-    });
+    throw err;
   }
-};
+});
 
-export const broadcastNotification = async (
-  req: AuthRequest,
-  res: Response,
-) => {
-  try {
-    const result = await broadcastNotificationService(
-      req.body,
-      req.user!.userId,
-    );
+export const broadcastNotification = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const result = await broadcastNotificationService(req.body, req.user!.userId);
+  return sendSuccess(res, result, {
+    message: `Notification sent to ${result.sentCount} users.`,
+    statusCode: 201,
+  });
+});
 
-    res.status(201).json({
-      success: true,
-      data: result,
-      message: `Notification sent to ${result.sentCount} users.`,
-    });
-  } catch (error: any) {
-    console.error("BroadcastNotification error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to send notification.",
-    });
-  }
-};
-
-export const getUnreadCount = async (req: AuthRequest, res: Response) => {
-  try {
-    const count = await getUnreadCountService(req.user!.userId);
-
-    res.json({
-      success: true,
-      data: { count },
-    });
-  } catch (error: any) {
-    console.error("GetUnreadCount error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to get unread count.",
-    });
-  }
-};
+export const getUnreadCount = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const count = await getUnreadCountService(req.user!.userId);
+  return sendSuccess(res, { count });
+});

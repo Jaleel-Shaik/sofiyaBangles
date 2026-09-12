@@ -38,7 +38,7 @@ export const createCategoryService = async (
   }
 
   // 2. Business Logic: Validate model type exists via DB layer
-  if (input.model_type_id) {
+  if (input.model_type_id && input.model_type_id !== "general") {
     const modelType = await getModelTypeByIdDb(input.model_type_id);
     if (!modelType) {
       throw new Error("MODEL_TYPE_NOT_FOUND");

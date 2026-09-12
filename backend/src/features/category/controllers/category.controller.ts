@@ -1,199 +1,118 @@
 import { Response } from "express";
 import { AuthRequest } from "../../../shared/types";
 import { getParam, getQuery } from "../../../shared/utils/params";
+import { asyncHandler } from "../../../core/utils/async-handler";
+import { sendSuccess } from "../../../core/utils/response";
 import {
-  getCategoriesService,     
+  getCategoriesService,
   getCategoryByIdService,
   createCategoryService,
   updateCategoryService,
-  deleteCategoryService, 
+  deleteCategoryService,
 } from "../services/category.service";
 import { getProductsService } from "../../product/services/product.service";
+import { NotFoundError, BadRequestError, ConflictError } from "../../../core/errors/app.error";
 
-export const getCategories = async (req: AuthRequest, res: Response) => {
+export const getCategories = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const modelTypeId = getQuery(req, "model_type_id");
+  const categories = await getCategoriesService(modelTypeId);
+  return sendSuccess(res, categories);
+});
+
+export const getCategoryById = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    // Support server-side filtering by model_type_id
-    const modelTypeId = getQuery(req, "model_type_id");
-    const categories = await getCategoriesService(modelTypeId);
-
-    res.json({
-      success: true,
-      data: categories,
-    });
-  } catch (error: any) {
-    console.error("GetCategories error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch categories.",
-    });
+    const category = await getCategoryByIdService(id);
+    return sendSuccess(res, category);
+  } catch (err: any) {
+    if (err.message === "CATEGORY_NOT_FOUND") throw new NotFoundError("Category not found.");
+    throw err;
   }
-};
+});
 
-export const getCategoryProducts = async (
-  req: AuthRequest,
-  res: Response,
-) => {
+export const getCategoryProducts = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const id = getParam(req, "id");
-
-    // Verify category exists
     await getCategoryByIdService(id);
-
-    const page = getQuery(req, "page");
-    const limit = getQuery(req, "limit");
-
-    const result = await getProductsService({
-      page: page ? Number(page) : undefined,
-      limit: limit ? Number(limit) : undefined,
-      categoryId: id,
-      userId: req.user?.userId,
-    });
-
-    res.json({
-      success: true,
-      data: result.products,
-      pagination: {
-        page: Number(page) || 1,
-        limit: Number(limit) || 20,
-        total: result.total,
-        totalPages: Math.ceil(result.total / (Number(limit) || 20)),
-      },
-    });
-  } catch (error: any) {
-    if (error.message === "CATEGORY_NOT_FOUND") {
-      res.status(404).json({
-        success: false,
-        message: "Category not found.",
-      });
-      return;
-    }
-    console.error("GetCategoryProducts error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch products.",
-    });
+  } catch (err: any) {
+    if (err.message === "CATEGORY_NOT_FOUND") throw new NotFoundError("Category not found.");
+    throw err;
   }
-};
 
-export const createCategory = async (req: AuthRequest, res: Response) => {
+  const page = getQuery(req, "page");
+  const limit = getQuery(req, "limit");
+
+  const result = await getProductsService({
+    page: page ? Number(page) : undefined,
+    limit: limit ? Number(limit) : undefined,
+    categoryId: id,
+    userId: req.user?.userId,
+  });
+
+  return sendSuccess(res, result.products, {
+    pagination: {
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+      total: result.total,
+      totalPages: Math.ceil(result.total / (Number(limit) || 20)),
+    },
+  });
+});
+
+export const createCategory = asyncHandler(async (req: AuthRequest, res: Response) => {
   try {
-    let parsedBody = { ...req.body };
-
     const category = await createCategoryService(
-      parsedBody,
+      { ...req.body },
       req.file as Express.Multer.File | undefined,
       req.user!.userId
     );
-
-    res.status(201).json({
-      success: true,
-      data: category,
-      message: "Category created successfully.",
-    });
-  } catch (error: any) {
-    if (error.message === "MODEL_TYPE_NOT_FOUND") {
-      res.status(400).json({
-        success: false,
-        code: "MODEL_TYPE_NOT_FOUND",
-        message: "The selected model type does not exist.",
-      });
-      return;
+    return sendSuccess(res, category, { message: "Category created successfully.", statusCode: 201 });
+  } catch (err: any) {
+    if (err.message === "MODEL_TYPE_NOT_FOUND") {
+      throw new BadRequestError("The selected model type does not exist.", "MODEL_TYPE_NOT_FOUND");
     }
-    if (error.message === "CATEGORY_ALREADY_EXISTS") {
-      res.status(409).json({
-        success: false,
-        code: "CATEGORY_ALREADY_EXISTS",
-        message: "A category with this name already exists.",
-      });
-      return;
+    if (err.message === "CATEGORY_ALREADY_EXISTS") {
+      throw new ConflictError("A category with this name already exists.", "CATEGORY_ALREADY_EXISTS");
     }
-    console.error("CreateCategory error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create category.",
-    });
+    throw err;
   }
-};
+});
 
-export const updateCategory = async (req: AuthRequest, res: Response) => {
+export const updateCategory = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const id = getParam(req, "id");
-    let parsedBody = { ...req.body };
-
     const category = await updateCategoryService(
       id,
-      parsedBody,
+      { ...req.body },
       req.file as Express.Multer.File | undefined,
       req.user!.userId
     );
-
-    res.json({
-      success: true,
-      data: category,
-      message: "Category updated successfully.",
-    });
-  } catch (error: any) {
-    if (error.message === "CATEGORY_NOT_FOUND") {
-      res.status(404).json({
-        success: false,
-        message: "Category not found.",
-      });
-      return;
+    return sendSuccess(res, category, "Category updated successfully.");
+  } catch (err: any) {
+    if (err.message === "CATEGORY_NOT_FOUND") throw new NotFoundError("Category not found.");
+    if (err.message === "MODEL_TYPE_NOT_FOUND") {
+      throw new BadRequestError("The selected model type does not exist.", "MODEL_TYPE_NOT_FOUND");
     }
-    if (error.message === "MODEL_TYPE_NOT_FOUND") {
-      res.status(400).json({
-        success: false,
-        code: "MODEL_TYPE_NOT_FOUND",
-        message: "The selected model type does not exist.",
-      });
-      return;
+    if (err.message === "CATEGORY_ALREADY_EXISTS") {
+      throw new ConflictError("A category with this name already exists.", "CATEGORY_ALREADY_EXISTS");
     }
-    if (error.message === "CATEGORY_ALREADY_EXISTS") {
-      res.status(409).json({
-        success: false,
-        code: "CATEGORY_ALREADY_EXISTS",
-        message: "A category with this name already exists.",
-      });
-      return;
-    }
-    console.error("UpdateCategory error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update category.",
-    });
+    throw err;
   }
-};
+});
 
-export const deleteCategory = async (req: AuthRequest, res: Response) => {
+export const deleteCategory = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const id = getParam(req, "id");
     await deleteCategoryService(id, req.user!.userId);
-
-    res.json({
-      success: true,
-      message: "Category deleted successfully.",
-    });
-  } catch (error: any) {
-    if (error.message === "CATEGORY_NOT_FOUND") {
-      res.status(404).json({
-        success: false,
-        message: "Category not found.",
-      });
-      return;
+    return sendSuccess(res, null, "Category deleted successfully.");
+  } catch (err: any) {
+    if (err.message === "CATEGORY_NOT_FOUND") throw new NotFoundError("Category not found.");
+    if (err.message === "CATEGORY_HAS_PRODUCTS") {
+      throw new ConflictError(
+        `Cannot delete this category because ${err.productCount} product(s) are assigned to it. Move or archive those products first.`,
+        "CATEGORY_HAS_PRODUCTS"
+      );
     }
-    if (error.message === "CATEGORY_HAS_PRODUCTS") {
-      res.status(409).json({
-        success: false,
-        code: "CATEGORY_HAS_PRODUCTS",
-        message: `Cannot delete this category because ${error.productCount} product(s) are assigned to it. Move or archive those products first.`,
-        productCount: error.productCount,
-      });
-      return;
-    }
-    console.error("DeleteCategory error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete category.",
-    });
+    throw err;
   }
-};
+});

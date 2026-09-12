@@ -11,12 +11,14 @@ import { updateUserRoleSchema } from "../validations/user.validation";
 
 const router = Router();
 
-// All user management routes require super_admin
+// Protected routes require authentication
 router.use(authenticate);
-router.use(requireRole("super_admin"));
 
-router.get("/", getUsers);
-router.get("/:id", getUserById);
-router.patch("/:id/role", validate(updateUserRoleSchema), updateUserRole);
+// Admin & Super Admin can list users/customers
+router.get("/", requireRole("admin", "super_admin"), getUsers);
+router.get("/:id", requireRole("admin", "super_admin"), getUserById);
+
+// Role modification remains SuperAdmin exclusive
+router.patch("/:id/role", requireRole("super_admin"), validate(updateUserRoleSchema), updateUserRole);
 
 export default router;

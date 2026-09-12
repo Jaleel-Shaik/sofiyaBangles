@@ -27,6 +27,24 @@ export class AdminStaffService {
     }));
   }
 
+  static async getAdminById(id: string) {
+    const data = await getAdminByIdDb(id);
+    if (!data) {
+      throw new Error("ADMIN_NOT_FOUND");
+    }
+    return {
+      id: data.id,
+      full_name: data.full_name || "Admin",
+      email: data.email,
+      phone: data.phone || null,
+      role: data.role || "admin",
+      isActive: data.isActive !== false && data.is_active !== false,
+      twoFactorEnabled: data.twoFactorEnabled === true || data.is_2fa_enabled === true,
+      created_at: data.created_at || null,
+      updated_at: data.updated_at || null,
+    };
+  }
+
   static async createAdmin(adminData: { full_name: string; email: string; password?: string; phone?: string }, actorId: string) {
     const { full_name, email, password, phone } = adminData;
 

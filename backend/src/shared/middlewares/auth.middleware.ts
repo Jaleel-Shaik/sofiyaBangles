@@ -5,6 +5,7 @@ import { AuthRequest, JwtPayload, UserRole, Platform } from "../types";
 
 import { auth } from "../config/firebase";
 import { findIdentityByIdModel } from "../models/identity.model";
+import { UnauthorizedError } from "../../core/errors/app.error";
 
 interface DecodedTokenPayload {
   userId?: string;
@@ -27,11 +28,7 @@ export const authenticate = async (
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res.status(401).json({
-      success: false,
-      message: "Authentication required. Please provide a valid token.",
-    });
-    return;
+    return next(new UnauthorizedError("Authentication required. Please provide a valid token."));
   }
 
   const token = authHeader.split(" ")[1];
@@ -77,10 +74,7 @@ export const authenticate = async (
     next();
   } catch (error) {
     console.error("JWT/Firebase Verification Error:", error);
-    res.status(401).json({
-      success: false,
-      message: "Invalid or expired token.",
-    });
+    return next(new UnauthorizedError("Invalid or expired token."));
   }
 };
 

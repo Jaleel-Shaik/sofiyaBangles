@@ -4,28 +4,42 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./shared/config/env";
 import { corsOptions } from "./shared/config/cors";
-import { errorHandler } from "./shared/middlewares/error.middleware";
+import { errorHandler, notFoundHandler } from "./shared/middlewares/error.middleware";
 import { apiLogMiddleware } from "./shared/middlewares/apiLog.middleware";
+import { requestIdMiddleware } from "./core/middlewares/request-id.middleware";
+import { generalApiLimiter } from "./core/middlewares/rate-limit.middleware";
+import { firebaseCredentialSource, firebaseInitError } from "./shared/config/firebase";
 import apiRouter from "./api";
 
 const app = express();
+
+// 1. Request correlation tracing
+app.use(requestIdMiddleware);
+
+// 2. Security & Cross-Origin
 app.use(cors(corsOptions));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false,
+  })
+);
 
-app.use(helmet({
-  // Allow cross-origin API consumption (frontend on different port/domain)
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  // Disable CSP for API server — it serves JSON, not HTML pages
-  contentSecurityPolicy: false,
-}));
+// 3. Logging & Parsing
 app.use(morgan("dev"));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-import { firebaseCredentialSource, firebaseInitError } from "./shared/config/firebase";
+// 4. Rate Limiting for general traffic
+app.use("/api", generalApiLimiter);
 
-// Health check endpoints for Docker container health checks & load balancers
+// 5. API Failure Audit Logging (Must wrap before routes to listen on res finish)
+app.use(apiLogMiddleware);
+
+// 6. Health check endpoints
 app.get(["/health", "/api/health"], (_req, res) => {
   res.status(200).json({
+    success: true,
     status: "ok",
     service: "sofiya-bangles-backend",
     timestamp: new Date().toISOString(),
@@ -38,7 +52,7 @@ app.get(["/health", "/api/health"], (_req, res) => {
   });
 });
 
-// Root API endpoint
+// 7. Root API endpoint
 app.get("/api", (_req, res) => {
   res.status(200).json({
     message: "Sofiya Bangles API",
@@ -56,12 +70,19 @@ app.get("/api", (_req, res) => {
       "/api/model-types",
       "/api/size-preferences",
       "/api/orders",
+      "/api/cart",
       "/api/super-admin",
     ],
   });
 });
 
+// 8. Core API routes
 app.use("/api", apiRouter);
-app.use(apiLogMiddleware);
+
+// 9. 404 Route handler
+app.use(notFoundHandler);
+
+// 10. Global central error handler
 app.use(errorHandler);
+
 export default app;

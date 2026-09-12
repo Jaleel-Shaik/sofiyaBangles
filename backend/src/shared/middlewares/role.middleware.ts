@@ -1,5 +1,6 @@
 import { Response, NextFunction } from "express";
 import { AuthRequest, UserRole } from "../types";
+import { UnauthorizedError, ForbiddenError } from "../../core/errors/app.error";
 
 /**
  * Role-based access control middleware.
@@ -8,21 +9,13 @@ import { AuthRequest, UserRole } from "../types";
  * @param roles - Allowed roles for this route
  */
 export const requireRole = (...roles: UserRole[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+  return (req: AuthRequest, _res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: "Authentication required.",
-      });
-      return;
+      return next(new UnauthorizedError("Authentication required."));
     }
 
     if (!roles.includes(req.user.role)) {
-      res.status(403).json({
-        success: false,
-        message: "You do not have permission to perform this action.",
-      });
-      return;
+      return next(new ForbiddenError("You do not have permission to perform this action."));
     }
 
     next();

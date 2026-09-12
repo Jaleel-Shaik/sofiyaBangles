@@ -1,99 +1,53 @@
 import { Response } from "express";
 import { AuthRequest } from "../../../shared/types";
 import { getParam } from "../../../shared/utils/params";
+import { asyncHandler } from "../../../core/utils/async-handler";
+import { sendSuccess } from "../../../core/utils/response";
 import {
   getSizePreferencesService,
   createSizePreferenceService,
   updateSizePreferenceService,
   deleteSizePreferenceService,
 } from "../services/sizePreference.service";
+import { NotFoundError, ForbiddenError } from "../../../core/errors/app.error";
 
-export const getSizePreferences = async (req: AuthRequest, res: Response) => {
+export const getSizePreferences = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const preferences = await getSizePreferencesService(req.user!.userId);
+  return sendSuccess(res, preferences);
+});
+
+export const createSizePreference = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const preference = await createSizePreferenceService({
+    ...req.body,
+    user_id: req.user!.userId,
+  });
+  return sendSuccess(res, preference, { message: "Size preference created successfully.", statusCode: 201 });
+});
+
+export const updateSizePreference = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const preferences = await getSizePreferencesService(req.user!.userId);
-    res.json({
-      success: true,
-      data: preferences,
-    });
-  } catch (error: any) {
-    console.error("GetSizePreferences error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch size preferences.",
-    });
-  }
-};
-
-export const createSizePreference = async (req: AuthRequest, res: Response) => {
-  try {
-    const preference = await createSizePreferenceService({
-      ...req.body,
-      user_id: req.user!.userId,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: preference,
-      message: "Size preference created successfully.",
-    });
-  } catch (error: any) {
-    console.error("CreateSizePreference error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create size preference.",
-    });
-  }
-};
-
-export const updateSizePreference = async (req: AuthRequest, res: Response) => {
-  try {
-    const id = getParam(req, "id");
     const preference = await updateSizePreferenceService(id, req.user!.userId, req.body);
-
-    res.json({
-      success: true,
-      data: preference,
-      message: "Size preference updated successfully.",
-    });
-  } catch (error: any) {
-    if (error.message === "SIZE_PREFERENCE_NOT_FOUND") {
-      res.status(404).json({ success: false, message: "Size preference not found." });
-      return;
+    return sendSuccess(res, preference, "Size preference updated successfully.");
+  } catch (err: any) {
+    if (err.message === "SIZE_PREFERENCE_NOT_FOUND") throw new NotFoundError("Size preference not found.");
+    if (err.message === "UNAUTHORIZED_ACCESS") {
+      throw new ForbiddenError("You do not have permission to modify this preference.");
     }
-    if (error.message === "UNAUTHORIZED_ACCESS") {
-      res.status(403).json({ success: false, message: "You do not have permission to modify this preference." });
-      return;
-    }
-    console.error("UpdateSizePreference error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update size preference.",
-    });
+    throw err;
   }
-};
+});
 
-export const deleteSizePreference = async (req: AuthRequest, res: Response) => {
+export const deleteSizePreference = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const id = getParam(req, "id");
     await deleteSizePreferenceService(id, req.user!.userId);
-
-    res.json({
-      success: true,
-      message: "Size preference deleted successfully.",
-    });
-  } catch (error: any) {
-    if (error.message === "SIZE_PREFERENCE_NOT_FOUND") {
-      res.status(404).json({ success: false, message: "Size preference not found." });
-      return;
+    return sendSuccess(res, null, "Size preference deleted successfully.");
+  } catch (err: any) {
+    if (err.message === "SIZE_PREFERENCE_NOT_FOUND") throw new NotFoundError("Size preference not found.");
+    if (err.message === "UNAUTHORIZED_ACCESS") {
+      throw new ForbiddenError("You do not have permission to delete this preference.");
     }
-    if (error.message === "UNAUTHORIZED_ACCESS") {
-      res.status(403).json({ success: false, message: "You do not have permission to delete this preference." });
-      return;
-    }
-    console.error("DeleteSizePreference error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete size preference.",
-    });
+    throw err;
   }
-};
+});

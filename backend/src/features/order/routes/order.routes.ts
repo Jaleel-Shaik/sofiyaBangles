@@ -6,6 +6,7 @@ import { createOrderSchema, updateOrderStatusSchema, createReviewSchema } from "
 import {
   createOrder,
   getUserOrders,
+  getOrderById,
   getAdminOrders,
   completeOrder,
   refundOrder,
@@ -25,9 +26,10 @@ router.use(authenticate);
 router.post("/", validate(createOrderSchema), createOrder);
 router.get("/", getUserOrders);
 router.get("/admin/all", requireRole("admin", "super_admin"), getAdminOrders);
+router.post("/reviews", validate(createReviewSchema), createReview);
+router.get("/:id", getOrderById);
 router.patch("/:id/status", requireRole("admin", "super_admin"), validate(updateOrderStatusSchema), updateOrderStatus);
 router.post("/:id/complete", requireRole("admin", "super_admin"), completeOrder);
 router.post("/:id/refund", requireRole("admin", "super_admin"), refundOrder);
-router.post("/reviews", validate(createReviewSchema), createReview);
 
 export default router;

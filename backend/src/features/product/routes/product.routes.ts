@@ -56,6 +56,12 @@ router.patch(
   requireRole("admin", "super_admin"),
   sellProduct,
 );
+router.post(
+  "/:id/sell",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  sellProduct,
+);
 router.patch(
   "/:id/restore",
   authenticate,

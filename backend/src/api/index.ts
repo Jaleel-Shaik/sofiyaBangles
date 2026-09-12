@@ -12,6 +12,7 @@ import modelTypeRoutes from "../features/model-type/routes/modelType.routes";
 import sizePreferenceRoutes from "../features/size-preference/routes/sizePreference.routes";
 import orderRoutes from "../features/order/routes/order.routes";
 import superAdminRoutes from "../features/super-admin/routes/superAdmin.routes";
+import cartRoutes from "../features/cart/routes/cart.routes";
 
 import { authenticate, optionalAuthenticate } from "../shared/middlewares/auth.middleware";
 import { validate } from "../shared/middlewares/validate.middleware";
@@ -49,6 +50,7 @@ apiRouter.use("/notifications", notificationRoutes);
 apiRouter.use("/model-types", modelTypeRoutes);
 apiRouter.use("/size-preferences", sizePreferenceRoutes);
 apiRouter.use("/orders", orderRoutes);
+apiRouter.use("/cart", cartRoutes);
 apiRouter.use("/super-admin", superAdminRoutes);
 
 export default apiRouter;

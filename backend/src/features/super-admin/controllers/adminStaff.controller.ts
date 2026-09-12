@@ -1,35 +1,46 @@
 import { Response } from "express";
 import { AuthRequest } from "../../../shared/types";
 import { getParam } from "../../../shared/utils/params";
+import { asyncHandler } from "../../../core/utils/async-handler";
+import { sendSuccess } from "../../../core/utils/response";
 import { AdminStaffService } from "../services/adminStaff.service";
+import { NotFoundError, BadRequestError, ForbiddenError, ConflictError } from "../../../core/errors/app.error";
 
 /**
  * List all administrator accounts (SuperAdmin exclusive)
  */
-export const listAdmins = async (req: AuthRequest, res: Response): Promise<void> => {
+export const listAdmins = asyncHandler(async (_req: AuthRequest, res: Response) => {
+  const admins = await AdminStaffService.listAdmins();
+  return res.json({
+    success: true,
+    data: admins,
+    total: admins.length,
+  });
+});
+
+/**
+ * Get administrator account by ID
+ */
+export const getAdminById = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const admins = await AdminStaffService.listAdmins();
-    res.json({
-      success: true,
-      data: admins,
-      total: admins.length,
-    });
-  } catch (error: any) {
-    console.error("ListAdmins error:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch admin staff list." });
+    const admin = await AdminStaffService.getAdminById(id);
+    return sendSuccess(res, admin);
+  } catch (err: any) {
+    if (err.message === "ADMIN_NOT_FOUND") throw new NotFoundError("Admin account not found.");
+    throw err;
   }
-};
+});
 
 /**
  * Create a new Store Admin / Manager account
  */
-export const createAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
+export const createAdmin = asyncHandler(async (req: AuthRequest, res: Response) => {
   try {
     const newAdminData = await AdminStaffService.createAdmin(req.body, req.user!.userId);
-    res.status(201).json({
-      success: true,
-      message: "Admin account created successfully.",
-      data: {
+    return sendSuccess(
+      res,
+      {
         id: newAdminData.id,
         full_name: newAdminData.full_name,
         email: newAdminData.email,
@@ -39,81 +50,68 @@ export const createAdmin = async (req: AuthRequest, res: Response): Promise<void
         twoFactorEnabled: false,
         created_at: newAdminData.created_at,
       },
-    });
-  } catch (error: any) {
-    if (error.message === "MISSING_REQUIRED_FIELDS") {
-      res.status(400).json({ success: false, message: "Full name, email, and password are required." });
-      return;
+      {
+        message: "Admin account created successfully.",
+        statusCode: 201,
+      }
+    );
+  } catch (err: any) {
+    if (err.message === "MISSING_REQUIRED_FIELDS") {
+      throw new BadRequestError("Full name, email, and password are required.");
     }
-    if (error.message === "PASSWORD_TOO_SHORT") {
-      res.status(400).json({ success: false, message: "Password must be at least 6 characters long." });
-      return;
+    if (err.message === "PASSWORD_TOO_SHORT") {
+      throw new BadRequestError("Password must be at least 6 characters long.");
     }
-    if (error.message === "ADMIN_EXISTS") {
-      res.status(409).json({ success: false, message: "An administrator with this email already exists." });
-      return;
+    if (err.message === "ADMIN_EXISTS") {
+      throw new ConflictError("An administrator with this email already exists.");
     }
-    console.error("CreateAdmin error:", error);
-    res.status(500).json({ success: false, message: "Failed to create administrator account." });
+    throw err;
   }
-};
+});
 
 /**
  * Toggle Admin active / inactive status
  */
-export const updateAdminStatus = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const id = getParam(req, "id");
-    const { isActive } = req.body;
-    
-    const result = await AdminStaffService.updateAdminStatus(id, isActive, req.user!.userId);
+export const updateAdminStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
+  const { isActive } = req.body;
 
-    res.json({
-      success: true,
-      message: `Admin account ${result.isActive ? "activated" : "deactivated"} successfully.`,
-      data: result,
-    });
-  } catch (error: any) {
-    if (error.message === "INVALID_STATUS") {
-      res.status(400).json({ success: false, message: "isActive (boolean) is required." });
-      return;
+  try {
+    const result = await AdminStaffService.updateAdminStatus(id, isActive, req.user!.userId);
+    return sendSuccess(
+      res,
+      result,
+      `Admin account ${result.isActive ? "activated" : "deactivated"} successfully.`
+    );
+  } catch (err: any) {
+    if (err.message === "INVALID_STATUS") {
+      throw new BadRequestError("isActive (boolean) is required.");
     }
-    if (error.message === "ADMIN_NOT_FOUND") {
-      res.status(404).json({ success: false, message: "Admin account not found." });
-      return;
+    if (err.message === "ADMIN_NOT_FOUND") {
+      throw new NotFoundError("Admin account not found.");
     }
-    if (error.message === "CANNOT_DEACTIVATE_SUPERADMIN") {
-      res.status(403).json({ success: false, message: "SuperAdmin accounts cannot be deactivated." });
-      return;
+    if (err.message === "CANNOT_DEACTIVATE_SUPERADMIN") {
+      throw new ForbiddenError("SuperAdmin accounts cannot be deactivated.");
     }
-    console.error("UpdateAdminStatus error:", error);
-    res.status(500).json({ success: false, message: "Failed to update admin account status." });
+    throw err;
   }
-};
+});
 
 /**
  * Delete an Administrator account
  */
-export const deleteAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteAdmin = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
   try {
-    const id = getParam(req, "id");
     const result = await AdminStaffService.deleteAdmin(id, req.user!.userId);
-    
-    res.json({
-      success: true,
-      message: "Admin account deleted successfully.",
-      data: result,
-    });
-  } catch (error: any) {
-    if (error.message === "ADMIN_NOT_FOUND") {
-      res.status(404).json({ success: false, message: "Admin account not found." });
-      return;
+    return sendSuccess(res, result, "Admin account deleted successfully.");
+  } catch (err: any) {
+    if (err.message === "ADMIN_NOT_FOUND") {
+      throw new NotFoundError("Admin account not found.");
     }
-    if (error.message === "CANNOT_DELETE_SUPERADMIN") {
-      res.status(403).json({ success: false, message: "SuperAdmin accounts cannot be deleted." });
-      return;
+    if (err.message === "CANNOT_DELETE_SUPERADMIN") {
+      throw new ForbiddenError("SuperAdmin accounts cannot be deleted.");
     }
-    console.error("DeleteAdmin error:", error);
-    res.status(500).json({ success: false, message: "Failed to delete administrator account." });
+    throw err;
   }
-};
+});

@@ -1,5 +1,6 @@
 import { Response, NextFunction } from "express";
 import { AuthRequest, Platform } from "../types";
+import { UnauthorizedError, ForbiddenError } from "../../core/errors/app.error";
 
 /**
  * Platform authorization middleware.
@@ -8,21 +9,15 @@ import { AuthRequest, Platform } from "../types";
  * @param platforms - Allowed platforms for this route (e.g. "web", "mobile")
  */
 export const requirePlatform = (...platforms: Platform[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+  return (req: AuthRequest, _res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: "Authentication required.",
-      });
-      return;
+      return next(new UnauthorizedError("Authentication required."));
     }
 
     if (!req.user.platform || !platforms.includes(req.user.platform)) {
-      res.status(403).json({
-        success: false,
-        message: `Platform access denied. This route only allows: ${platforms.join(", ")}.`,
-      });
-      return;
+      return next(
+        new ForbiddenError(`Platform access denied. This route only allows: ${platforms.join(", ")}.`)
+      );
     }
 
     next();

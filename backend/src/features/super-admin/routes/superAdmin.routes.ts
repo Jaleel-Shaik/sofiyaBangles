@@ -21,6 +21,7 @@ import {
 
 import {
   listAdmins,
+  getAdminById,
   createAdmin,
   updateAdminStatus,
   deleteAdmin,
@@ -41,6 +42,7 @@ router.use(requireRole("super_admin"));
 // Sub-admin management
 router.get("/admins", listAdmins);
 router.post("/admins", validate(createAdminSchema), createAdmin);
+router.get("/admins/:id", getAdminById);
 router.patch("/admins/:id/status", validate(updateAdminStatusSchema), updateAdminStatus);
 router.delete("/admins/:id", deleteAdmin);
 
