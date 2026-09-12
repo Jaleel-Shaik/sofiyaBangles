@@ -1,5 +1,5 @@
-import { Response } from "express";
-import { AuthRequest } from "../../../shared/types";
+import type { Response } from "express";
+import { AuthRequest, SalesAnalyticsQuery, RevenueTransactionType } from "../../../shared/types";
 import { getParam, getQuery } from "../../../shared/utils/params";
 import { SuperAdminService } from "../services/superAdmin.service";
 
@@ -8,7 +8,7 @@ import { SuperAdminService } from "../services/superAdmin.service";
  */
 export const getDashboard = async (req: AuthRequest, res: Response) => {
   try {
-    const period = getQuery(req, "period") as any;
+    const period = getQuery(req, "period") as SalesAnalyticsQuery["period"];
     const fromDate = getQuery(req, "fromDate");
     const toDate = getQuery(req, "toDate");
     const categoryId = getQuery(req, "categoryId");
@@ -130,7 +130,7 @@ export const getRevenueLedger = async (req: AuthRequest, res: Response) => {
     const limit = getQuery(req, "limit") ? Number(getQuery(req, "limit")) : 20;
     const fromDate = getQuery(req, "fromDate");
     const toDate = getQuery(req, "toDate");
-    const transactionType = getQuery(req, "transactionType") as any;
+    const transactionType = getQuery(req, "transactionType") as RevenueTransactionType | undefined;
     const adminId = getQuery(req, "adminId");
 
     const result = await SuperAdminService.getRevenueLedger({

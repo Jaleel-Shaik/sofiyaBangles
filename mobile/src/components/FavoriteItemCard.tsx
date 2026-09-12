@@ -1,8 +1,9 @@
 import { View, Text, Image, TouchableOpacity } from 'react-native';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Product } from '@/src/api/products';
 
 interface FavoriteItemCardProps {
-  product: any;
+  product: Product;
   onRemove: () => void;
   onWhatsApp: () => void;
 }

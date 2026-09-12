@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import axios, { type InternalAxiosRequestConfig, type AxiosRequestConfig } from "axios";
 import { ClassifiedApiError } from "./errors";
 import { logApiError } from "@/features/error-center/lib/log";
 
@@ -9,7 +10,7 @@ import { logApiError } from "@/features/error-center/lib/log";
  */
 const DEBOUNCE_MS = 6000;
 
-type RetryHandler = (config: any) => Promise<unknown>;
+type RetryHandler = (config: InternalAxiosRequestConfig | AxiosRequestConfig) => Promise<unknown>;
 
 let retryHandler: RetryHandler | null = null;
 
@@ -24,7 +25,7 @@ export function registerRetryHandler(handler: RetryHandler) {
 interface PendingError {
   apiError: ClassifiedApiError;
   failedUrl: string | null;
-  config: any;
+  config: InternalAxiosRequestConfig | AxiosRequestConfig | null;
   reportedAt: number;
 }
 
@@ -32,7 +33,7 @@ interface ApiErrorBusState {
   currentError: PendingError | null;
   isRetrying: boolean;
   lastDismissedAt: number;
-  reportError: (error: any, url?: string) => void;
+  reportError: (error: unknown, url?: string) => void;
   dismiss: () => void;
   retry: () => Promise<boolean>;
 }
@@ -50,6 +51,7 @@ export const useApiErrorBus = create<ApiErrorBusState>((set, get) => ({
 
     const now = Date.now();
     const { currentError, lastDismissedAt } = get();
+    const reqConfig = axios.isAxiosError(error) ? error.config ?? null : null;
 
     // While a popup is open, refresh its content with the newest failure.
     if (currentError) {
@@ -57,7 +59,7 @@ export const useApiErrorBus = create<ApiErrorBusState>((set, get) => ({
         currentError: {
           apiError,
           failedUrl: url ?? null,
-          config: error?.config ?? null,
+          config: reqConfig,
           reportedAt: now,
         },
       });
@@ -74,7 +76,7 @@ export const useApiErrorBus = create<ApiErrorBusState>((set, get) => ({
       currentError: {
         apiError,
         failedUrl: url ?? null,
-        config: error?.config ?? null,
+        config: reqConfig,
         reportedAt: now,
       },
     });
@@ -86,7 +88,7 @@ export const useApiErrorBus = create<ApiErrorBusState>((set, get) => ({
 
   retry: async () => {
     const { currentError, isRetrying } = get();
-    if (!currentError || isRetrying || !retryHandler) {
+    if (!currentError || !currentError.config || isRetrying || !retryHandler) {
       set({ currentError: null, lastDismissedAt: Date.now() });
       return false;
     }

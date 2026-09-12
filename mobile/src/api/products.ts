@@ -1,5 +1,22 @@
-import { API_ENDPOINTS } from "./endpoints";
+import { API_ENDPOINTS } from './endpoints';
 import { apiClient } from './client';
+
+export interface ProductImage {
+  id?: string;
+  image_url: string;
+  is_primary?: boolean;
+  display_order?: number;
+}
+
+export interface ProductVariant {
+  id?: string;
+  size?: string;
+  color?: string;
+  price: number;
+  stock_quantity?: number;
+  quantity: number;
+  sku?: string;
+}
 
 export interface Product {
   id: string;
@@ -8,7 +25,7 @@ export interface Product {
   description: string;
   price: number;
   image_url: string;
-  images?: any[];
+  images?: string[];
   category_id: string;
   quantity: number;
   likes?: number;
@@ -18,7 +35,7 @@ export interface Product {
   status?: 'draft' | 'active' | 'out_of_stock' | 'archived';
   deleted_at?: string | null;
   has_variants?: boolean;
-  variants?: any[];
+  variants?: ProductVariant[];
   accepts_custom_size?: boolean;
   custom_size_price?: number | string;
   model_type_id: string;
@@ -27,14 +44,19 @@ export interface Product {
   updated_at?: string;
 }
 
-export const getProducts = async (page = 1, limit = 10, categoryId?: string, search?: string) => {
+export const getProducts = async (
+  page = 1,
+  limit = 10,
+  categoryId?: string,
+  search?: string
+): Promise<{ products: Product[]; total: number }> => {
   try {
     let url = `${API_ENDPOINTS.PRODUCTS.BASE}?page=${page}&limit=${limit}`;
     if (categoryId) url += `&category_id=${categoryId}`;
     if (search) url += `&search=${search}`;
 
     const res = await apiClient.get(url);
-    const payload = Array.isArray(res.data?.data) ? res.data.data : [];
+    const payload: Product[] = Array.isArray(res.data?.data) ? res.data.data : [];
     const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;
     return { products: payload, total };
   } catch (error) {
@@ -43,40 +65,57 @@ export const getProducts = async (page = 1, limit = 10, categoryId?: string, sea
   }
 };
 
-export const getProductById = async (id: string) => {
+export const getRecommendedProducts = async (
+  page = 1,
+  limit = 10,
+  search?: string
+): Promise<{ products: Product[]; total: number }> => {
+  return getProducts(page, limit, undefined, search);
+};
+
+export const getProductById = async (id: string): Promise<Product | null> => {
   try {
     const res = await apiClient.get(API_ENDPOINTS.PRODUCTS.BY_ID(id));
-    return res.data?.data ?? null;
+    return (res.data?.data || null) as Product | null;
   } catch (error) {
     console.error(`Error fetching product ${id}`, error);
     return null;
   }
 };
 
-export const getRecommendedProducts = async (page = 1, limit = 10, search?: string) => {
+export const getFeaturedProducts = async (): Promise<Product[]> => {
   try {
-    let url = `${API_ENDPOINTS.PRODUCTS.BASE}/recommended?page=${page}&limit=${limit}`;
-    if (search) url += `&search=${search}`;
-
-    const res = await apiClient.get(url);
-    const payload = Array.isArray(res.data?.data) ? res.data.data : [];
-    const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;
-    return { products: payload, total };
+    const res = await apiClient.get(`${API_ENDPOINTS.PRODUCTS.BASE}?featured=true`);
+    return (res.data?.data || []) as Product[];
   } catch (error) {
-    console.error('Error fetching recommended products', error);
-    return { products: [], total: 0 };
+    console.error('Error fetching featured products', error);
+    return [];
   }
 };
 
-export const getNewArrivals = async (daysAgo: number, page = 1, limit = 20) => {
+export const getNewArrivals = async (
+  daysAgo = 7,
+  page = 1,
+  limit = 20
+): Promise<{ products: Product[]; total: number }> => {
   try {
-    let url = `${API_ENDPOINTS.PRODUCTS.BASE}/new-arrivals?daysAgo=${daysAgo}&page=${page}&limit=${limit}`;
+    const url = `${API_ENDPOINTS.PRODUCTS.BASE}?new_arrivals=true&days=${daysAgo}&page=${page}&limit=${limit}`;
     const res = await apiClient.get(url);
-    const payload = Array.isArray(res.data?.data) ? res.data.data : [];
+    const payload: Product[] = Array.isArray(res.data?.data) ? res.data.data : [];
     const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;
     return { products: payload, total };
   } catch (error) {
     console.error('Error fetching new arrivals', error);
     return { products: [], total: 0 };
+  }
+};
+
+export const getProductsByCategory = async (categoryId: string): Promise<Product[]> => {
+  try {
+    const res = await apiClient.get(`${API_ENDPOINTS.PRODUCTS.BASE}?category_id=${categoryId}`);
+    return (res.data?.data || []) as Product[];
+  } catch (error) {
+    console.error(`Error fetching products for category ${categoryId}`, error);
+    return [];
   }
 };

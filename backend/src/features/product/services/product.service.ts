@@ -26,6 +26,19 @@ import { CreateProductInput, UpdateProductInput } from "../validations/product.v
 import { v2 as cloudinary } from "cloudinary";
 import "multer"; // Fix for ts-node Express.Multer resolution
 
+interface ImageInput {
+  image_url?: string;
+  [key: string]: unknown;
+}
+
+interface VariantInput {
+  size?: string;
+  sku?: string | null;
+  price: number | string;
+  quantity?: number | string;
+  [key: string]: unknown;
+}
+
 export const createProductService = async (
   input: CreateProductInput,
   files: Express.Multer.File[] | undefined,
@@ -54,7 +67,7 @@ export const createProductService = async (
   let allImageUrls: string[] = [];
   
   if (input.images && Array.isArray(input.images)) {
-    allImageUrls.push(...input.images.map((img: any) => typeof img === 'string' ? img : img.image_url).filter(Boolean));
+    allImageUrls.push(...(input.images as (string | ImageInput)[]).map((img) => typeof img === 'string' ? img : (img.image_url || '')).filter(Boolean));
   }
 
   if (files && files.length > 0) {
@@ -99,11 +112,11 @@ export const createProductService = async (
 
   const variants: ProductVariant[] = [];
   if (input.has_variants && input.variants) {
-    input.variants.forEach((v: any) => {
+    (input.variants as VariantInput[]).forEach((v) => {
       variants.push({
         id: uuidv4(),
         product_id: newId,
-        size: v.size,
+        size: v.size || '',
         sku: v.sku || null,
         price: Number(v.price),
         quantity: Number(v.quantity || 0),
@@ -282,7 +295,7 @@ export const updateProductService = async (
     updated_at: new Date().toISOString(),
   }));
 
-  const updateData: any = { ...restInput, updated_at: new Date().toISOString() };
+  const updateData: Record<string, unknown> = { ...restInput, updated_at: new Date().toISOString() };
   if (restInput.status) {
     updateData.is_active = restInput.status === "active" || restInput.status === "out_of_stock";
   } else if (restInput.is_active !== undefined) {
@@ -304,12 +317,12 @@ export const updateProductService = async (
   let formattedVariants: ProductVariant[] | undefined = undefined;
   if (variants !== undefined) {
     formattedVariants = [];
-    if (variants && variants.length > 0) {
-      variants.forEach((v: any) => {
+    if (variants && Array.isArray(variants) && variants.length > 0) {
+      (variants as VariantInput[]).forEach((v) => {
         formattedVariants!.push({
           id: uuidv4(),
           product_id: id,
-          size: v.size,
+          size: v.size || '',
           sku: v.sku || null,
           price: Number(v.price),
           quantity: Number(v.quantity || 0),

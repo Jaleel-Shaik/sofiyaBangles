@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { ShoppingBag, ArrowLeft, CheckCircle, RefreshCw, Shield, User, MapPin } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/src/lib/api";
+import { AdminOrder, AdminOrderItem } from "@/src/lib/api/types";
 
 export default function SaleDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
 
-  const [sale, setSale] = useState<any | null>(null);
+  const [sale, setSale] = useState<AdminOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [refundReason, setRefundReason] = useState("");
@@ -156,7 +157,7 @@ export default function SaleDetailPage() {
           </h2>
 
           <div className="divide-y divide-slate-100">
-            {sale.items?.map((item: any) => (
+            {sale.items?.map((item: AdminOrderItem) => (
               <div key={item.id} className="py-4 flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-900">{item.product_name_snapshot}</p>

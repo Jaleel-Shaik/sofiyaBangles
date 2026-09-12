@@ -1,6 +1,6 @@
 import { api } from "@/src/api";
 import { create } from 'zustand';
-
+import { Favorite } from "@/src/api/favorites";
 
 interface FavoriteStore {
   favoriteIds: string[];
@@ -15,11 +15,11 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
   initialized: false,
   fetchFavorites: async () => {
     try {
-      const favs = await api.favorites.getFavorites();
+      const favs: Favorite[] = await api.favorites.getFavorites();
       // Only keep favorites that actually exist (backend filters deleted)
       const ids = favs
-        .filter((f: any) => f && f.product_id)
-        .map((f: any) => f.product_id);
+        .filter((f) => Boolean(f?.product_id))
+        .map((f) => f.product_id);
       const currentIds = get().favoriteIds;
       // Only update if changed to avoid unnecessary re-renders
       if (JSON.stringify(currentIds.sort()) !== JSON.stringify([...ids].sort())) {
@@ -53,11 +53,11 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
   },
   removeStaleFavorites: async () => {
     try {
-      const favs = await api.favorites.getFavorites();
+      const favs: Favorite[] = await api.favorites.getFavorites();
       const validIds = new Set(
         favs
-          .filter((f: any) => f && f.product_id)
-          .map((f: any) => f.product_id)
+          .filter((f) => Boolean(f?.product_id))
+          .map((f) => f.product_id)
       );
       const { favoriteIds } = get();
       const staleIds = favoriteIds.filter(id => !validIds.has(id));

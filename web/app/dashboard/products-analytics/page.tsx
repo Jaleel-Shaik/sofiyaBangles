@@ -4,12 +4,23 @@ import { useState, useEffect } from "react";
 import { Package, Search, Download, Eye, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/src/lib/api";
+import { ProductAnalyticsItem } from "@/src/lib/api/types";
+
+type ProductAnalyticsTab = "all" | "best_sellers" | "low_stock" | "out_of_stock" | "unsold";
+
+const ANALYTICS_TABS: Array<{ id: ProductAnalyticsTab; label: string }> = [
+  { id: "all", label: "All Products" },
+  { id: "best_sellers", label: "Best Sellers" },
+  { id: "low_stock", label: "Low Stock Alert" },
+  { id: "out_of_stock", label: "Out of Stock" },
+  { id: "unsold", label: "Unsold Items" },
+];
 
 export default function ProductsAnalyticsPage() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductAnalyticsItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [tab, setTab] = useState<"all" | "best_sellers" | "low_stock" | "out_of_stock" | "unsold">("all");
+  const [tab, setTab] = useState<ProductAnalyticsTab>("all");
   const [loading, setLoading] = useState(true);
 
   const fetchProducts = async () => {
@@ -62,16 +73,10 @@ export default function ProductsAnalyticsPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-1">
-        {[
-          { id: "all", label: "All Products" },
-          { id: "best_sellers", label: "Best Sellers" },
-          { id: "low_stock", label: "Low Stock Alert" },
-          { id: "out_of_stock", label: "Out of Stock" },
-          { id: "unsold", label: "Unsold Items" },
-        ].map((t) => (
+        {ANALYTICS_TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id as any)}
+            onClick={() => setTab(t.id)}
             className={`px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
               tab === t.id
                 ? "bg-rose-600 text-white shadow-sm"

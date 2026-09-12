@@ -1,10 +1,9 @@
 import type { Product } from '@/src/api/products';
-import { api } from "@/src/api";
-import { View, Text, Image, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
-import { useFavoriteStore } from "../store/favoriteStore";
+import { useFavoriteStore } from '../store/favoriteStore';
 
 interface ProductCardProps {
   product: Product;
@@ -26,12 +25,12 @@ export default function ProductCard({
   return (
     <TouchableOpacity
       className="bg-surface rounded-2xl mb-4 border border-divider overflow-hidden"
-      style={{ width: "48%" }}
+      style={{ width: '48%' }}
       onPress={() =>
         router.push({
-          pathname: "/products/[id]",
+          pathname: '/products/[id]',
           params: { id: product.id },
-        } as any)
+        })
       }
       activeOpacity={0.9}
     >
@@ -40,7 +39,7 @@ export default function ProductCard({
           source={{
             uri:
               product.image_url ||
-              "https://images.unsplash.com/photo-1599643478524-fb66f453863a",
+              'https://images.unsplash.com/photo-1599643478524-fb66f453863a',
           }}
           className="w-full h-full"
           resizeMode="cover"
@@ -59,9 +58,9 @@ export default function ProductCard({
           }}
         >
           <Ionicons
-            name={isFavorite ? "heart" : "heart-outline"}
+            name={isFavorite ? 'heart' : 'heart-outline'}
             size={18}
-            color={isFavorite ? "#e11d48" : "#94a3b8"}
+            color={isFavorite ? '#e11d48' : '#94a3b8'}
           />
         </TouchableOpacity>
       </View>

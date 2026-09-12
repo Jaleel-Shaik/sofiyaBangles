@@ -1,10 +1,19 @@
-import { Response, NextFunction } from "express";
+import type { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
-import { AuthRequest, JwtPayload } from "../types";
+import { AuthRequest, JwtPayload, UserRole, Platform } from "../types";
 
 import { auth } from "../config/firebase";
 import { findIdentityByIdModel } from "../models/identity.model";
+
+interface DecodedTokenPayload {
+  userId?: string;
+  uid?: string;
+  email?: string;
+  role?: string;
+  platform?: string;
+  [key: string]: unknown;
+}
 
 /**
  * Verifies the JWT token from Authorization header.
@@ -28,21 +37,21 @@ export const authenticate = async (
   const token = authHeader.split(" ")[1];
 
   try {
-    let decoded: any;
+    let decoded: DecodedTokenPayload;
     let isFirebaseToken = false;
 
     try {
       // Try verifying as an Express custom JWT first
-      decoded = jwt.verify(token, env.JWT_SECRET);
-    } catch (e) {
+      decoded = jwt.verify(token, env.JWT_SECRET) as DecodedTokenPayload;
+    } catch {
       // If it fails, try verifying as a Firebase ID token
-      decoded = await auth.verifyIdToken(token);
+      decoded = (await auth.verifyIdToken(token)) as DecodedTokenPayload;
       isFirebaseToken = true;
     }
 
-    let role = decoded.role;
-    let userId = decoded.userId || decoded.uid;
-    let platform = decoded.platform || (isFirebaseToken ? "mobile" : "web");
+    let role = typeof decoded.role === "string" ? decoded.role : undefined;
+    const userId = (typeof decoded.userId === "string" ? decoded.userId : undefined) || (typeof decoded.uid === "string" ? decoded.uid : "");
+    const platform = (typeof decoded.platform === "string" ? decoded.platform : undefined) || (isFirebaseToken ? "mobile" : "web");
 
     // If it's a Firebase token and lacks a role in claims, fetch from users/admins
     if (isFirebaseToken && !role) {
@@ -54,11 +63,15 @@ export const authenticate = async (
       }
     }
 
+    const userRole: UserRole =
+      role === "admin" || role === "super_admin" || role === "user" ? role : "user";
+    const userPlatform: Platform = platform === "mobile" ? "mobile" : "web";
+
     req.user = {
       userId,
-      email: decoded.email,
-      role: role,
-      platform: platform,
+      email: typeof decoded.email === "string" ? decoded.email : "",
+      role: userRole,
+      platform: userPlatform,
     };
 
     next();
@@ -90,19 +103,19 @@ export const optionalAuthenticate = async (
   const token = authHeader.split(" ")[1];
 
   try {
-    let decoded: any;
+    let decoded: DecodedTokenPayload;
     let isFirebaseToken = false;
 
     try {
-      decoded = jwt.verify(token, env.JWT_SECRET);
-    } catch (e) {
-      decoded = await auth.verifyIdToken(token);
+      decoded = jwt.verify(token, env.JWT_SECRET) as DecodedTokenPayload;
+    } catch {
+      decoded = (await auth.verifyIdToken(token)) as DecodedTokenPayload;
       isFirebaseToken = true;
     }
 
-    let role = decoded.role;
-    let userId = decoded.userId || decoded.uid;
-    let platform = decoded.platform || (isFirebaseToken ? "mobile" : "web");
+    let role = typeof decoded.role === "string" ? decoded.role : undefined;
+    const userId = (typeof decoded.userId === "string" ? decoded.userId : undefined) || (typeof decoded.uid === "string" ? decoded.uid : "");
+    const platform = (typeof decoded.platform === "string" ? decoded.platform : undefined) || (isFirebaseToken ? "mobile" : "web");
 
     if (isFirebaseToken && !role) {
       try {
@@ -112,18 +125,22 @@ export const optionalAuthenticate = async (
         } else {
           role = "user";
         }
-      } catch (e) {
+      } catch {
         role = "user";
       }
     }
 
+    const userRole: UserRole =
+      role === "admin" || role === "super_admin" || role === "user" ? role : "user";
+    const userPlatform: Platform = platform === "mobile" ? "mobile" : "web";
+
     req.user = {
       userId,
-      email: decoded.email,
-      role: role,
-      platform: platform,
+      email: typeof decoded.email === "string" ? decoded.email : "",
+      role: userRole,
+      platform: userPlatform,
     };
-  } catch (error) {
+  } catch {
     // Token invalid or expired; leave req.user undefined for optional auth
   }
 

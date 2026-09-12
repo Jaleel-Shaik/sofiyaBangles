@@ -1,6 +1,18 @@
 import { API_ENDPOINTS } from "./endpoints";
 import { apiClient, extractData, API_URL } from "./client";
-import { SuperAdminDashboardData, RevenueLedgerItem, ProductAnalyticsDetail, AdminStaff, AdminOrder, UserProfile } from "./types";
+import {
+  SuperAdminDashboardData,
+  RevenueLedgerItem,
+  ProductAnalyticsDetail,
+  AdminStaff,
+  AdminOrder,
+  UserProfile,
+  CommissionSettings,
+  AdminActivityItem,
+  AdminNotification,
+  ProductAnalyticsItem,
+  ShippingAddressSnapshot,
+} from "./types";
 
 export const superAdminApi = {
   getDashboard: (params?: { period?: string; fromDate?: string; toDate?: string; categoryId?: string; modelTypeId?: string; adminId?: string }) =>
@@ -8,16 +20,16 @@ export const superAdminApi = {
 
   getSalesList: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.SALES, { params }).then((r) => ({
-      sales: extractData<any[]>(r),
+      sales: extractData<AdminOrder[]>(r),
       total: r.data?.pagination?.total || 0,
     })),
 
   getSaleDetail: (id: string) =>
-    apiClient.get(API_ENDPOINTS.SUPER_ADMIN.SALE_BY_ID(id)).then((r) => extractData<any>(r)),
+    apiClient.get(API_ENDPOINTS.SUPER_ADMIN.SALE_BY_ID(id)).then((r) => extractData<AdminOrder>(r)),
 
   getProductsAnalytics: (params?: { page?: number; limit?: number }) =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.PRODUCTS_ANALYTICS, { params }).then((r) => ({
-      products: extractData<any[]>(r),
+      products: extractData<ProductAnalyticsItem[]>(r),
       total: r.data?.pagination?.total || 0,
     })),
 
@@ -32,21 +44,21 @@ export const superAdminApi = {
 
   getAdminActivity: (params?: { page?: number; limit?: number; actorId?: string; action?: string }) =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.ACTIVITY, { params }).then((r) => ({
-      items: extractData<any[]>(r),
+      items: extractData<AdminActivityItem[]>(r),
       total: r.data?.pagination?.total || 0,
     })),
 
   getNotifications: () =>
-    apiClient.get(API_ENDPOINTS.SUPER_ADMIN.NOTIFICATIONS).then((r) => extractData<any[]>(r)),
+    apiClient.get(API_ENDPOINTS.SUPER_ADMIN.NOTIFICATIONS).then((r) => extractData<AdminNotification[]>(r)),
 
   markNotificationRead: (id: string) =>
     apiClient.patch(API_ENDPOINTS.SUPER_ADMIN.MARK_NOTIFICATION_READ(id)).then((r) => r.data),
 
   getCommissionSettings: () =>
-    apiClient.get(API_ENDPOINTS.SUPER_ADMIN.COMMISSION).then((r) => extractData<any>(r)),
+    apiClient.get(API_ENDPOINTS.SUPER_ADMIN.COMMISSION).then((r) => extractData<CommissionSettings>(r)),
 
   updateCommissionSettings: (data: { admin_percentage: number; super_admin_percentage: number }) =>
-    apiClient.put(API_ENDPOINTS.SUPER_ADMIN.COMMISSION, data).then((r) => extractData<any>(r)),
+    apiClient.put(API_ENDPOINTS.SUPER_ADMIN.COMMISSION, data).then((r) => extractData<CommissionSettings>(r)),
 
   completeOrder: (id: string) =>
     apiClient.post(API_ENDPOINTS.ORDERS.COMPLETE(id)).then((r) => r.data),
@@ -77,7 +89,7 @@ export const superAdminApi = {
 
   createOrder: (data: {
     items: Array<{ productId: string; variantId?: string | null; quantity: number }>;
-    shippingAddressSnapshot?: any;
+    shippingAddressSnapshot?: ShippingAddressSnapshot;
   }) => apiClient.post(API_ENDPOINTS.ORDERS.BASE, data).then((r) => r.data),
 
   updateOrderStatus: (id: string, status: string, notes?: string) =>

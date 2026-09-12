@@ -26,7 +26,7 @@ export default function Badge({ label, variant = 'success', icon, className = ''
 
   return (
     <View className={`flex-row items-center px-3 py-1 rounded-full ${variants[variant]} ${className}`}>
-      {icon && <Ionicons name={icon as any} size={12} color={textColors[variant]} className="mr-1" />}
+      {icon && <Ionicons name={icon} size={12} color={textColors[variant]} className="mr-1" />}
       <Text className={`text-xs font-bold`} style={{ color: textColors[variant] }}>
         {label}
       </Text>

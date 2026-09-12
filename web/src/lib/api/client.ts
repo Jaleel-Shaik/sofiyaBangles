@@ -139,4 +139,28 @@ apiClient.interceptors.response.use(
   }
 );
 
-export const extractData = <T>(response: any): T => response?.data?.data ?? response?.data ?? response;
+export interface ApiResponseEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  message?: string;
+  [key: string]: unknown;
+}
+
+export type ExtractableResponse<T> =
+  | { data: { data: T } }
+  | { data: T }
+  | ApiResponseEnvelope<T>
+  | T;
+
+export const extractData = <T>(response: ExtractableResponse<T> | unknown): T => {
+  if (response && typeof response === "object") {
+    const res = response as Record<string, unknown>;
+    if (res.data && typeof res.data === "object" && "data" in (res.data as Record<string, unknown>)) {
+      return (res.data as Record<string, unknown>).data as T;
+    }
+    if ("data" in res) {
+      return res.data as T;
+    }
+  }
+  return response as T;
+};

@@ -204,7 +204,7 @@ export default function OrdersManagementPage() {
   };
 
   const handleShareOrderOnWhatsApp = (order: AdminOrder) => {
-    const rawPhone = order.customer_phone || (order.shipping_address_snapshot as any)?.phone || "";
+    const rawPhone = order.customer_phone || order.shipping_address_snapshot?.phone || "";
     let cleanPhone = rawPhone.replace(/[^0-9]/g, "");
     if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
 
@@ -232,8 +232,8 @@ export default function OrdersManagementPage() {
       "",
       `*Grand Total:* ₹${order.total_amount}`,
       "━━━━━━━━━━━━━━━━━━━━",
-      (order.shipping_address_snapshot as any)?.address_line1
-        ? `*Delivery To:* ${(order.shipping_address_snapshot as any).address_line1}`
+      order.shipping_address_snapshot?.address_line1
+        ? `*Delivery To:* ${order.shipping_address_snapshot.address_line1}`
         : "",
       "",
       "Thank you for shopping with Sofiya Bangles! 💫",

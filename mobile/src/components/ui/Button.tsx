@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, TouchableOpacityProps, ActivityIndicator } from 'react-native';
-import { Typography } from './Typography';
+import { Typography, type TypographyColor } from './Typography';
 import { Ionicons } from '@expo/vector-icons';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -14,6 +14,7 @@ interface ButtonProps extends TouchableOpacityProps {
   iconPosition?: 'left' | 'right';
   loading?: boolean;
   fullWidth?: boolean;
+  disabled?: boolean;
   className?: string;
 }
 
@@ -25,32 +26,33 @@ export function Button({
   iconPosition = 'left',
   loading = false,
   fullWidth = false,
+  disabled = false,
   className = '',
-  disabled,
   ...props
 }: ButtonProps) {
   
-  const baseClasses = 'flex-row items-center justify-center rounded-full';
+  // Base classes mapping to tailwind.config.js
+  const baseClasses = 'flex-row items-center justify-center rounded-xl transition-colors';
   
-  const variantClasses = {
-    primary: 'bg-primary shadow-sm',
-    secondary: 'bg-primary-light',
-    outline: 'bg-transparent border border-primary',
+  const variantClasses: Record<ButtonVariant, string> = {
+    primary: 'bg-primary border border-primary',
+    secondary: 'bg-primary-50 border border-primary-100',
+    outline: 'bg-transparent border border-primary-200',
     ghost: 'bg-transparent',
-    danger: 'bg-error-light border border-error-light',
+    danger: 'bg-error border border-error'
   };
 
-  const sizeClasses = {
-    sm: 'py-2 px-4',
-    md: 'py-3.5 px-6',
-    lg: 'py-4 px-8',
-    icon: 'p-3 w-12 h-12', // For circular icon buttons
+  const sizeClasses: Record<ButtonSize, string> = {
+    sm: 'py-2 px-3',
+    md: 'py-3.5 px-5',
+    lg: 'py-4 px-6',
+    icon: 'p-3'
   };
 
   const widthClasses = fullWidth ? 'w-full' : '';
   const disabledClasses = (disabled || loading) ? 'opacity-60' : '';
 
-  const getTextColor = () => {
+  const getTextColor = (): TypographyColor => {
     if (variant === 'primary') return 'white';
     if (variant === 'danger') return 'error';
     return 'brand-primary';
@@ -88,7 +90,7 @@ export function Button({
           {title && (
             <Typography 
               variant="label-lg" 
-              color={getTextColor() as any}
+              color={getTextColor()}
               weight="bold"
             >
               {title}

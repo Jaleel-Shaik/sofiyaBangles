@@ -1,7 +1,7 @@
 import { API_ENDPOINTS } from "./endpoints";
-import axios, { create } from 'axios';
+import axios, { create, type InternalAxiosRequestConfig, type AxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, AppStateStatus, Platform, type NativeEventSubscription } from 'react-native';
 import {
   initApiClientConfig,
   getCachedApiBaseUrl,
@@ -57,10 +57,10 @@ export const checkServerConnection = async (): Promise<boolean> => {
 let isRefreshing = false;
 let failedQueue: {
   resolve: (token: string) => void;
-  reject: (error: any) => void;
+  reject: (error: unknown) => void;
 }[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
@@ -180,7 +180,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
       if (isRefreshing) {
         // Queue the request while refresh is in progress
-        return new Promise((resolve, reject) => {
+        return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
           .then((token) => {
@@ -261,7 +261,7 @@ apiClient.interceptors.response.use(
 );
 
 // ─── AppState Listener for Session Management ─────────────
-let appStateSubscription: any = null;
+let appStateSubscription: NativeEventSubscription | null = null;
 
 const refreshTokenSilently = async () => {
   try {
@@ -303,7 +303,7 @@ export const stopAppStateListener = () => {
 };
 
 // ─── Retry handler for the NetworkErrorModal ──────────────
-registerRetryHandler((config: any) => {
+registerRetryHandler((config: InternalAxiosRequestConfig | AxiosRequestConfig) => {
   const cloned = { ...config };
   // Drop the stale base URL so the request uses the currently resolved one.
   cloned.baseURL = undefined;

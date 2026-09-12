@@ -61,6 +61,23 @@ export interface Session {
   is_active: boolean;
 }
 
+export interface ProductImage {
+  id?: string;
+  image_url: string;
+  is_primary?: boolean;
+  display_order?: number;
+}
+
+export interface ProductVariant {
+  id?: string;
+  size?: string;
+  color?: string;
+  price?: number;
+  stock_quantity?: number;
+  quantity?: number;
+  sku?: string;
+}
+
 export interface Product {
   id: string;
   unique_code: string;
@@ -68,7 +85,7 @@ export interface Product {
   description: string;
   price: number;
   image_url: string;
-  images?: any[];
+  images?: (ProductImage | string)[];
   category_id: string;
   quantity: number;
   likes?: number;
@@ -78,7 +95,7 @@ export interface Product {
   status?: 'draft' | 'active' | 'out_of_stock' | 'archived';
   deleted_at?: string | null;
   has_variants?: boolean;
-  variants?: any[];
+  variants?: ProductVariant[];
   accepts_custom_size?: boolean;
   custom_size_price?: number | string;
   model_type_id: string;
@@ -274,6 +291,41 @@ export interface AdminStaff {
   updated_at?: string | null;
 }
 
+export interface ShippingAddressSnapshot {
+  name?: string;
+  phone?: string;
+  address_line1?: string;
+  address_line_1?: string;
+  address_line2?: string;
+  address_line_2?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  postal_code?: string;
+  country?: string;
+  [key: string]: unknown;
+}
+
+export interface AdminOrderItem {
+  id?: string;
+  productId?: string;
+  product_id?: string;
+  productNameSnapshot?: string;
+  product_name?: string;
+  product_name_snapshot?: string;
+  category_name_snapshot?: string;
+  sku_snapshot?: string;
+  price_snapshot?: number;
+  subtotal?: number;
+  quantity: number;
+  itemPrice?: number;
+  unit_price?: number;
+  total_amount?: number;
+  imageUrl?: string | null;
+  image_url?: string | null;
+}
+
 export interface AdminOrder {
   id: string;
   order_number: string;
@@ -281,28 +333,69 @@ export interface AdminOrder {
   customer_name?: string;
   customer_email?: string;
   customer_phone?: string;
-  items: Array<{
-    id?: string;
-    productId?: string;
-    product_id?: string;
-    productNameSnapshot?: string;
-    product_name?: string;
-    quantity: number;
-    itemPrice?: number;
-    unit_price?: number;
-    total_amount?: number;
-    imageUrl?: string | null;
-    image_url?: string | null;
-  }>;
-  shippingAddressSnapshot?: any;
-  shipping_address?: any;
-  shipping_address_snapshot?: any;
+  items: AdminOrderItem[];
+  shippingAddressSnapshot?: ShippingAddressSnapshot | null;
+  shipping_address?: ShippingAddressSnapshot | null;
+  shipping_address_snapshot?: ShippingAddressSnapshot | null;
   total_amount: number;
   subtotal?: number;
+  admin_share?: number;
+  super_admin_share?: number;
+  net_amount?: number;
   status: string;
   payment_status: string;
   payment_method?: string;
   admin_notes?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface CommissionSettings {
+  admin_percentage: number;
+  super_admin_percentage: number;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface AdminActivityItem {
+  id: string;
+  actor_id: string;
+  actor_name?: string;
+  actor_role?: string;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  details?: Record<string, unknown>;
+  ip_address?: string;
+  created_at: string;
+}
+
+export interface AdminNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  link?: string;
+  created_at: string;
+}
+
+export interface ProductAnalyticsItem {
+  id: string;
+  unique_code: string;
+  product_name: string;
+  category_id: string;
+  category_name?: string;
+  model_type_id: string;
+  model_type_name?: string;
+  price: number;
+  quantity: number;
+  units_sold?: number;
+  gross_sales?: number;
+  gross_revenue?: number;
+  admin_share?: number;
+  super_admin_share?: number;
+  net_sales?: number;
+  status: string;
+  image_url?: string;
 }

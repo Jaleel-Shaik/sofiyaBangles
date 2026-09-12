@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { apiClient } from '../api/client';
 
-interface User {
+export interface User {
   id: string;
   email: string;
   role: string;

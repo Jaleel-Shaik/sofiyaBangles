@@ -8,12 +8,13 @@ import {
   createAdminModel,
   updateAdminModel,
   deleteAdminModel,
+  AdminRecord,
 } from "../models/adminStaff.model";
 
 export class AdminStaffService {
   static async listAdmins() {
     const admins = await getAllAdminsModel();
-    return admins.map((data: any) => ({
+    return admins.map((data: AdminRecord) => ({
       id: data.id,
       full_name: data.full_name || "Admin",
       email: data.email,

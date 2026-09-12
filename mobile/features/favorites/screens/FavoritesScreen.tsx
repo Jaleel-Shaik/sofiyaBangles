@@ -1,4 +1,5 @@
 import type { Favorite } from '@/src/api/favorites';
+import type { Product } from '@/src/api/products';
 import { api } from "@/src/api";
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useState, useCallback } from 'react';
@@ -45,7 +46,7 @@ export default function FavoritesScreen() {
     }
   };
 
-  const openWhatsApp = async (product?: any) => {
+  const openWhatsApp = async (product?: Product) => {
     if (!product) return;
     await openWhatsAppEnquiry({
       productId: product.id,
@@ -74,18 +75,17 @@ export default function FavoritesScreen() {
 
   return (
     <View className="flex-1 bg-[#FAFAFA]">
-      <View className="bg-surface border-b border-divider">
-        <Header
-          title="Favorites"
-          subtitle={`${favorites.length} items saved`}
-          transparent
-          titleClassName="text-2xl font-bold text-text-primary"
-        />
-      </View>
+      <Header title="My Favorites" showBack={false} />
 
+      {/* Category Pills */}
       {availableCategories.length > 0 && (
-        <View className="px-5 py-3 bg-surface border-b border-divider">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View className="py-2">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+            className="flex-row"
+          >
             <FilterPill
               label="All"
               isActive={activeFilter === 'All'}
@@ -94,7 +94,7 @@ export default function FavoritesScreen() {
             {availableCategories.map((cat) => (
               <FilterPill
                 key={cat.id}
-                label={cat.category_name}
+                label={cat.name || cat.category_name}
                 isActive={activeFilter === cat.id}
                 onPress={() => setActiveFilter(cat.id)}
               />
@@ -103,10 +103,10 @@ export default function FavoritesScreen() {
         </View>
       )}
 
+      {/* List */}
       <ScrollView
-        className="flex-1 px-5"
+        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}
       >
         {filteredFavorites.length === 0 ? (
           <View className="items-center justify-center py-20">
@@ -120,12 +120,14 @@ export default function FavoritesScreen() {
           </View>
         ) : (
           filteredFavorites.map((fav) => (
-            <FavoriteItemCard
-              key={fav.id}
-              product={fav.product}
-              onRemove={() => handleRemove(fav.product_id)}
-              onWhatsApp={() => openWhatsApp(fav.product)}
-            />
+            fav.product ? (
+              <FavoriteItemCard
+                key={fav.id}
+                product={fav.product}
+                onRemove={() => handleRemove(fav.product_id)}
+                onWhatsApp={() => openWhatsApp(fav.product)}
+              />
+            ) : null
           ))
         )}
       </ScrollView>

@@ -1,3 +1,4 @@
+import { SalesAnalyticsQuery, RevenueTransactionType } from "../../../shared/types";
 import {
   getSuperAdminDashboardData,
   getProductAnalyticsDetailModel,
@@ -14,7 +15,7 @@ import { getAllAdminOrdersModel, getOrderByIdModel, getOrderItemsModel } from ".
 import { getAdminProductsModel } from "../../product/models/product.model";
 
 export class SuperAdminService {
-  static async getDashboard(params: any) {
+  static async getDashboard(params: SalesAnalyticsQuery) {
     return await getSuperAdminDashboardData(params);
   }
 
@@ -94,11 +95,23 @@ export class SuperAdminService {
     return await getProductAnalyticsDetailModel(id);
   }
 
-  static async getRevenueLedger(params: any) {
+  static async getRevenueLedger(params: {
+    page?: number;
+    limit?: number;
+    fromDate?: string;
+    toDate?: string;
+    transactionType?: RevenueTransactionType;
+    adminId?: string;
+  }) {
     return await getRevenueLedgerModel(params);
   }
 
-  static async getAdminActivity(params: any) {
+  static async getAdminActivity(params: {
+    page?: number;
+    limit?: number;
+    actorId?: string;
+    action?: string;
+  }) {
     return await getAdminActivityModel(params);
   }
 

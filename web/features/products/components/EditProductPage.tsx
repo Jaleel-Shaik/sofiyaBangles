@@ -63,13 +63,13 @@ export default function EditProductPage() {
             status: product.status || (product.is_active !== false ? "active" : "draft"),
           });
           setSelectedModelType(product.model_type_id || "");
-          if (product.images?.length) setExistingImages(product.images.map((img: any) => typeof img === 'string' ? img : img.image_url));
+          if (product.images?.length) setExistingImages(product.images.map((img) => typeof img === 'string' ? img : img.image_url));
           else if (product.image_url) setExistingImages([product.image_url]);
           if (product.variants?.length) {
             setHasVariants(true);
-            setVariants(product.variants.map((v: any, idx: number) => ({
-              id: v.id || `v-${idx}-${v.size}`,
-              size: v.size, price: String(v.price), quantity: String(v.quantity),
+            setVariants(product.variants.map((v, idx) => ({
+              id: v.id || `v-${idx}-${v.size || ""}`,
+              size: v.size || "", price: String(v.price ?? ""), quantity: String(v.quantity ?? v.stock_quantity ?? "0"),
             })));
           }
           if (product.accepts_custom_size) {

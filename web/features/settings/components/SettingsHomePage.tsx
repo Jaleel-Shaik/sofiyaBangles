@@ -6,7 +6,16 @@ import Link from "next/link";
 
 import { useAuth } from "@/features/auth/lib/auth-context";
 
-const baseSettingsItems = [
+interface SettingItem {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  desc: string;
+  color: string;
+  href: string;
+  badge?: string;
+}
+
+const baseSettingsItems: SettingItem[] = [
   { icon: User, label: "My Profile", desc: "Manage profile picture, name & contact info", color: "bg-purple-50 text-purple-600", href: "/dashboard/settings/profile" },
   { icon: Store, label: "Store Profile", desc: "Edit name, description, location & hours", color: "bg-indigo-50 text-indigo-600", href: "/dashboard/settings/store-profile" },
   { icon: Shield, label: "Account Security & 2FA", desc: "Review 2-step verification, password & active sessions", color: "bg-emerald-50 text-emerald-600", href: "/dashboard/settings/security" },
@@ -16,7 +25,7 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
 
-  const items = isSuperAdmin
+  const items: SettingItem[] = isSuperAdmin
     ? [
         ...baseSettingsItems,
         {
@@ -49,9 +58,9 @@ export default function SettingsPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-bold text-sm text-[#171717] group-hover:text-[#E8436E] transition-colors">{item.label}</p>
-                  {(item as any).badge && (
+                  {item.badge && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-[#E8436E]">
-                      {(item as any).badge}
+                      {item.badge}
                     </span>
                   )}
                 </div>

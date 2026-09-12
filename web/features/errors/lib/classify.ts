@@ -1,4 +1,4 @@
-import type { AxiosError } from "axios";
+import axios, { type AxiosError } from "axios";
 
 export type ApiErrorType =
   | "TIMEOUT"
@@ -21,8 +21,14 @@ export interface ClassifiedApiError {
   systemic: boolean;
 }
 
-function serverMessage(error: AxiosError, fallback: string): string {
-  const data = error.response?.data as any;
+interface ApiErrorBody {
+  message?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+function serverMessage(error: AxiosError<ApiErrorBody>, fallback: string): string {
+  const data = error.response?.data;
   if (typeof data?.message === "string" && data.message.trim()) {
     return data.message;
   }
@@ -32,11 +38,15 @@ function serverMessage(error: AxiosError, fallback: string): string {
   return fallback;
 }
 
-export function classifyApiError(error: any, url?: string): ClassifiedApiError {
-  const attemptedUrl = url || error?.config?.url || "";
+export function classifyApiError(error: unknown, url?: string): ClassifiedApiError {
+  const isAxios = axios.isAxiosError(error);
+  const axiosErr = isAxios ? (error as AxiosError<ApiErrorBody>) : null;
+  const attemptedUrl = url || axiosErr?.config?.url || "";
 
-  if (!error?.response) {
-    if (error?.code === "ECONNABORTED" || /timeout/i.test(error?.message || "")) {
+  if (!axiosErr?.response) {
+    const errorMsg = axiosErr?.message || (error instanceof Error ? error.message : "");
+    const code = axiosErr?.code;
+    if (code === "ECONNABORTED" || /timeout/i.test(errorMsg)) {
       return {
         type: "TIMEOUT",
         title: "Request Timed Out",
@@ -48,13 +58,13 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
       };
     }
 
-    if (error?.code === "ERR_NETWORK" || /network error|network request failed/i.test(error?.message || "")) {
+    if (code === "ERR_NETWORK" || /network error|network request failed/i.test(errorMsg)) {
       return {
         type: "NETWORK",
         title: "Cannot Reach Server",
         message:
           "Could not establish a connection to the backend. Make sure it is running and the API URL is correct.",
-        technical: `${error?.message || "Network error"} → ${attemptedUrl}`,
+        technical: `${errorMsg || "Network error"} → ${attemptedUrl}`,
         retriable: true,
         systemic: true,
       };
@@ -64,13 +74,13 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
       type: "NETWORK",
       title: "No Internet Connection",
       message: "You appear to be offline. Check your internet connection and try again.",
-      technical: `${error?.message || "Unknown network error"} → ${attemptedUrl}`,
+      technical: `${errorMsg || "Unknown network error"} → ${attemptedUrl}`,
       retriable: true,
       systemic: true,
     };
   }
 
-  const status = error.response.status;
+  const status = axiosErr.response.status;
 
   if (status === 401) {
     return {
@@ -78,7 +88,7 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
       statusCode: status,
       title: "Session Expired",
       message: "Your session has expired. Please log in again.",
-      technical: serverMessage(error, "Unauthorized"),
+      technical: serverMessage(axiosErr, "Unauthorized"),
       retriable: false,
       systemic: false,
     };
@@ -89,8 +99,8 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
       type: "FORBIDDEN",
       statusCode: status,
       title: "Access Denied",
-      message: serverMessage(error, "You do not have permission to perform this action."),
-      technical: serverMessage(error, "Forbidden"),
+      message: serverMessage(axiosErr, "You do not have permission to perform this action."),
+      technical: serverMessage(axiosErr, "Forbidden"),
       retriable: false,
       systemic: false,
     };
@@ -101,7 +111,7 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
       type: "NOT_FOUND",
       statusCode: status,
       title: "Not Found",
-      message: serverMessage(error, "The requested resource was not found."),
+      message: serverMessage(axiosErr, "The requested resource was not found."),
       technical: `${attemptedUrl} returned 404`,
       retriable: false,
       systemic: false,
@@ -113,8 +123,8 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
       type: "VALIDATION",
       statusCode: status,
       title: "Invalid Request",
-      message: serverMessage(error, "The request was invalid. Please check your input and try again."),
-      technical: serverMessage(error, "Bad request"),
+      message: serverMessage(axiosErr, "The request was invalid. Please check your input and try again."),
+      technical: serverMessage(axiosErr, "Bad request"),
       retriable: false,
       systemic: false,
     };
@@ -126,7 +136,7 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
       statusCode: status,
       title: "Request Timed Out",
       message: "The server took too long to respond. Please try again.",
-      technical: serverMessage(error, "Request timeout"),
+      technical: serverMessage(axiosErr, "Request timeout"),
       retriable: true,
       systemic: true,
     };
@@ -137,8 +147,8 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
       type: "SERVER",
       statusCode: status,
       title: `Server Error (${status})`,
-      message: serverMessage(error, "Something went wrong on the server. Please try again in a moment."),
-      technical: serverMessage(error, "Internal server error"),
+      message: serverMessage(axiosErr, "Something went wrong on the server. Please try again in a moment."),
+      technical: serverMessage(axiosErr, "Internal server error"),
       retriable: true,
       systemic: true,
     };
@@ -148,9 +158,10 @@ export function classifyApiError(error: any, url?: string): ClassifiedApiError {
     type: "UNKNOWN",
     statusCode: status,
     title: `Unexpected Error (${status})`,
-    message: serverMessage(error, "Something went wrong. Please try again."),
-    technical: error?.message || `HTTP ${status}`,
+    message: serverMessage(axiosErr, "Something went wrong. Please try again."),
+    technical: axiosErr.message || `HTTP ${status}`,
     retriable: false,
     systemic: false,
   };
 }
+

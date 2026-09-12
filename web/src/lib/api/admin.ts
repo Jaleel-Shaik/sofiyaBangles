@@ -1,6 +1,24 @@
 import { API_ENDPOINTS } from "./endpoints";
 import { apiClient, extractData } from "./client";
-import { Product, Category, ModelType, BusinessProfile, AnalyticsOverview, UserProfile } from "./types";
+import { Product, Category, ModelType, BusinessProfile, AnalyticsOverview, UserProfile, ProductVariant } from "./types";
+export interface CreateProductData {
+  product_name: string;
+  category_id: string;
+  model_type_id: string;
+  price: number | string;
+  quantity: number | string;
+  unique_code?: string;
+  description?: string;
+  is_active?: boolean;
+  has_variants?: boolean;
+  variants?: string | ProductVariant[];
+  accepts_custom_size?: boolean;
+  custom_size_price?: number | string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+export type UpdateProductData = Partial<CreateProductData>;
 
 export const adminApi = {
   // Products
@@ -20,14 +38,15 @@ export const adminApi = {
     })),
   getProductById: (id: string) =>
     apiClient.get(API_ENDPOINTS.PRODUCTS.BY_ID(id)).then((r) => extractData<Product>(r)),
-  createProduct: async (productData: any, imageUris: string[] = []) => {
+  createProduct: async (productData: CreateProductData, imageUris: string[] = []) => {
     const formData = new FormData();
     Object.keys(productData).forEach(key => {
-      if (productData[key] !== undefined && productData[key] !== null) {
-        formData.append(key, String(productData[key]));
+      const val = productData[key];
+      if (val !== undefined && val !== null) {
+        formData.append(key, String(val));
       }
     });
-    imageUris.forEach((uri, i) => {
+    imageUris.forEach((uri) => {
       if (!uri.startsWith('http')) {
         formData.append('images', uri);
       }
@@ -44,11 +63,12 @@ export const adminApi = {
     apiClient.put(API_ENDPOINTS.PRODUCTS.BY_ID(id), formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data.data),
-  updateProduct: async (id: string, productData: any, imageUris: string[] = []) => {
+  updateProduct: async (id: string, productData: UpdateProductData, imageUris: string[] = []) => {
     const formData = new FormData();
     Object.keys(productData).forEach(key => {
-      if (productData[key] !== undefined && productData[key] !== null) {
-        formData.append(key, String(productData[key]));
+      const val = productData[key];
+      if (val !== undefined && val !== null) {
+        formData.append(key, String(val));
       }
     });
     imageUris.forEach(uri => {

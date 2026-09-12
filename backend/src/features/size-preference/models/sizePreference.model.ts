@@ -55,7 +55,7 @@ export const updateSizePreferenceModel = async (
     throw new Error("UNAUTHORIZED_ACCESS");
   }
 
-  const updateData: any = { ...data, updated_at: new Date().toISOString() };
+  const updateData: Record<string, unknown> = { ...data, updated_at: new Date().toISOString() };
   Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
   await docRef.update(updateData);

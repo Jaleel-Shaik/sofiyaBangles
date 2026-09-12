@@ -397,8 +397,8 @@ export const getProductAnalyticsDetailModel = async (
   const stockHistory = auditLogs
     .filter((log) => log.action === "STOCK_UPDATED" || log.action === "PRODUCT_SOLD" || log.action === "PRODUCT_CREATED")
     .map((log) => {
-      const oldQty = (log.old_data as any)?.quantity || 0;
-      const newQty = (log.new_data as any)?.quantity || 0;
+      const oldQty = typeof log.old_data?.quantity === "number" ? log.old_data.quantity : 0;
+      const newQty = typeof log.new_data?.quantity === "number" ? log.new_data.quantity : 0;
       return {
         id: log.id,
         action: log.action,
