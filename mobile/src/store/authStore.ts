@@ -180,7 +180,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('refresh_token');
         await SecureStore.deleteItemAsync('auth_user');
-      } catch (e) {}
+      } catch {}
       set({ 
         token: null,
         refreshToken: null,

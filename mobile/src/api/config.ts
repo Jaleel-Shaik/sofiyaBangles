@@ -75,19 +75,27 @@ export async function clearStoredOverride(): Promise<void> {
   }
 }
 
+export const PRODUCTION_FALLBACK_URL = "https://api.sofiyabangles.com/api";
+
 /**
  * Best synchronous guess at the API base URL (no SecureStore read):
- *   auto-detected Metro IP → env var → platform default.
+ *   Production (!__DEV__): env var → production HTTPS fallback
+ *   Development (__DEV__): auto-detected Metro IP → env var → platform default
  */
 export function resolveApiBaseUrlSync(): ApiConfig {
-  const metroHost = detectHostFromMetro();
-  if (metroHost) {
-    return { url: buildUrl(metroHost), source: "auto-detect" };
-  }
-
   const envUrl = getEnvApiUrl();
   if (envUrl) {
     return { url: normalizeUrl(envUrl), source: "env" };
+  }
+
+  // In production builds, never fallback to unencrypted LAN or loopback
+  if (!__DEV__) {
+    return { url: PRODUCTION_FALLBACK_URL, source: "default" };
+  }
+
+  const metroHost = detectHostFromMetro();
+  if (metroHost) {
+    return { url: buildUrl(metroHost), source: "auto-detect" };
   }
 
   if (Platform.OS === "android") {

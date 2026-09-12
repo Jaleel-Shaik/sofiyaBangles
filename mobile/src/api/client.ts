@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { create } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import {
@@ -12,7 +12,7 @@ import { useApiErrorBus, registerRetryHandler } from './errorBus';
 // automatically — see config.ts for the priority order.
 let API_URL = getCachedApiBaseUrl();
 
-export const apiClient = axios.create({
+export const apiClient = create({
   baseURL: API_URL,
   timeout: 15000, // 15 seconds timeout
   headers: {
@@ -28,13 +28,19 @@ initApiClientConfig()
   .then((url) => {
     API_URL = url;
     apiClient.defaults.baseURL = url;
-    console.log('Using API URL:', url, `(source: ${getCachedApiSource()})`);
+    if (__DEV__) {
+      console.log('Using API URL:', url, `(source: ${getCachedApiSource()})`);
+    }
   })
   .catch((error) => {
-    console.error('Failed to resolve API base URL:', error);
+    if (__DEV__) {
+      console.error('Failed to resolve API base URL:', error);
+    }
   });
 
-console.log('Platform:', Platform.OS);
+if (__DEV__) {
+  console.log('Platform:', Platform.OS);
+}
 
 // ─── Health Check ─────────────────────────────────────────
 export const checkServerConnection = async (): Promise<boolean> => {
@@ -117,7 +123,9 @@ apiClient.interceptors.request.use(
     }
     const method = config.method?.toUpperCase() || 'GET';
     const url = config.url || '';
-    console.log(`[API] ${method} ${url}`);
+    if (__DEV__) {
+      console.log(`[API] ${method} ${url}`);
+    }
     return config;
   },
   (error) => {
@@ -131,7 +139,9 @@ apiClient.interceptors.response.use(
     const method = response.config?.method?.toUpperCase() || 'GET';
     const url = response.config?.url || '';
     const status = response.status;
-    console.log(`[API] ${method} ${url} → ${status}`);
+    if (__DEV__) {
+      console.log(`[API] ${method} ${url} → ${status}`);
+    }
     return response;
   },
   (error) => {
@@ -139,7 +149,9 @@ apiClient.interceptors.response.use(
     const url = error.config?.url || '';
     const status = error.response?.status || 'NETWORK_ERROR';
     const msg = error.response?.data?.message || error.message || 'Unknown error';
-    console.error(`[API] ${method} ${url} → ${status}: ${msg}`);
+    if (__DEV__) {
+      console.error(`[API] ${method} ${url} → ${status}: ${msg}`);
+    }
 
     // Surface connectivity / server failures to the global popup
     // (timeouts, network unreachable, 5xx).

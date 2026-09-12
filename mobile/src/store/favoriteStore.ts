@@ -38,14 +38,14 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
       set({ favoriteIds: favoriteIds.filter(id => id !== productId) });
       try {
         await removeFavorite(productId);
-      } catch (error) {
+      } catch {
         set({ favoriteIds: [...favoriteIds] });
       }
     } else {
       set({ favoriteIds: [...favoriteIds, productId] });
       try {
         await addFavorite(productId);
-      } catch (error) {
+      } catch {
         set({ favoriteIds: favoriteIds.filter(id => id !== productId) });
       }
     }

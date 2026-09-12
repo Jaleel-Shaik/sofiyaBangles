@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "sofiya-bangles",
+    "name": "Sofiya Bangles",
     "slug": "sofiya-bangles",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,7 +13,14 @@
     },
     "android": {
       "package": "com.jaleel.sofiyabangles",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "INTERNET",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -46,9 +53,20 @@
       [
         "expo-build-properties",
         {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0"
+          },
           "ios": {
             "useFrameworks": "static"
           }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to allow you to upload profile avatars and product images."
         }
       ],
       "@react-native-firebase/auth",
@@ -60,3 +78,4 @@
     }
   }
 }
+

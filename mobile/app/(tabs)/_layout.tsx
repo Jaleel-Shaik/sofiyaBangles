@@ -1,12 +1,11 @@
 import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import { useFavoriteStore } from "@/src/store/favoriteStore";
 import { useNotificationStore } from "@/src/store/notificationStore";
 import { useAuthStore } from "@/src/store/authStore";
-import { getDashboardHref } from "@/src/utils/navigation";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -21,7 +20,7 @@ export default function TabLayout() {
     if (!notifInit) {
       fetchNotifications();
     }
-  }, [favInit, notifInit]);
+  }, [favInit, notifInit, fetchFavorites, fetchNotifications]);
 
   if (isLoading) return null;
 

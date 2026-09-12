@@ -9,6 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { useAuthStore } from "@/src/store/authStore";
 import { getDashboardHref } from "@/src/utils/navigation";
+import { startAppStateListener, stopAppStateListener } from "@/src/api/client";
 import NetworkErrorModal from "@/src/components/NetworkErrorModal";
 import "../global.css";
 
@@ -34,6 +35,14 @@ export default function RootLayout() {
   const { token, user } = useAuthStore();
   const segments = useSegments();
   const rootNavigationState = useRootNavigationState();
+
+  // Active AppState listener to automatically refresh tokens upon app foregrounding
+  useEffect(() => {
+    startAppStateListener();
+    return () => {
+      stopAppStateListener();
+    };
+  }, []);
 
   // isNavigating stays true from when we detect the user is authenticated
   // and on the login screen, until the router.replace() transition finishes.
