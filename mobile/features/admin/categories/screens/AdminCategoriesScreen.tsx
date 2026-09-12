@@ -31,9 +31,13 @@ export default function ManageCategoriesScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [cats, mts] = await Promise.all([api.categories.getCategories(), getModelTypes()]);
-      setCategories(cats);
-      setModelTypes(mts);
+      const [catsRes, mtsRes] = await Promise.allSettled([api.categories.getCategories(), getModelTypes()]);
+      if (catsRes.status === 'fulfilled') {
+        setCategories(catsRes.value || []);
+      }
+      if (mtsRes.status === 'fulfilled') {
+        setModelTypes(mtsRes.value || []);
+      }
     } catch (e) {
       console.error(e);
     } finally {

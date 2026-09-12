@@ -8,12 +8,14 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { getCategories, Category } from '@/src/api/categories';
 import { useFavoriteStore } from '@/src/store/favoriteStore';
+import { useAuthStore } from '@/src/store/authStore';
 import Header from '@/src/components/Header';
 import FilterPill from '@/src/components/FilterPill';
 import FavoriteItemCard from '@/src/components/FavoriteItemCard';
 import { openWhatsAppEnquiry } from '@/src/utils/whatsapp';
 
 export default function FavoritesScreen() {
+  const { token } = useAuthStore();
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,19 +24,41 @@ export default function FavoritesScreen() {
   const { toggleFavorite } = useFavoriteStore();
 
   const fetchFavoritesAndCats = async () => {
-    const [favData, catData] = await Promise.all([
-      api.favorites.getFavorites(),
-      getCategories()
-    ]);
-    setFavorites(favData);
-    setCategories(catData);
-    setLoading(false);
+    setLoading(true);
+    try {
+      if (!token) {
+        setFavorites([]);
+        const catData = await getCategories();
+        setCategories(catData);
+      } else {
+        const [favResult, catResult] = await Promise.allSettled([
+          api.favorites.getFavorites(),
+          getCategories()
+        ]);
+        if (favResult.status === 'fulfilled') {
+          setFavorites(favResult.value);
+        } else {
+          console.warn("Failed to fetch favorites:", favResult.reason);
+          setFavorites([]);
+        }
+        if (catResult.status === 'fulfilled') {
+          setCategories(catResult.value);
+        } else {
+          console.warn("Failed to fetch categories:", catResult.reason);
+          setCategories([]);
+        }
+      }
+    } catch (err) {
+      console.error("Favorites screen fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useFocusEffect(
     useCallback(() => {
       fetchFavoritesAndCats();
-    }, [])
+    }, [token])
   );
 
   const handleRemove = async (productId: string) => {

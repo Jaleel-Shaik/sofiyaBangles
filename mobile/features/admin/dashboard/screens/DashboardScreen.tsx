@@ -32,16 +32,48 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setConnectionError(false);
     try {
-      const [data, productsData, cats, mts] = await Promise.all([
+      const results = await Promise.allSettled([
         api.admin.getOverviewAnalytics(selectedCategory || undefined, selectedModelType || undefined),
         api.admin.getAdminProducts(1, 5),
         getCategories(),
         getModelTypes()
       ]);
-      setStats(data);
-      setRecentProducts(productsData.products);
-      setCategories(cats);
-      setModelTypes(mts);
+
+      const [statsRes, productsRes, catsRes, mtsRes] = results;
+      let anySucceeded = false;
+
+      if (statsRes.status === 'fulfilled') {
+        setStats(statsRes.value);
+        anySucceeded = true;
+      } else {
+        console.warn("Dashboard stats fetch issue:", statsRes.reason);
+      }
+
+      if (productsRes.status === 'fulfilled') {
+        setRecentProducts(productsRes.value.products || []);
+        anySucceeded = true;
+      } else {
+        console.warn("Dashboard products fetch issue:", productsRes.reason);
+      }
+
+      if (catsRes.status === 'fulfilled') {
+        setCategories(catsRes.value || []);
+        anySucceeded = true;
+      } else {
+        console.warn("Dashboard categories fetch issue:", catsRes.reason);
+      }
+
+      if (mtsRes.status === 'fulfilled') {
+        setModelTypes(mtsRes.value || []);
+        anySucceeded = true;
+      } else {
+        console.warn("Dashboard model types fetch issue:", mtsRes.reason);
+      }
+
+      // Only show connection error if all 4 requests failed
+      if (!anySucceeded) {
+        setConnectionError(true);
+      }
     } catch (error) {
       console.error("Failed to fetch dashboard data", error);
       setConnectionError(true);

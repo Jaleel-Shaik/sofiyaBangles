@@ -53,7 +53,7 @@ export const getProducts = async (
   try {
     let url = `${API_ENDPOINTS.PRODUCTS.BASE}?page=${page}&limit=${limit}`;
     if (categoryId) url += `&category_id=${categoryId}`;
-    if (search) url += `&search=${search}`;
+    if (search && search.trim()) url += `&search=${encodeURIComponent(search.trim())}`;
 
     const res = await apiClient.get(url);
     const payload: Product[] = Array.isArray(res.data?.data) ? res.data.data : [];
@@ -70,7 +70,26 @@ export const getRecommendedProducts = async (
   limit = 10,
   search?: string
 ): Promise<{ products: Product[]; total: number }> => {
-  return getProducts(page, limit, undefined, search);
+  try {
+    let url = `${API_ENDPOINTS.PRODUCTS.RECOMMENDED}?page=${page}&limit=${limit}`;
+    if (search && search.trim()) {
+      url += `&search=${encodeURIComponent(search.trim())}`;
+    }
+
+    const res = await apiClient.get(url);
+    const payload: Product[] = Array.isArray(res.data?.data) ? res.data.data : [];
+    const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;
+
+    // Resilient fallback: If recommendations endpoint returns 0 (e.g. cold start with no interaction history), fallback to getProducts
+    if (payload.length === 0 && !search) {
+      return getProducts(page, limit);
+    }
+
+    return { products: payload, total };
+  } catch (error) {
+    console.warn('Falling back to standard products for recommendations:', error);
+    return getProducts(page, limit, undefined, search);
+  }
 };
 
 export const getProductById = async (id: string): Promise<Product | null> => {
@@ -94,19 +113,24 @@ export const getFeaturedProducts = async (): Promise<Product[]> => {
 };
 
 export const getNewArrivals = async (
-  daysAgo = 7,
+  daysAgo = 30,
   page = 1,
   limit = 20
 ): Promise<{ products: Product[]; total: number }> => {
   try {
-    const url = `${API_ENDPOINTS.PRODUCTS.BASE}?new_arrivals=true&days=${daysAgo}&page=${page}&limit=${limit}`;
+    const url = `${API_ENDPOINTS.PRODUCTS.NEW_ARRIVALS}?daysAgo=${daysAgo}&page=${page}&limit=${limit}`;
     const res = await apiClient.get(url);
     const payload: Product[] = Array.isArray(res.data?.data) ? res.data.data : [];
     const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;
+
+    if (payload.length === 0) {
+      return getProducts(page, limit);
+    }
+
     return { products: payload, total };
   } catch (error) {
-    console.error('Error fetching new arrivals', error);
-    return { products: [], total: 0 };
+    console.warn('Falling back to standard products for new arrivals:', error);
+    return getProducts(page, limit);
   }
 };
 

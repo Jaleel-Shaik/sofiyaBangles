@@ -15,14 +15,18 @@ export default function CategoriesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSearch, setActiveSearch] = useState('');
 
   const fetchCats = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
-    const data = await api.categories.getCategories();
-    setCategories(data);
-    setLoading(false);
-    setRefreshing(false);
+    try {
+      const data = await api.categories.getCategories();
+      setCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn("Failed to fetch categories:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useFocusEffect(
@@ -37,7 +41,7 @@ export default function CategoriesScreen() {
   }, []);
 
   const filteredCategories = categories.filter(cat =>
-    cat.category_name.toLowerCase().includes(activeSearch)
+    cat.category_name.toLowerCase().includes(searchQuery.toLowerCase().trim())
   );
 
   if (loading) {
@@ -104,7 +108,7 @@ export default function CategoriesScreen() {
               </View>
               <Text className="text-lg font-bold text-text-primary mb-1">No categories found</Text>
               <Text className="text-text-secondary text-sm text-center px-8">
-                We couldn&apos;t find any categories matching &quot;{activeSearch}&quot;
+                We couldn&apos;t find any categories matching &quot;{searchQuery}&quot;
               </Text>
               <TouchableOpacity
                 className="mt-5 bg-primary px-6 py-3 rounded-full"

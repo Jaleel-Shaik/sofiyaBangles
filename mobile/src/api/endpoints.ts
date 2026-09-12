@@ -18,6 +18,9 @@ export const API_ENDPOINTS = {
   PRODUCTS: {
     BASE: '/products',
     ADMIN: '/products/admin',
+    RECOMMENDED: '/products/recommended',
+    NEW_ARRIVALS: '/products/new-arrivals',
+    SEARCH: '/products/search',
     BY_ID: (id: string) => `/products/${id}`,
     SELL: (id: string) => `/products/${id}/sell`,
   },

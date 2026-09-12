@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate } from "../../../shared/middlewares/auth.middleware";
+import { authenticate, optionalAuthenticate } from "../../../shared/middlewares/auth.middleware";
 import { requireRole } from "../../../shared/middlewares/role.middleware";
 import { validate } from "../../../shared/middlewares/validate.middleware";
 import { createOrderSchema, updateOrderStatusSchema, createReviewSchema } from "../validations/order.validation";
@@ -15,6 +15,11 @@ import {
 } from "../controllers/order.controller";
 
 const router = Router();
+
+// Publicly readable product reviews (can be browsed by guests)
+router.get("/products/:productId/reviews", optionalAuthenticate, getProductReviews);
+
+// Protected routes require authentication
 router.use(authenticate);
 
 router.post("/", validate(createOrderSchema), createOrder);
@@ -24,6 +29,5 @@ router.patch("/:id/status", requireRole("admin", "super_admin"), validate(update
 router.post("/:id/complete", requireRole("admin", "super_admin"), completeOrder);
 router.post("/:id/refund", requireRole("admin", "super_admin"), refundOrder);
 router.post("/reviews", validate(createReviewSchema), createReview);
-router.get("/products/:productId/reviews", getProductReviews);
 
 export default router;

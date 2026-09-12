@@ -21,12 +21,16 @@ export default function ProductsListScreen() {
   const fetchData = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
-      const [prodRes, cats] = await Promise.all([
+      const [prodRes, catsRes] = await Promise.allSettled([
         getAdminProducts(1, 100),
         api.categories.getCategories(),
       ]);
-      setProducts(prodRes.products);
-      setCategories(cats);
+      if (prodRes.status === 'fulfilled') {
+        setProducts(prodRes.value.products || []);
+      }
+      if (catsRes.status === 'fulfilled') {
+        setCategories(catsRes.value || []);
+      }
     } catch (error) {
       console.error('Failed to load products', error);
     } finally {

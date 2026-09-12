@@ -11,7 +11,7 @@ import {
   FlatList,
 } from "react-native";
 import { useState, useCallback, useMemo } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useAuthStore } from "@/src/store/authStore";
 import { useSizeStore } from "@/src/store/sizeStore";
 
@@ -20,13 +20,12 @@ import { getUserOrders } from "@/src/api/orders";
 import ProductCard from "@/src/components/ProductCard";
 import SearchInput from "@/src/components/SearchInput";
 import CategoryItem from "@/src/components/CategoryItem";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const { preferences, fetchPreferences } = useSizeStore();
   const router = useRouter();
 
@@ -46,13 +45,23 @@ export default function HomeScreen() {
     try {
       setLoading(true);
       setPage(1);
-      const [fetchedProductsResponse, fetchedCategories] = await Promise.all([
+      const [productsResult, categoriesResult] = await Promise.allSettled([
         api.products.getRecommendedProducts(1, 50, searchQuery.trim()),
         getCategories(),
       ]);
-      setProducts(fetchedProductsResponse.products);
-      setCategories(fetchedCategories);
-      setHasMore(fetchedProductsResponse.products.length >= 50);
+
+      if (productsResult.status === 'fulfilled') {
+        setProducts(productsResult.value.products);
+        setHasMore(productsResult.value.products.length >= 50);
+      } else {
+        console.warn("Failed to load products:", productsResult.reason);
+      }
+
+      if (categoriesResult.status === 'fulfilled') {
+        setCategories(categoriesResult.value);
+      } else {
+        console.warn("Failed to load categories:", categoriesResult.reason);
+      }
     } catch (error) {
       console.error("Failed to load home data", error);
     } finally {
@@ -83,18 +92,26 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchPreferences();
-      const loadPurchasedProducts = async () => {
+      // Only fetch user-specific preferences and orders if logged in as a customer
+      if (token && user?.role === 'user') {
         try {
-          const orders = await getUserOrders();
-          const productIds = orders.flatMap((order) => order.items?.map((item) => item.product_id) || []);
-          setPurchasedProductIds(productIds.filter(Boolean));
-        } catch (error) {
-          console.error("Failed to load purchased products", error);
+          fetchPreferences();
+        } catch (e) {
+          console.warn("Error fetching size preferences", e);
         }
-      };
-      loadPurchasedProducts();
-    }, [])
+
+        const loadPurchasedProducts = async () => {
+          try {
+            const orders = await getUserOrders();
+            const productIds = orders.flatMap((order) => order.items?.map((item) => item.product_id) || []);
+            setPurchasedProductIds(productIds.filter(Boolean));
+          } catch (error) {
+            console.warn("Failed to load purchased products", error);
+          }
+        };
+        loadPurchasedProducts();
+      }
+    }, [token, user?.role])
   );
 
   const availableSizes = useMemo(() => {
@@ -152,9 +169,15 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Immediate load on focus when there is no search query
+      if (!searchQuery.trim()) {
+        fetchInitialData();
+        return;
+      }
+      // Debounce active search queries
       const delayDebounceFn = setTimeout(() => {
         fetchInitialData();
-      }, 500);
+      }, 400);
       return () => clearTimeout(delayDebounceFn);
     }, [searchQuery])
   );

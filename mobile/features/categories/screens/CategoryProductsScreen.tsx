@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView }
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useMemo } from 'react';
 import { useSizeStore } from '@/src/store/sizeStore';
+import { useAuthStore } from '@/src/store/authStore';
 
 import ProductCard from '@/src/components/ProductCard';
 import Header from '@/src/components/Header';
@@ -16,6 +17,7 @@ export default function CategoryScreen() {
   const categoryId = id as string;
   const categoryName = (name as string) || 'Category Products';
 
+  const { token, user } = useAuthStore();
   const { preferences, fetchPreferences } = useSizeStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,17 +26,6 @@ export default function CategoryScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchPreferences();
-      if (!categoryId) return;
-      const delayDebounceFn = setTimeout(() => {
-        fetchInitialProducts();
-      }, 500);
-      return () => clearTimeout(delayDebounceFn);
-    }, [categoryId, searchQuery])
-  );
 
   const fetchInitialProducts = async () => {
     setLoading(true);
@@ -49,6 +40,31 @@ export default function CategoryScreen() {
       setLoading(false);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (token && user?.role === 'user') {
+        try {
+          fetchPreferences();
+        } catch (e) {
+          console.warn("Failed to fetch preferences:", e);
+        }
+      }
+      if (!categoryId) return;
+
+      // Immediate fetch if no search query
+      if (!searchQuery.trim()) {
+        fetchInitialProducts();
+        return;
+      }
+
+      // Debounce active search query typing
+      const delayDebounceFn = setTimeout(() => {
+        fetchInitialProducts();
+      }, 400);
+      return () => clearTimeout(delayDebounceFn);
+    }, [categoryId, searchQuery, token, user?.role])
+  );
 
   const loadMore = async () => {
     if (!hasMore || isFetchingMore) return;

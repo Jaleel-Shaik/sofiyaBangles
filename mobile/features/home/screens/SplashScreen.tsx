@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { useAuthStore } from "@/src/store/authStore";
 import { useSizeStore } from "@/src/store/sizeStore";
 import { getDashboardHref } from "@/src/utils/navigation";
+import { initApiClientConfig } from "@/src/api/config";
 
 export default function SplashScreen() {
   const insets = useSafeAreaInsets();
@@ -16,19 +17,39 @@ export default function SplashScreen() {
   
   const progressAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const [initDone, setInitDone] = useState(false);
   const [ready, setReady] = useState(false);
 
-  // Restore auth token and wait for it
+  // Initialize API base URL configuration and restore auth session in parallel
   useEffect(() => {
-    useAuthStore.getState().restoreToken();
+    let mounted = true;
+    const initializeApp = async () => {
+      try {
+        await Promise.allSettled([
+          initApiClientConfig(),
+          useAuthStore.getState().restoreToken(),
+        ]);
+      } catch (err) {
+        console.warn("App initialization warning:", err);
+      } finally {
+        if (mounted) {
+          setInitDone(true);
+        }
+      }
+    };
+
+    initializeApp();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Start loading bar animation once auth is ready
+  // Start loading bar animation once initialization is complete and auth is resolved
   useEffect(() => {
-    if (!isLoading) {
+    if (initDone && !isLoading) {
       Animated.timing(progressAnim, {
         toValue: 100,
-        duration: 1800,
+        duration: 1500,
         useNativeDriver: false,
       }).start(({ finished }) => {
         if (finished) {
@@ -36,15 +57,19 @@ export default function SplashScreen() {
         }
       });
     }
-  }, [isLoading]);
+  }, [initDone, isLoading]);
 
   // Fade out and navigate when ready
   useEffect(() => {
     if (!ready) return;
     
-    // Fetch size preferences if logged in (fire and forget)
-    if (token && user) {
-      fetchPreferences();
+    // Only fetch size preferences if logged in as regular customer (role === 'user')
+    if (token && user && user.role === 'user') {
+      try {
+        fetchPreferences();
+      } catch (e) {
+        console.warn("Initial size preference fetch error:", e);
+      }
     }
     
     // Fade out animation

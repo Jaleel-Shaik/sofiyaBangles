@@ -74,9 +74,14 @@ export const createOrder = async (payload: {
 };
 
 export const getUserOrders = async (): Promise<Order[]> => {
-  const res = await apiClient.get('orders');
-  const data = Array.isArray(res.data?.data) ? res.data.data : [];
-  return data as Order[];
+  try {
+    const res = await apiClient.get('/orders');
+    const data = Array.isArray(res.data?.data) ? res.data.data : [];
+    return data as Order[];
+  } catch (error) {
+    console.warn('Failed to fetch user orders:', error);
+    return [];
+  }
 };
 
 export const createReview = async (payload: ReviewPayload): Promise<OrderReview> => {
@@ -85,6 +90,11 @@ export const createReview = async (payload: ReviewPayload): Promise<OrderReview>
 };
 
 export const getProductReviews = async (productId: string): Promise<OrderReview[]> => {
-  const res = await apiClient.get(`orders/products/${productId}/reviews`);
-  return (res.data?.data || []) as OrderReview[];
+  try {
+    const res = await apiClient.get(`/orders/products/${productId}/reviews`);
+    return (res.data?.data || []) as OrderReview[];
+  } catch (error) {
+    console.warn(`Failed to fetch reviews for product ${productId}:`, error);
+    return [];
+  }
 };
