@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { zStringNumber, zStringBoolean, zJsonArray } from "../../../shared/utils/validation.utils";
 
 export const createProductSchema = z.object({
   unique_code: z
@@ -15,61 +16,30 @@ export const createProductSchema = z.object({
     .string()
     .max(2000, "Description must be under 2000 characters")
     .optional(),
-  price: z
-    .union([z.string(), z.number()])
-    .transform((val) => Number(val))
+  price: zStringNumber
     .pipe(z.number().positive("Price must be a positive number").max(9999999, "Price is too high")),
-  quantity: z
-    .union([z.string(), z.number()])
-    .transform((val) => Number(val))
+  quantity: zStringNumber
     .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative"))
     .default(0),
   category_id: z.string().min(1, "Category is required"),
   model_type_id: z.string().min(1, "Model Type is required"),
   status: z.enum(["draft", "active", "out_of_stock", "archived"]).optional(),
-  is_active: z
-    .union([z.boolean(), z.string()])
-    .transform((val) => val === true || val === "true")
+  is_active: zStringBoolean
     .optional()
     .default(true),
-  images: z.union([z.array(z.any()), z.string()])
-    .transform((val) => {
-      if (typeof val === "string") {
-        try {
-          return JSON.parse(val);
-        } catch {
-          return [];
-        }
-      }
-      return val;
-    })
+  images: zJsonArray
     .optional()
     .default([]),
   likes: z.number().int().min(0).default(0).optional(),
   rating: z.number().min(0).max(5).default(0).optional(),
   reviews: z.number().int().min(0).default(0).optional(),
-  has_variants: z
-    .union([z.boolean(), z.string()])
-    .transform((val) => val === true || val === "true")
+  has_variants: zStringBoolean
     .optional()
     .default(false),
-  variants: z
-    .union([z.array(z.any()), z.string()])
-    .transform((val) => {
-      if (typeof val === "string") {
-        try {
-          return JSON.parse(val);
-        } catch {
-          return [];
-        }
-      }
-      return val;
-    })
+  variants: zJsonArray
     .optional()
     .default([]),
-  accepts_custom_size: z
-    .union([z.boolean(), z.string()])
-    .transform((val) => val === true || val === "true")
+  accepts_custom_size: zStringBoolean
     .optional()
     .default(false),
   custom_size_price: z
@@ -89,9 +59,7 @@ export const updateProductSchema = createProductSchema.partial().extend({
 });
 
 export const updateStockSchema = z.object({
-  quantity: z
-    .union([z.string(), z.number()])
-    .transform((val) => Number(val))
+  quantity: zStringNumber
     .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative")),
 });
 

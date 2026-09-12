@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateReviewStats, createProductModel, deleteProductModel, restoreProductModel } from './product.model';
+import { calculateReviewStats, deleteProductModel, restoreProductModel } from './product.model';
+import { createProductService } from '../services/product.service';
 import { createProductSchema } from '../validations/product.validation';
 import { db } from '../../../shared/config/firebase';
 
@@ -37,14 +38,14 @@ test('Product Model Setup and Lifecycle', async (t) => {
 
     try {
       // 1. Create product
-      const product = await createProductModel({
+      const product = await createProductService(createProductSchema.parse({
         product_name: 'Test Bangle',
         price: 150,
         quantity: 10,
         is_active: true,
         category_id: testCatId,
         model_type_id: testModelId
-      });
+      }), undefined, 'test-actor-id');
 
       assert.ok(product.id, 'Product should have an ID');
       assert.equal(product.status, 'active', 'Created product status should be active');

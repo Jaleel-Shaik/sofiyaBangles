@@ -1,5 +1,6 @@
 import { createCategoryModel } from '../features/category/models/category.model';
-import { createProductModel } from '../features/product/models/product.model';
+import { createProductService } from '../features/product/services/product.service';
+import { createProductSchema } from '../features/product/validations/product.validation';
 import { createModelTypeModel, getModelTypesModel } from '../features/model-type/models/modelType.model';
 
 const seedData = async () => {
@@ -41,7 +42,7 @@ const seedData = async () => {
     console.log('Seeding products...');
     
     // Bridal products
-    await createProductModel({
+    await createProductService(createProductSchema.parse({
       product_name: 'Royal Bridal Gold Set',
       description: 'Elegant handcrafted gold bangles perfect for your special day.',
       price: 2499,
@@ -49,9 +50,9 @@ const seedData = async () => {
       category_id: bridal.id,
       model_type_id,
       quantity: 10
-    });
+    }), undefined, 'seed-script');
 
-    await createProductModel({
+    await createProductService(createProductSchema.parse({
       product_name: 'Traditional Bridal Chura',
       description: 'Classic red and white bridal chura set.',
       price: 1599,
@@ -59,10 +60,10 @@ const seedData = async () => {
       category_id: bridal.id,
       model_type_id,
       quantity: 5
-    });
+    }), undefined, 'seed-script');
 
     // Glass products
-    await createProductModel({
+    await createProductService(createProductSchema.parse({
       product_name: 'Festive Glass Bangles (Red)',
       description: 'Beautiful red glass bangles that chime wonderfully.',
       price: 299,
@@ -70,10 +71,10 @@ const seedData = async () => {
       category_id: glass.id,
       model_type_id,
       quantity: 50
-    });
+    }), undefined, 'seed-script');
 
     // Stone products
-    await createProductModel({
+    await createProductService(createProductSchema.parse({
       product_name: 'Diamond Studded Premium Set',
       description: 'American diamond studded bangles for party wear.',
       price: 3999,
@@ -81,7 +82,7 @@ const seedData = async () => {
       category_id: stone.id,
       model_type_id,
       quantity: 8
-    });
+    }), undefined, 'seed-script');
 
     console.log('Seeding completed successfully!');
     process.exit(0);

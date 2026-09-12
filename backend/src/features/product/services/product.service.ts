@@ -14,8 +14,13 @@ import {
   nullifyNotificationProductRef,
   searchProductsModel,
   getRecommendedProductsModel,
-  getNewArrivalsModel
+  getNewArrivalsModel,
+  generateNextProductCodeModel,
 } from "../models/product.model";
+import { getModelTypeByIdModel } from "../../model-type/models/modelType.model";
+import { getCategoryByIdModel } from "../../category/models/category.model";
+import { v4 as uuidv4 } from "uuid";
+import { Product, ProductImage, ProductVariant } from "../../../shared/types";
 import { createAuditLogModel } from "../../../shared/models/audit.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.validation";
 import { v2 as cloudinary } from "cloudinary";
@@ -26,21 +31,106 @@ export const createProductService = async (
   actorId: string,
   actorRole?: 'admin' | 'super_admin',
 ) => {
-  let imageUrls: string[] = [];
-
-  if (files && files.length > 0) {
-    imageUrls = await uploadMultipleToCloudinary(files);
+  // ── CENTRAL INTEGRITY RULE ─────────────────────────────────────
+  // 1. Validate model_type exists
+  const mtDoc = await getModelTypeByIdModel(input.model_type_id);
+  if (!mtDoc) {
+    throw new Error("MODEL_TYPE_NOT_FOUND");
   }
 
-  const images = imageUrls.map(url => ({ image_url: url }));
+  // 2. Validate category exists and is active
+  const catDoc = await getCategoryByIdModel(input.category_id);
+  if (!catDoc || catDoc.is_active === false) {
+    throw new Error("CATEGORY_NOT_FOUND");
+  }
 
-  const product = await createProductModel({
-    ...input,
-    images: images,
+  // 3. Validate category belongs to the selected model
+  if (catDoc.model_type_id !== input.model_type_id) {
+    throw new Error("INVALID_MODEL_CATEGORY_RELATIONSHIP");
+  }
+  // ────────────────────────────────────────────────────────────────
+
+  let allImageUrls: string[] = [];
+  
+  if (input.images && Array.isArray(input.images)) {
+    allImageUrls.push(...input.images.map((img: any) => typeof img === 'string' ? img : img.image_url).filter(Boolean));
+  }
+
+  if (files && files.length > 0) {
+    const uploadedUrls = await uploadMultipleToCloudinary(files);
+    allImageUrls.push(...uploadedUrls);
+  }
+
+  let generatedCode = input.unique_code;
+  if (!generatedCode) {
+    generatedCode = await generateNextProductCodeModel(input.model_type_id, mtDoc.name || "PRD");
+  }
+
+  const newId = uuidv4();
+  const status = input.status || (input.is_active !== false ? "active" : "draft");
+  const is_active = status === "active" || status === "out_of_stock";
+
+  const productData: Product = {
+    id: newId,
+    unique_code: generatedCode || `PRD-${Date.now().toString().slice(-4)}`,
+    product_name: input.product_name,
+    description: input.description || null,
+    price: input.price,
+    image_url: allImageUrls.length > 0 ? allImageUrls[0] : null,
+    category_id: input.category_id,
+    model_type_id: input.model_type_id,
+    quantity: input.quantity || 0,
+    likes: input.likes || 0,
+    rating: input.rating || 0,
+    reviews: input.reviews || 0,
+    is_active,
+    status,
+    deleted_at: null,
+    has_variants: input.has_variants || false,
+    accepts_custom_size: input.accepts_custom_size || false,
+    custom_size_price: input.custom_size_price ? Number(input.custom_size_price) : input.price,
     created_by: actorId,
     created_by_role: actorRole || 'admin',
     updated_by: actorId,
-  });
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const variants: ProductVariant[] = [];
+  if (input.has_variants && input.variants) {
+    input.variants.forEach((v: any) => {
+      variants.push({
+        id: uuidv4(),
+        product_id: newId,
+        size: v.size,
+        sku: v.sku || null,
+        price: Number(v.price),
+        quantity: Number(v.quantity || 0),
+        status: 'active',
+        created_at: productData.created_at,
+        updated_at: productData.updated_at,
+      });
+    });
+  }
+
+  const images: ProductImage[] = [];
+  if (allImageUrls.length > 0) {
+    allImageUrls.forEach((url, idx) => {
+      images.push({
+        id: uuidv4(),
+        product_id: newId,
+        image_url: url,
+        public_id: null,
+        alt_text: null,
+        display_order: idx,
+        is_primary: idx === 0,
+        created_at: productData.created_at,
+        updated_at: productData.updated_at,
+      });
+    });
+  }
+
+  const product = await createProductModel(productData, variants, images);
 
   // Audit log
   await createAuditLogModel({
@@ -143,15 +233,26 @@ export const updateProductService = async (
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
+  // ── CENTRAL INTEGRITY RULE (UPDATE) ──────────────────────────
+  const targetCategoryId = input.category_id || existing.category_id;
+  const targetModelTypeId = input.model_type_id || existing.model_type_id;
+
+  if (targetCategoryId && targetModelTypeId) {
+    const catDoc = await getCategoryByIdModel(targetCategoryId);
+    if (!catDoc || catDoc.is_active === false) {
+      throw new Error("CATEGORY_NOT_FOUND");
+    }
+    if (catDoc.model_type_id !== targetModelTypeId) {
+      throw new Error("INVALID_MODEL_CATEGORY_RELATIONSHIP");
+    }
+  }
+  // ────────────────────────────────────────────────────────────────
+
   let imageUrls: string[] | undefined;
   if (files && files.length > 0) {
     imageUrls = await uploadMultipleToCloudinary(files);
   }
 
-  // Merge existing images from body (URLs of previously uploaded images)
-  // and newly uploaded image URLs.
-  // existing_images === '' means admin explicitly cleared all images
-  // existing_images === undefined means no explicit change
   const existingImagesUrls: string[] = (existing.images || []).map((img: any) => typeof img === 'string' ? img : img.image_url);
 
   const existingImages: string[] = input.existing_images !== undefined
@@ -168,13 +269,61 @@ export const updateProductService = async (
 
   const { existing_images, ...restInput } = input;
   
-  const formattedImages = mergedImages.map(url => ({ image_url: url }));
+  const formattedImages = mergedImages.map((url, idx) => ({
+    id: uuidv4(),
+    product_id: id,
+    image_url: url,
+    public_id: null,
+    alt_text: null,
+    display_order: idx,
+    is_primary: idx === 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
+
+  const updateData: any = { ...restInput, updated_at: new Date().toISOString() };
+  if (restInput.status) {
+    updateData.is_active = restInput.status === "active" || restInput.status === "out_of_stock";
+  } else if (restInput.is_active !== undefined) {
+    updateData.status = restInput.is_active ? "active" : "draft";
+  }
+
+  Object.keys(updateData).forEach(
+    (key) => updateData[key] === undefined && delete updateData[key],
+  );
+
+  const { variants, images, image_url, ...productFields } = updateData;
+
+  if (mergedImages.length > 0) {
+    productFields.image_url = mergedImages[0];
+  } else if (image_url !== undefined) {
+    productFields.image_url = image_url;
+  }
+
+  let formattedVariants: ProductVariant[] | undefined = undefined;
+  if (variants !== undefined) {
+    formattedVariants = [];
+    if (variants && variants.length > 0) {
+      variants.forEach((v: any) => {
+        formattedVariants!.push({
+          id: uuidv4(),
+          product_id: id,
+          size: v.size,
+          sku: v.sku || null,
+          price: Number(v.price),
+          quantity: Number(v.quantity || 0),
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      });
+    }
+  }
 
   const product = await updateProductModel(id, {
-    ...restInput,
-    images: formattedImages as any[],
+    ...productFields,
     updated_by: actorId,
-  });
+  }, formattedVariants, images !== undefined ? formattedImages : undefined);
 
   // Identify old images that were replaced (non-blocking cleanup)
   if (existingImagesUrls.length > 0) {
