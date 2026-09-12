@@ -6,6 +6,8 @@ import {
 } from "../controllers/user.controller";
 import { authenticate } from "../../../shared/middlewares/auth.middleware";
 import { requireRole } from "../../../shared/middlewares/role.middleware";
+import { validate } from "../../../shared/middlewares/validate.middleware";
+import { updateUserRoleSchema } from "../validations/user.validation";
 
 const router = Router();
 
@@ -15,6 +17,6 @@ router.use(requireRole("super_admin"));
 
 router.get("/", getUsers);
 router.get("/:id", getUserById);
-router.patch("/:id/role", updateUserRole);
+router.patch("/:id/role", validate(updateUserRoleSchema), updateUserRole);
 
 export default router;

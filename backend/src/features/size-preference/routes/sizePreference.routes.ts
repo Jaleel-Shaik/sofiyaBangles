@@ -6,6 +6,8 @@ import {
   updateSizePreference,
   deleteSizePreference
 } from "../controllers/sizePreference.controller";
+import { validate } from "../../../shared/middlewares/validate.middleware";
+import { createSizePreferenceSchema, updateSizePreferenceSchema } from "../validations/sizePreference.validation";
 
 const router = Router();
 
@@ -13,8 +15,8 @@ const router = Router();
 router.use(authenticate);
 
 router.get("/", getSizePreferences);
-router.post("/", createSizePreference);
-router.put("/:id", updateSizePreference);
+router.post("/", validate(createSizePreferenceSchema), createSizePreference);
+router.put("/:id", validate(updateSizePreferenceSchema), updateSizePreference);
 router.delete("/:id", deleteSizePreference);
 
 export default router;

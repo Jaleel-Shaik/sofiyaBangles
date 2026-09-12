@@ -53,6 +53,24 @@ export const regenerateQRSchema = z.object({
   otp_pending_token: z.string().min(1, "OTP pending token is required"),
 });
 
+export const sendOtpSchema = z.object({
+  phone: z.string().min(1, "Phone number is required"),
+});
+
+export const verifyOtpSchema = z.object({
+  phone: z.string().min(1, "Phone number is required"),
+  otp: z.string().min(1, "OTP is required"),
+});
+
+export const firebaseLoginSchema = z.object({
+  firebase_token: z.string().min(1, "Firebase token is required"),
+});
+
+export const setPasswordSchema = z.object({
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type Verify2faInput = z.infer<typeof verify2faSchema>;

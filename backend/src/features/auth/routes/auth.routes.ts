@@ -25,6 +25,10 @@ import {
   verify2faSchema,
   refreshTokenSchema,
   regenerateQRSchema,
+  sendOtpSchema,
+  verifyOtpSchema,
+  firebaseLoginSchema,
+  setPasswordSchema,
 } from "../validations/auth.validation";
 
 const router = Router();
@@ -36,14 +40,14 @@ router.post("/verify-2fa", validate(verify2faSchema), verify2FAController);
 router.post("/refresh-token", validate(refreshTokenSchema), refreshTokenController);
 
 // Legacy SMS OTP routes (kept for backwards compatibility)
-router.post("/send-otp", sendOtp);
-router.post("/verify-otp", verifyOtp);
+router.post("/send-otp", validate(sendOtpSchema), sendOtp);
+router.post("/verify-otp", validate(verifyOtpSchema), verifyOtp);
 
 // Firebase token login (for Firebase Auth-registered mobile users)
-router.post("/firebase-login", firebaseLoginController);
+router.post("/firebase-login", validate(firebaseLoginSchema), firebaseLoginController);
 
 // Password migration for Firebase Auth users
-router.post("/set-password", setPasswordController);
+router.post("/set-password", authenticate, validate(setPasswordSchema), setPasswordController);
 
 // Protected routes
 router.post("/logout", authenticate, logoutController);
