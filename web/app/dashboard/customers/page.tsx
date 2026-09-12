@@ -12,8 +12,9 @@ import {
   AlertCircle,
   Eye,
 } from "lucide-react";
-import { superAdminApi, type UserProfile } from "@/src/lib/api";
+import { type UserProfile } from "@/src/lib/api";
 import toast from "react-hot-toast";
+import { api } from "@/src/lib/api";
 
 export default function CustomersDirectoryPage() {
   const [customers, setCustomers] = useState<UserProfile[]>([]);
@@ -26,7 +27,7 @@ export default function CustomersDirectoryPage() {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const res = await superAdminApi.getCustomers({
+      const res = await api.superAdmin.getCustomers({
         page,
         limit: 20,
         search: search.trim() || undefined,

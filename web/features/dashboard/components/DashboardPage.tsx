@@ -1,3 +1,4 @@
+import { api } from "@/src/lib/api";
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -14,7 +15,7 @@ import {
   ShieldCheck,
   ArrowUpRight,
 } from "lucide-react";
-import { adminApi, type Product, type AnalyticsOverview, type Category, type ModelType } from "@/src/lib/api";
+import { type Product, type AnalyticsOverview, type Category, type ModelType } from "@/src/lib/api";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -37,10 +38,10 @@ export default function DashboardPage() {
       setError(null);
       try {
         const [analyticsData, productsData, cats, mts] = await Promise.all([
-          adminApi.getOverviewAnalytics(),
-          adminApi.getAdminProducts(1, 6),
-          adminApi.getCategories(),
-          adminApi.getModelTypes(),
+          api.admin.getOverviewAnalytics(),
+          api.admin.getAdminProducts(1, 6),
+          api.admin.getCategories(),
+          api.admin.getModelTypes(),
         ]);
         setStats(analyticsData);
         setRecentProducts(productsData.products || []);
@@ -68,7 +69,7 @@ export default function DashboardPage() {
     const updateStats = async () => {
       setStatsLoading(true);
       try {
-        const data = await adminApi.getOverviewAnalytics(
+        const data = await api.admin.getOverviewAnalytics(
           selectedCategory || undefined,
           selectedModelType || undefined
         );

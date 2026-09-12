@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Edit, Trash2, Package, Loader2, ShoppingCart, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { adminApi, type Product } from "@/src/lib/api";
+import { type Product } from "@/src/lib/api";
+import { api } from "@/src/lib/api";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -28,7 +29,7 @@ export default function ProductDetailPage() {
 
   const fetchProduct = async () => {
     try {
-      const prod = await adminApi.getProductById(id);
+      const prod = await api.admin.getProductById(id);
       setProduct(prod);
     } catch {
       toast.error("Failed to load product");
@@ -43,7 +44,7 @@ export default function ProductDetailPage() {
     if (!product) return;
     if (!confirm(`Delete "${product.product_name}"? This action cannot be undone.`)) return;
     try {
-      await adminApi.deleteProduct(id);
+      await api.admin.deleteProduct(id);
       toast.success("Product deleted");
       router.push("/dashboard/products");
     } catch {
@@ -57,7 +58,7 @@ export default function ProductDetailPage() {
     if (sellQty > product.quantity) { toast.error("Not enough stock"); return; }
     setSelling(true);
     try {
-      const updated = await adminApi.sellProduct(id, sellQty);
+      const updated = await api.admin.sellProduct(id, sellQty);
       setProduct(updated);
       setSellQty(1);
       toast.success(`Sold ${sellQty} unit(s)!`);

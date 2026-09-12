@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { superAdminApi } from "@/src/lib/api";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import Link from "next/link";
+import { api } from "@/src/lib/api";
 import {
   Package,
   PlusCircle,
@@ -33,7 +33,7 @@ export default function AdminProductActivityPage() {
   const fetchActivity = async () => {
     setLoading(true);
     try {
-      const res = await superAdminApi.getAdminActivity({ page, limit: 50 });
+      const res = await api.superAdmin.getAdminActivity({ page, limit: 50 });
       setItems(res.items || []);
       setTotal(res.total || 0);
     } catch (error) {

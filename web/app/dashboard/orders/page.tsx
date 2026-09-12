@@ -27,8 +27,9 @@ import {
   Check,
   ExternalLink,
 } from "lucide-react";
-import { superAdminApi, adminApi, type AdminOrder, type Product } from "@/src/lib/api";
+import { type AdminOrder, type Product } from "@/src/lib/api";
 import toast from "react-hot-toast";
+import { api } from "@/src/lib/api";
 
 export default function OrdersManagementPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -54,7 +55,7 @@ export default function OrdersManagementPage() {
   const fetchOrders = async (targetPage = page, targetSearch = search) => {
     setLoading(true);
     try {
-      const res = await superAdminApi.getOrders({
+      const res = await api.superAdmin.getOrders({
         page: targetPage,
         limit: 20,
         search: targetSearch || undefined,
@@ -94,7 +95,7 @@ export default function OrdersManagementPage() {
     setIsSaleModalOpen(true);
     setLoadingProducts(true);
     try {
-      const res = await adminApi.getAdminProducts(1, 100);
+      const res = await api.admin.getAdminProducts(1, 100);
       setProducts(res.products || []);
       if (res.products && res.products.length > 0) {
         setSelectedProductId(res.products[0].id);
@@ -130,7 +131,7 @@ export default function OrdersManagementPage() {
     setCreatingSale(true);
     try {
       // 1. Create order in backend (which automatically decrements product stock in Firestore)
-      const res = await superAdminApi.createOrder({
+      const res = await api.superAdmin.createOrder({
         items: [
           {
             productId: selectedProduct.id,
@@ -246,7 +247,7 @@ export default function OrdersManagementPage() {
   const handleUpdateStatus = async (orderId: string, newStatus: string, notes?: string) => {
     setActionLoading(true);
     try {
-      await superAdminApi.updateOrderStatus(orderId, newStatus, notes);
+      await api.superAdmin.updateOrderStatus(orderId, newStatus, notes);
       toast.success(`Order status changed to ${newStatus}`);
       await fetchOrders();
       if (selectedOrder && selectedOrder.id === orderId) {
@@ -269,7 +270,7 @@ export default function OrdersManagementPage() {
     }
     setActionLoading(true);
     try {
-      await superAdminApi.completeOrder(orderId);
+      await api.superAdmin.completeOrder(orderId);
       toast.success("Order completed and 70/30 commission allocated!");
       await fetchOrders();
       if (selectedOrder && selectedOrder.id === orderId) {
@@ -287,7 +288,7 @@ export default function OrdersManagementPage() {
     if (!reason) return;
     setActionLoading(true);
     try {
-      await superAdminApi.refundOrder(orderId, reason);
+      await api.superAdmin.refundOrder(orderId, reason);
       toast.success("Order refunded and ledger reversed.");
       await fetchOrders();
       if (selectedOrder && selectedOrder.id === orderId) {

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { superAdminApi } from "@/src/lib/api";
 import { ShoppingBag, ArrowLeft, CheckCircle, RefreshCw, Shield, User, MapPin } from "lucide-react";
 import toast from "react-hot-toast";
+import { api } from "@/src/lib/api";
 
 export default function SaleDetailPage() {
   const params = useParams();
@@ -20,7 +20,7 @@ export default function SaleDetailPage() {
   const fetchSaleDetail = async () => {
     setLoading(true);
     try {
-      const data = await superAdminApi.getSaleDetail(id);
+      const data = await api.superAdmin.getSaleDetail(id);
       setSale(data);
     } catch (error) {
       toast.error("Failed to load sale details");
@@ -37,7 +37,7 @@ export default function SaleDetailPage() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      await superAdminApi.completeOrder(id);
+      await api.superAdmin.completeOrder(id);
       toast.success("Order completed and 70/30 revenue allocated!");
       fetchSaleDetail();
     } catch (error: any) {
@@ -51,7 +51,7 @@ export default function SaleDetailPage() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      await superAdminApi.refundOrder(id, refundReason || "SuperAdmin manual refund");
+      await api.superAdmin.refundOrder(id, refundReason || "SuperAdmin manual refund");
       toast.success("Order refunded and revenue reversed!");
       setShowRefundModal(false);
       fetchSaleDetail();

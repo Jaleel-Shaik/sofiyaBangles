@@ -6,13 +6,14 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { adminApi, type Category, type ModelType } from "@/src/lib/api";
+import { type Category, type ModelType } from "@/src/lib/api";
 
 import { ProductImageUpload } from "./form/ProductImageUpload";
 import { ProductBasicInfo } from "./form/ProductBasicInfo";
 import { ProductCategorySelect } from "./form/ProductCategorySelect";
 import { ProductVariants } from "./form/ProductVariants";
 import { FormState, VariantState } from "./form/types";
+import { api } from "@/src/lib/api";
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function AddProductPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    adminApi.getModelTypes()
+    api.admin.getModelTypes()
       .then((mts) => {
         setModelTypes(mts);
         if (mts.length > 0 && !selectedModelType) {
@@ -54,7 +55,7 @@ export default function AddProductPage() {
 
   useEffect(() => {
     if (selectedModelType) {
-      adminApi.getCategories(selectedModelType)
+      api.admin.getCategories(selectedModelType)
         .then(cats => setCategories(cats))
         .catch(() => setCategories([]));
     } else {
@@ -152,7 +153,7 @@ export default function AddProductPage() {
       
       imageFiles.forEach(file => formData.append("images", file));
       
-      await adminApi.createProductDirect(formData);
+      await api.admin.createProductDirect(formData);
       toast.success("Product created");
       router.push("/dashboard/products");
     } catch (e: any) {

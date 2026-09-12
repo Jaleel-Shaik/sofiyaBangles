@@ -1,10 +1,11 @@
+import { API_ENDPOINTS } from "./endpoints";
 import { apiClient, extractData } from "./client";
 import { Product, Category, ModelType, BusinessProfile, AnalyticsOverview, UserProfile } from "./types";
 
 export const adminApi = {
   // Products
   getProducts: (page = 1, limit = 10, categoryId?: string, search?: string) => {
-    let url = `/products?page=${page}&limit=${limit}`;
+    let url = `${API_ENDPOINTS.PRODUCTS.BASE}?page=${page}&limit=${limit}`;
     if (categoryId) url += `&category_id=${categoryId}`;
     if (search) url += `&search=${search}`;
     return apiClient.get(url).then((r) => ({
@@ -13,12 +14,12 @@ export const adminApi = {
     }));
   },
   getAdminProducts: (page = 1, limit = 10) =>
-    apiClient.get(`/products/admin?page=${page}&limit=${limit}`).then((r) => ({
+    apiClient.get(`${API_ENDPOINTS.PRODUCTS.ADMIN}?page=${page}&limit=${limit}`).then((r) => ({
       products: extractData<Product[]>(r),
       total: r.data?.pagination?.total || 0,
     })),
   getProductById: (id: string) =>
-    apiClient.get(`/products/${id}`).then((r) => extractData<Product>(r)),
+    apiClient.get(API_ENDPOINTS.PRODUCTS.BY_ID(id)).then((r) => extractData<Product>(r)),
   createProduct: async (productData: any, imageUris: string[] = []) => {
     const formData = new FormData();
     Object.keys(productData).forEach(key => {
@@ -31,16 +32,16 @@ export const adminApi = {
         formData.append('images', uri);
       }
     });
-    return apiClient.post('/products', formData, {
+    return apiClient.post(API_ENDPOINTS.PRODUCTS.BASE, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data.data);
   },
   createProductDirect: (formData: FormData) =>
-    apiClient.post('/products', formData, {
+    apiClient.post(API_ENDPOINTS.PRODUCTS.BASE, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data.data),
   updateProductDirect: (id: string, formData: FormData) =>
-    apiClient.put(`/products/${id}`, formData, {
+    apiClient.put(API_ENDPOINTS.PRODUCTS.BY_ID(id), formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data.data),
   updateProduct: async (id: string, productData: any, imageUris: string[] = []) => {
@@ -54,18 +55,18 @@ export const adminApi = {
       if (!uri.startsWith('http')) formData.append('images', uri);
       else formData.append('existing_images', uri);
     });
-    return apiClient.put(`/products/${id}`, formData, {
+    return apiClient.put(API_ENDPOINTS.PRODUCTS.BY_ID(id), formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data.data);
   },
   deleteProduct: (id: string) =>
-    apiClient.delete(`/products/${id}`).then(r => r.data),
+    apiClient.delete(API_ENDPOINTS.PRODUCTS.BY_ID(id)).then(r => r.data),
   sellProduct: (id: string, quantity = 1) =>
-    apiClient.patch(`/products/${id}/sell`, { quantity }).then(r => r.data.data),
+    apiClient.patch(API_ENDPOINTS.PRODUCTS.SELL(id), { quantity }).then(r => r.data.data),
 
   // Categories
   getCategories: async (modelTypeId?: string) => {
-    const res = await apiClient.get('/categories', { params: { model_type_id: modelTypeId } });
+    const res = await apiClient.get(API_ENDPOINTS.CATEGORIES.BASE, { params: { model_type_id: modelTypeId } });
     return res.data.data as Category[];
   },
   createCategory: async (data: { category_name: string; model_type_id: string; image?: string; standard_sizes?: string[] }) => {
@@ -82,7 +83,7 @@ export const adminApi = {
     } else {
        formData.append('size_type', 'none');
     }
-    return apiClient.post('/categories', formData, {
+    return apiClient.post(API_ENDPOINTS.CATEGORIES.BASE, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }).then(r => r.data.data);
   },
@@ -100,44 +101,44 @@ export const adminApi = {
     } else if (data.standard_sizes !== undefined) {
        formData.append('size_type', 'none');
     }
-    return apiClient.put(`/categories/${id}`, formData, {
+    return apiClient.put(API_ENDPOINTS.CATEGORIES.BY_ID(id), formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then(r => r.data.data);
   },
   deleteCategory: (id: string) =>
-    apiClient.delete(`/categories/${id}`).then(r => r.data),
+    apiClient.delete(API_ENDPOINTS.CATEGORIES.BY_ID(id)).then(r => r.data),
 
   // Model Types
   getModelTypes: () =>
-    apiClient.get('/model-types').then(r => extractData<ModelType[]>(r)),
+    apiClient.get(API_ENDPOINTS.MODEL_TYPES.BASE).then(r => extractData<ModelType[]>(r)),
   createModelType: (data: { name: string }) =>
-    apiClient.post('/model-types', data).then(r => r.data.data),
+    apiClient.post(API_ENDPOINTS.MODEL_TYPES.BASE, data).then(r => r.data.data),
   updateModelType: (id: string, data: { name: string }) =>
-    apiClient.put(`/model-types/${id}`, data).then(r => r.data.data),
+    apiClient.put(API_ENDPOINTS.MODEL_TYPES.BY_ID(id), data).then(r => r.data.data),
   deleteModelType: (id: string) =>
-    apiClient.delete(`/model-types/${id}`).then(r => r.data),
+    apiClient.delete(API_ENDPOINTS.MODEL_TYPES.BY_ID(id)).then(r => r.data),
 
   // Settings / Business Profile
   getBusinessProfile: () =>
-    apiClient.get('/settings/business-profile').then(r => extractData<BusinessProfile>(r)),
+    apiClient.get(API_ENDPOINTS.SETTINGS.BUSINESS_PROFILE).then(r => extractData<BusinessProfile>(r)),
   updateBusinessProfile: (data: Partial<BusinessProfile>) =>
-    apiClient.put('/settings/business-profile', data).then(r => r.data.data),
+    apiClient.put(API_ENDPOINTS.SETTINGS.BUSINESS_PROFILE, data).then(r => r.data.data),
   uploadBusinessLogo: (file: File) => {
     const formData = new FormData();
     formData.append("logo", file);
     return apiClient
-      .post<{ success: boolean; data: BusinessProfile; message: string }>("/settings/business-profile/logo", formData, {
+      .post<{ success: boolean; data: BusinessProfile; message: string }>(API_ENDPOINTS.SETTINGS.LOGO, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       })
       .then((r) => r.data.data);
   },
 
   getOverviewAnalytics: (categoryId?: string, modelTypeId?: string) =>
-    apiClient.get('/analytics/overview', { params: { category_id: categoryId, model_type_id: modelTypeId } }).then(r => extractData<AnalyticsOverview>(r)),
+    apiClient.get(API_ENDPOINTS.ANALYTICS.OVERVIEW, { params: { category_id: categoryId, model_type_id: modelTypeId } }).then(r => extractData<AnalyticsOverview>(r)),
 
   // Users
   getUsers: () =>
-    apiClient.get('/users').then(r => extractData<UserProfile[]>(r)),
+    apiClient.get(API_ENDPOINTS.USERS.BASE).then(r => extractData<UserProfile[]>(r)),
   getUserById: (id: string) =>
-    apiClient.get(`/users/${id}`).then(r => extractData<UserProfile>(r)),
+    apiClient.get(API_ENDPOINTS.USERS.BY_ID(id)).then(r => extractData<UserProfile>(r)),
 };

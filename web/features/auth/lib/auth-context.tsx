@@ -1,3 +1,4 @@
+import { api } from "@/src/lib/api";
 "use client";
 
 import {
@@ -9,7 +10,6 @@ import {
   ReactNode,
 } from "react";
 import {
-  authApi,
   type User,
   type LoginResponse,
   type Verify2FAResponse,
@@ -215,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isLoading: true, accessDenied: false, accessDeniedMessage: null }));
 
     try {
-      const result = await authApi.login(email, password);
+      const result = await api.auth.login(email, password);
 
       const isSetup = Boolean(result.isTotpSetupRequired ?? result.setup_required);
       const isOtp = Boolean(result.requiresOtp ?? result.require_otp ?? result.otp_pending_token);
@@ -333,7 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const challengeId = state.challengeId || (typeof window !== "undefined" ? sessionStorage.getItem("2fa_challenge_id") : null);
       const email = state.email || (typeof window !== "undefined" ? sessionStorage.getItem("2fa_email") : null);
 
-      const result = await authApi.verify2FA({
+      const result = await api.auth.verify2FA({
         challengeId: challengeId || undefined,
         challenge_id: challengeId || undefined,
         email: email || undefined,
@@ -410,7 +410,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const challengeId = state.challengeId || (typeof window !== "undefined" ? sessionStorage.getItem("2fa_challenge_id") : null);
       const email = state.email || (typeof window !== "undefined" ? sessionStorage.getItem("2fa_email") : null);
 
-      const result = await authApi.verify2FA({
+      const result = await api.auth.verify2FA({
         challengeId: challengeId || undefined,
         challenge_id: challengeId || undefined,
         email: email || undefined,
@@ -499,7 +499,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isLoading: true }));
 
     try {
-      const result = await authApi.regenerateQR(state.otpPendingToken);
+      const result = await api.auth.regenerateQR(state.otpPendingToken);
       setState((prev) => ({
         ...prev,
         otpPendingToken: result.otp_pending_token,
@@ -519,7 +519,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sessionId = localStorage.getItem("session_id");
     try {
       if (refreshToken) {
-        await authApi.logout(refreshToken, sessionId || undefined);
+        await api.auth.logout(refreshToken, sessionId || undefined);
       }
     } catch {
       // Best effort logout
@@ -559,7 +559,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const user = await authApi.getMe();
+      const user = await api.auth.getMe();
       if (user.role === "user") {
         throw new Error("Invalid role for web");
       }
@@ -572,7 +572,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [performLogout]);
 
   const getSessions = useCallback(async () => {
-    const sessions = await authApi.getSessions();
+    const sessions = await api.auth.getSessions();
     return sessions;
   }, []);
 

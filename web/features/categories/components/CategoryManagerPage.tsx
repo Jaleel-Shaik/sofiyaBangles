@@ -1,10 +1,11 @@
+import { api } from "@/src/lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Edit, Trash2, FolderOpen, X, Loader2, Layers } from "lucide-react";
 import toast from "react-hot-toast";
-import { adminApi, type Category, type ModelType } from "@/src/lib/api";
+import { type Category, type ModelType } from "@/src/lib/api";
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -21,8 +22,8 @@ export default function CategoriesPage() {
     setLoading(true);
     try {
       const [cats, mts] = await Promise.all([
-        adminApi.getCategories(),
-        adminApi.getModelTypes(),
+        api.admin.getCategories(),
+        api.admin.getModelTypes(),
       ]);
       setCategories(cats);
       setModelTypes(mts);
@@ -63,10 +64,10 @@ export default function CategoriesPage() {
         standard_sizes: sizes.split(",").map(s => s.trim()).filter(Boolean),
       };
       if (editingId) {
-        await adminApi.updateCategory(editingId, data);
+        await api.admin.updateCategory(editingId, data);
         toast.success("Category updated");
       } else {
-        await adminApi.createCategory(data);
+        await api.admin.createCategory(data);
         toast.success("Category created");
       }
       resetForm();
@@ -81,7 +82,7 @@ export default function CategoriesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this category?")) return;
     try {
-      await adminApi.deleteCategory(id);
+      await api.admin.deleteCategory(id);
       toast.success("Category deleted");
       fetchData();
     } catch (e: any) {

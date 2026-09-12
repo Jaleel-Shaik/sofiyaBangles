@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { superAdminApi, type RevenueLedgerItem } from "@/src/lib/api";
+import { type RevenueLedgerItem } from "@/src/lib/api";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import {
   TrendingUp,
@@ -15,6 +15,7 @@ import {
   Settings,
 } from "lucide-react";
 import Link from "next/link";
+import { api } from "@/src/lib/api";
 
 export default function ProductSalesRevenuePage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -33,12 +34,12 @@ export default function ProductSalesRevenuePage() {
     setLoading(true);
     try {
       const [res, settings] = await Promise.all([
-        superAdminApi.getRevenueLedger({
+        api.superAdmin.getRevenueLedger({
           page,
           limit: 30,
           transactionType: transactionType || undefined,
         }),
-        superAdminApi.getCommissionSettings().catch(() => null),
+        api.superAdmin.getCommissionSettings().catch(() => null),
       ]);
 
       setItems(res.items || []);
@@ -122,7 +123,7 @@ export default function ProductSalesRevenuePage() {
           </Link>
 
           <a
-            href={superAdminApi.exportRevenueCsvUrl}
+            href={api.superAdmin.exportRevenueCsvUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-[#E8436E] hover:bg-[#CC3366] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-all"

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { superAdminApi } from "@/src/lib/api";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import Link from "next/link";
 import { Settings, Save, ShieldCheck, CheckCircle2, Shield } from "lucide-react";
 import toast from "react-hot-toast";
+import { api } from "@/src/lib/api";
 
 export default function CommissionSettingsPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -17,7 +17,7 @@ export default function CommissionSettingsPage() {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const res = await superAdminApi.getCommissionSettings();
+      const res = await api.superAdmin.getCommissionSettings();
       if (res) {
         setAdminPct(res.admin_percentage ?? 70);
         setSuperAdminPct(res.super_admin_percentage ?? 30);
@@ -70,7 +70,7 @@ export default function CommissionSettingsPage() {
 
     setSaving(true);
     try {
-      await superAdminApi.updateCommissionSettings({
+      await api.superAdmin.updateCommissionSettings({
         admin_percentage: adminPct,
         super_admin_percentage: superAdminPct,
       });

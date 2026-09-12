@@ -1,10 +1,11 @@
+import { api } from "@/src/lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Edit, Trash2, Layers, X, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { adminApi, type ModelType } from "@/src/lib/api";
+import { type ModelType } from "@/src/lib/api";
 
 export default function ModelTypesPage() {
   const [modelTypes, setModelTypes] = useState<ModelType[]>([]);
@@ -17,7 +18,7 @@ export default function ModelTypesPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await adminApi.getModelTypes();
+      const data = await api.admin.getModelTypes();
       setModelTypes(data);
     } catch {
       toast.error("Failed to load model types");
@@ -46,10 +47,10 @@ export default function ModelTypesPage() {
     setSaving(true);
     try {
       if (editingId) {
-        await adminApi.updateModelType(editingId, { name });
+        await api.admin.updateModelType(editingId, { name });
         toast.success("Updated");
       } else {
-        await adminApi.createModelType({ name });
+        await api.admin.createModelType({ name });
         toast.success("Created");
       }
       resetForm();
@@ -64,7 +65,7 @@ export default function ModelTypesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this model type?")) return;
     try {
-      await adminApi.deleteModelType(id);
+      await api.admin.deleteModelType(id);
       toast.success("Deleted");
       fetchData();
     } catch (e: any) {

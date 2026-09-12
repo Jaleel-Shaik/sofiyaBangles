@@ -1,3 +1,4 @@
+import { api } from "@/src/lib/api";
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,7 +6,7 @@ import { motion } from "framer-motion";
 import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { adminApi, type Product, type Category } from "@/src/lib/api";
+import { type Product, type Category } from "@/src/lib/api";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -18,8 +19,8 @@ export default function ProductsPage() {
     setLoading(true);
     try {
       const [prodRes, cats] = await Promise.all([
-        adminApi.getAdminProducts(1, 100),
-        adminApi.getCategories(),
+        api.admin.getAdminProducts(1, 100),
+        api.admin.getCategories(),
       ]);
       setProducts(prodRes.products);
       setCategories(cats);
@@ -45,7 +46,7 @@ export default function ProductsPage() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete "${name}"? This action cannot be undone.`)) return;
     try {
-      await adminApi.deleteProduct(id);
+      await api.admin.deleteProduct(id);
       toast.success("Product deleted");
       fetchData();
     } catch {

@@ -6,13 +6,14 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { adminApi, type Category, type ModelType } from "@/src/lib/api";
+import { type Category, type ModelType } from "@/src/lib/api";
 
 import { EditProductImageUpload } from "./form/EditProductImageUpload";
 import { ProductBasicInfo } from "./form/ProductBasicInfo";
 import { ProductCategorySelect } from "./form/ProductCategorySelect";
 import { ProductVariants } from "./form/ProductVariants";
 import { FormState, VariantState } from "./form/types";
+import { api } from "@/src/lib/api";
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function EditProductPage() {
   const initialCategoryIdRef = useRef("");
 
   useEffect(() => {
-    Promise.all([adminApi.getProductById(id), adminApi.getModelTypes()])
+    Promise.all([api.admin.getProductById(id), api.admin.getModelTypes()])
       .then(([product, mts]) => {
         setModelTypes(mts);
         if (product) {
@@ -83,7 +84,7 @@ export default function EditProductPage() {
 
   useEffect(() => {
     if (selectedModelType) {
-      adminApi.getCategories(selectedModelType)
+      api.admin.getCategories(selectedModelType)
         .then(cats => setCategories(cats))
         .catch(() => setCategories([]));
     } else {
@@ -186,7 +187,7 @@ export default function EditProductPage() {
       if (existingImages.length > 0) formData.append("existing_images", JSON.stringify(existingImages));
       newImageFiles.forEach(file => formData.append("images", file));
       
-      await adminApi.updateProductDirect(id, formData);
+      await api.admin.updateProductDirect(id, formData);
       toast.success("Product updated");
       router.push("/dashboard/products");
     } catch (e: any) {

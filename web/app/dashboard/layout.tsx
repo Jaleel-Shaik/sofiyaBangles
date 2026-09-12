@@ -30,7 +30,7 @@ import toast from "react-hot-toast";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { superAdminApi } from "@/src/lib/api";
+import { api } from "@/src/lib/api";
 
 export default function DashboardLayout({
   children,
@@ -59,7 +59,7 @@ export default function DashboardLayout({
   // Fetch notifications for super_admin
   useEffect(() => {
     if (user?.role === "super_admin") {
-      superAdminApi
+      api.superAdmin
         .getNotifications()
         .then((items) => setNotifications(items || []))
         .catch(() => {});
@@ -70,7 +70,7 @@ export default function DashboardLayout({
 
   const handleMarkRead = async (id: string) => {
     try {
-      await superAdminApi.markNotificationRead(id);
+      await api.superAdmin.markNotificationRead(id);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );

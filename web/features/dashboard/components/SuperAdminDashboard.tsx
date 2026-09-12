@@ -16,8 +16,9 @@ import {
   ArrowRight,
   ShieldCheck,
 } from "lucide-react";
-import { superAdminApi, type SuperAdminDashboardData } from "@/src/lib/api";
+import { type SuperAdminDashboardData } from "@/src/lib/api";
 import Link from "next/link";
+import { api } from "@/src/lib/api";
 
 export default function SuperAdminDashboard() {
   const [period, setPeriod] = useState<string>("30d");
@@ -29,7 +30,7 @@ export default function SuperAdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await superAdminApi.getDashboard({ period });
+      const res = await api.superAdmin.getDashboard({ period });
       setData(res);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || "Failed to load super admin dashboard.");
@@ -84,7 +85,7 @@ export default function SuperAdminDashboard() {
           </div>
 
           <a
-            href={superAdminApi.exportSalesCsvUrl}
+            href={api.superAdmin.exportSalesCsvUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 bg-[#E8436E] hover:bg-[#CC3366] text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors shadow-sm"

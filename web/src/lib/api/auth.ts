@@ -1,9 +1,10 @@
+import { API_ENDPOINTS } from "./endpoints";
 import { apiClient } from "./client";
 import { LoginResponse, Verify2FAResponse, RefreshTokenResponse, User, Session } from "./types";
 
 export const authApi = {
   login: (email: string, password: string) =>
-    apiClient.post<{ success: boolean; data: LoginResponse }>("/auth/login", { email, password }).then((r) => r.data.data),
+    apiClient.post<{ success: boolean; data: LoginResponse }>(API_ENDPOINTS.AUTH.LOGIN, { email, password }).then((r) => r.data.data),
 
   verify2FA: (
     payloadOrToken:
@@ -26,44 +27,44 @@ export const authApi = {
         : payloadOrToken;
 
     return apiClient
-      .post<{ success: boolean; data: Verify2FAResponse }>("/auth/verify-2fa", payload)
+      .post<{ success: boolean; data: Verify2FAResponse }>(API_ENDPOINTS.AUTH.VERIFY_2FA, payload)
       .then((r) => r.data.data);
   },
 
   refreshToken: (refreshToken: string) =>
     apiClient
-      .post<{ success: boolean; data: RefreshTokenResponse }>("/auth/refresh-token", {
+      .post<{ success: boolean; data: RefreshTokenResponse }>(API_ENDPOINTS.AUTH.REFRESH_TOKEN, {
         refresh_token: refreshToken,
       })
       .then((r) => r.data.data),
 
-  getMe: () => apiClient.get<{ data: User }>("/auth/me").then((r) => r.data.data),
+  getMe: () => apiClient.get<{ data: User }>(API_ENDPOINTS.AUTH.ME).then((r) => r.data.data),
 
   logout: (refreshToken: string, sessionId?: string) =>
-    apiClient.post("/auth/logout", {
+    apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, {
       refresh_token: refreshToken,
       session_id: sessionId,
     }),
 
   getSessions: () =>
-    apiClient.get<{ data: Session[] }>("/auth/sessions").then((r) => r.data.data),
+    apiClient.get<{ data: Session[] }>(API_ENDPOINTS.AUTH.SESSIONS).then((r) => r.data.data),
 
   regenerateQR: (otpPendingToken: string) =>
     apiClient
       .post<{ success: boolean; data: { qr_code_url: string; secret: string; otp_pending_token: string } }>(
-        "/auth/regenerate-qr",
+        API_ENDPOINTS.AUTH.REGENERATE_QR,
         { otp_pending_token: otpPendingToken }
       )
       .then((r) => r.data.data),
 
   disable2FA: (password: string) =>
-    apiClient.post("/auth/disable-2fa", { password }),
+    apiClient.post(API_ENDPOINTS.AUTH.DISABLE_2FA, { password }),
 
   uploadAvatar: (file: File) => {
     const formData = new FormData();
     formData.append("avatar", file);
     return apiClient
-      .post<{ success: boolean; data: User; message: string }>("/auth/me/avatar", formData, {
+      .post<{ success: boolean; data: User; message: string }>(API_ENDPOINTS.AUTH.AVATAR, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       })
       .then((r) => r.data.data);

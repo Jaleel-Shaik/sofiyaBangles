@@ -15,10 +15,11 @@ import {
   Key,
   AlertTriangle,
 } from "lucide-react";
-import { superAdminApi, type AdminStaff } from "@/src/lib/api";
+import { type AdminStaff } from "@/src/lib/api";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { api } from "@/src/lib/api";
 
 export default function AdminsManagementPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -36,7 +37,7 @@ export default function AdminsManagementPage() {
   const fetchAdmins = async () => {
     setLoading(true);
     try {
-      const data = await superAdminApi.getAdmins();
+      const data = await api.superAdmin.getAdmins();
       setAdmins(data || []);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Failed to load admin staff");
@@ -85,7 +86,7 @@ export default function AdminsManagementPage() {
     if (!confirm(confirmMsg)) return;
 
     try {
-      await superAdminApi.updateAdminStatus(admin.id, newStatus);
+      await api.superAdmin.updateAdminStatus(admin.id, newStatus);
       toast.success(`Admin ${newStatus ? "activated" : "deactivated"} successfully.`);
       setAdmins((prev) =>
         prev.map((a) => (a.id === admin.id ? { ...a, isActive: newStatus } : a))
@@ -106,7 +107,7 @@ export default function AdminsManagementPage() {
     }
 
     try {
-      await superAdminApi.deleteAdmin(admin.id);
+      await api.superAdmin.deleteAdmin(admin.id);
       toast.success("Administrator deleted successfully.");
       setAdmins((prev) => prev.filter((a) => a.id !== admin.id));
     } catch (err: any) {
@@ -123,7 +124,7 @@ export default function AdminsManagementPage() {
 
     setSubmitting(true);
     try {
-      await superAdminApi.createAdmin({
+      await api.superAdmin.createAdmin({
         full_name: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,

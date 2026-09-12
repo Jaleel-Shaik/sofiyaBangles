@@ -2,11 +2,11 @@
 
 import { useState, useRef } from "react";
 import { useAuth } from "@/features/auth/lib/auth-context";
-import { authApi } from "@/src/lib/api";
 import { ArrowLeft, Camera, Loader2, User, Mail, Phone, Shield, Pencil, X, Check } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import Image from "next/image";
+import { api } from "@/src/lib/api";
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -33,7 +33,7 @@ export default function ProfilePage() {
     }
     setSaving(true);
     try {
-      await authApi.updateProfile({ full_name: form.full_name.trim(), phone: form.phone.trim() });
+      await api.auth.updateProfile({ full_name: form.full_name.trim(), phone: form.phone.trim() });
       await refreshUser();
       toast.success("Profile updated");
       setEditing(false);
@@ -56,7 +56,7 @@ export default function ProfilePage() {
 
     setUploading(true);
     try {
-      await authApi.uploadAvatar(file);
+      await api.auth.uploadAvatar(file);
       await refreshUser();
       toast.success("Profile picture updated!");
     } catch {

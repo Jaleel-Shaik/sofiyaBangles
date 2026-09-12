@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { superAdminApi } from "@/src/lib/api";
 import { Package, Search, Download, Eye, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import { api } from "@/src/lib/api";
 
 export default function ProductsAnalyticsPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -15,7 +15,7 @@ export default function ProductsAnalyticsPage() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await superAdminApi.getProductsAnalytics({ page, limit: 15 });
+      const res = await api.superAdmin.getProductsAnalytics({ page, limit: 15 });
       setProducts(res.products || []);
       setTotal(res.total || 0);
     } catch (error) {
@@ -51,7 +51,7 @@ export default function ProductsAnalyticsPage() {
         </div>
 
         <a
-          href={superAdminApi.exportProductsCsvUrl}
+          href={api.superAdmin.exportProductsCsvUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors"

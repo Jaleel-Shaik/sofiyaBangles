@@ -5,7 +5,8 @@ import { ArrowLeft, Loader2, Store, Camera, ImageIcon, Pencil, Check, MessageCir
 import Link from "next/link";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { adminApi, type BusinessProfile } from "@/src/lib/api";
+import { type BusinessProfile } from "@/src/lib/api";
+import { api } from "@/src/lib/api";
 
 export default function StoreProfilePage() {
   const [profile, setProfile] = useState<BusinessProfile>({
@@ -19,7 +20,7 @@ export default function StoreProfilePage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    adminApi.getBusinessProfile()
+    api.admin.getBusinessProfile()
       .then(d => { if (d) { setProfile(d); setForm(d); } })
       .catch(() => toast.error("Failed to load store profile"))
       .finally(() => setLoading(false));
@@ -38,7 +39,7 @@ export default function StoreProfilePage() {
     if (saving) return;
     setSaving(true);
     try {
-      const updated = await adminApi.updateBusinessProfile(form);
+      const updated = await api.admin.updateBusinessProfile(form);
       setProfile(updated);
       toast.success("Store profile updated");
       setEditing(false);
@@ -57,7 +58,7 @@ export default function StoreProfilePage() {
 
     setUploading(true);
     try {
-      const updated = await adminApi.uploadBusinessLogo(file);
+      const updated = await api.admin.uploadBusinessLogo(file);
       setProfile(prev => ({ ...prev, logo_url: updated.logo_url }));
       toast.success("Store logo updated!");
     } catch {

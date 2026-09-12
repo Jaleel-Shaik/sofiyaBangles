@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { superAdminApi, type ProductAnalyticsDetail } from "@/src/lib/api";
+import { type ProductAnalyticsDetail } from "@/src/lib/api";
 import { ArrowLeft, TrendingUp, DollarSign, Package, ShoppingBag, History, Calendar } from "lucide-react";
 import toast from "react-hot-toast";
+import { api } from "@/src/lib/api";
 
 export default function ProductAnalyticsDetailPage() {
   const params = useParams();
@@ -18,7 +19,7 @@ export default function ProductAnalyticsDetailPage() {
     const fetchDetail = async () => {
       setLoading(true);
       try {
-        const data = await superAdminApi.getProductAnalyticsDetail(id);
+        const data = await api.superAdmin.getProductAnalyticsDetail(id);
         setDetail(data);
       } catch (error) {
         toast.error("Failed to load product analytics detail");
