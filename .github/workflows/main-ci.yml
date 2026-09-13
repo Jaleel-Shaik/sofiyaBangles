@@ -39,16 +39,29 @@ jobs:
           PORT: 5001
           JWT_SECRET: ci-test-jwt-secret-for-github-actions-only-32-chars
           FIREBASE_STORAGE_BUCKET: sofiya-bangles.firebasestorage.app
+          FIREBASE_SECRET_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_SECRET_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}
         run: |
           npm ci
           npm run build
-          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" ]; then
-            echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" > service-account.json
-          elif [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}" ]; then
-            echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}" | base64 -d > service-account.json
-          else
-            echo '{"type":"service_account","project_id":"sofiya-bangles-ci","private_key_id":"ci-test-key","private_key":"-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7V...ci-key\n-----END PRIVATE KEY-----\n","client_email":"ci-tester@sofiya-bangles-ci.iam.gserviceaccount.com","client_id":"1234567890","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token"}' > service-account.json
-          fi
+          node -e "
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const json = process.env.FIREBASE_SECRET_JSON;
+          const b64 = process.env.FIREBASE_SECRET_BASE64;
+          let sa;
+          if (json && json.trim()) {
+            try { sa = JSON.parse(json.trim()); } catch(e) { console.warn('JSON secret parse warning:', e.message); }
+          }
+          if (!sa && b64 && b64.trim()) {
+            try { sa = JSON.parse(Buffer.from(b64.trim(), 'base64').toString('utf-8')); } catch(e) { console.warn('Base64 secret parse warning:', e.message); }
+          }
+          if (!sa) {
+            const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } });
+            sa = { type: 'service_account', project_id: 'sofiya-bangles-ci', private_key_id: 'ci-test-key', private_key: privateKey, client_email: 'ci-tester@sofiya-bangles-ci.iam.gserviceaccount.com', client_id: '1234567890', auth_uri: 'https://accounts.google.com/o/oauth2/auth', token_uri: 'https://oauth2.googleapis.com/token' };
+          }
+          fs.writeFileSync('service-account.json', JSON.stringify(sa, null, 2));
+          "
           npm test
 
       # Web Admin Portal Checks
