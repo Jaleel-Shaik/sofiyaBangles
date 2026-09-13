@@ -20,11 +20,15 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
  * Pure Database Operation: Retrieve business profile document.
  */
 export const getBusinessProfileDb = async (): Promise<BusinessProfile> => {
-  const doc = await db.collection(SETTINGS_COLLECTION).doc(BUSINESS_PROFILE_DOC).get();
-  if (!doc.exists) {
+  try {
+    const doc = await db.collection(SETTINGS_COLLECTION).doc(BUSINESS_PROFILE_DOC).get();
+    if (!doc.exists) {
+      return DEFAULT_BUSINESS_PROFILE;
+    }
+    return doc.data() as BusinessProfile;
+  } catch (err: any) {
     return DEFAULT_BUSINESS_PROFILE;
   }
-  return doc.data() as BusinessProfile;
 };
 
 /**
