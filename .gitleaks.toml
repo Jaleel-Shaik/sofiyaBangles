@@ -1,0 +1,21 @@
+title = "Sofiya Bangles Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for CI mock test secrets and template config files"
+paths = [
+  '''^\.github/workflows/''',
+  '''^\.env\.example$''',
+  '''^backend/\.env\.example$''',
+  '''^web/\.env\.example$''',
+  '''^BRANCH_PROTECTION_GUIDE\.md$''',
+]
+regexes = [
+  '''ci-test-jwt-secret.*''',
+  '''ci-test-key''',
+  '''MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7V''',
+  '''ci-tester@sofiya-bangles-ci\.iam\.gserviceaccount\.com''',
+  '''-----BEGIN PRIVATE KEY-----''',
+]

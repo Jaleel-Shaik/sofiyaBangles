@@ -61,16 +61,20 @@ export const getProductByIdDb = async (id: string): Promise<Product | null> => {
  * Pure Database Operation: Retrieve all active product documents.
  */
 export const getActiveProductsDb = async (categoryId?: string): Promise<Product[]> => {
-  let query: FirebaseFirestore.Query = db
-    .collection("products")
-    .where("is_active", "==", true);
+  try {
+    let query: FirebaseFirestore.Query = db
+      .collection("products")
+      .where("is_active", "==", true);
 
-  if (categoryId) {
-    query = query.where("category_id", "==", categoryId);
+    if (categoryId) {
+      query = query.where("category_id", "==", categoryId);
+    }
+
+    const snapshot = await query.get();
+    return snapshot.docs.map((doc) => doc.data() as Product);
+  } catch (err: any) {
+    return [];
   }
-
-  const snapshot = await query.get();
-  return snapshot.docs.map((doc) => doc.data() as Product);
 };
 
 /**

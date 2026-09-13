@@ -5,16 +5,20 @@ import { Category } from "../shared/types";
  * Pure Database Operation: Retrieve active categories, optionally filtered by model_type_id.
  */
 export const getCategoriesDb = async (modelTypeId?: string): Promise<Category[]> => {
-  let query: FirebaseFirestore.Query = db.collection("categories").where("is_active", "==", true);
+  try {
+    let query: FirebaseFirestore.Query = db.collection("categories").where("is_active", "==", true);
 
-  if (modelTypeId) {
-    query = query.where("model_type_id", "==", modelTypeId);
+    if (modelTypeId) {
+      query = query.where("model_type_id", "==", modelTypeId);
+    }
+
+    const snapshot = await query.get();
+    const categories = snapshot.docs.map((doc) => doc.data() as Category);
+    categories.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+    return categories;
+  } catch (err: any) {
+    return [];
   }
-
-  const snapshot = await query.get();
-  const categories = snapshot.docs.map((doc) => doc.data() as Category);
-  categories.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
-  return categories;
 };
 
 /**
