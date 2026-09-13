@@ -1,0 +1,134 @@
+name: Main Branch CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: main-deployment-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. Full Workspace Verification
+  # ─────────────────────────────────────────────────────────────
+  verify-main:
+    name: Verify Main Branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Backend Checks
+      - name: Setup & Verify Backend
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          PORT: 5001
+          JWT_SECRET: ci-test-jwt-secret-for-github-actions-only-32-chars
+          FIREBASE_STORAGE_BUCKET: sofiya-bangles.firebasestorage.app
+        run: |
+          npm ci
+          npm run build
+          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" ]; then
+            echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" > service-account.json
+          elif [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}" ]; then
+            echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}" | base64 -d > service-account.json
+          else
+            echo '{"type":"service_account","project_id":"sofiya-bangles-ci","private_key_id":"ci-test-key","private_key":"-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7V...ci-key\n-----END PRIVATE KEY-----\n","client_email":"ci-tester@sofiya-bangles-ci.iam.gserviceaccount.com","client_id":"1234567890","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token"}' > service-account.json
+          fi
+          npm test
+
+      # Web Admin Portal Checks
+      - name: Setup & Verify Web Admin Portal
+        working-directory: web
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_API_URL: http://localhost:5050/api
+        run: |
+          npm ci
+          npm run lint
+          npm run test
+          npm run build
+
+      # Mobile Checks
+      - name: Setup & Verify Mobile
+        working-directory: mobile
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Package and Archive Production Artifacts
+  # ─────────────────────────────────────────────────────────────
+  package-artifacts:
+    name: Package Production Artifacts
+    needs: verify-main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build Backend Distribution
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload Backend Dist Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist-${{ github.sha }}
+          path: backend/dist/
+          retention-days: 14
+
+      - name: Build Web Standalone Distribution
+        working-directory: web
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'https://api.sofiyabangles.com/api' }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload Web Standalone Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-standalone-${{ github.sha }}
+          path: |
+            web/.next/standalone
+            web/.next/static
+            web/public
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Deployment Ready Gate
+  # ─────────────────────────────────────────────────────────────
+  deploy-ready:
+    name: Deployment Readiness
+    needs: [verify-main, package-artifacts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Deployment Readiness
+        run: |
+          echo "🚀 Commit ${{ github.sha }} successfully passed all verifications and artifacts are generated."
+          echo "Deployment pipeline or webhook triggers can be connected to this stage."
