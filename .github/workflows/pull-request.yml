@@ -1,0 +1,156 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. Backend CI (TypeScript Compilation & Automated Tests)
+  # ─────────────────────────────────────────────────────────────
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Typecheck and compile backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Setup CI Firebase Test Credentials
+        working-directory: backend
+        run: |
+          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" ]; then
+            echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" > service-account.json
+          elif [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}" ]; then
+            echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASE64 }}" | base64 -d > service-account.json
+          else
+            echo '{"type":"service_account","project_id":"sofiya-bangles-ci","private_key_id":"ci-test-key","private_key":"-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7V...ci-key\n-----END PRIVATE KEY-----\n","client_email":"ci-tester@sofiya-bangles-ci.iam.gserviceaccount.com","client_id":"1234567890","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token"}' > service-account.json
+          fi
+
+      - name: Run backend unit and integration test suite
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          PORT: 5001
+          JWT_SECRET: ci-test-jwt-secret-for-github-actions-only-32-chars
+          FIREBASE_STORAGE_BUCKET: sofiya-bangles.firebasestorage.app
+          GOOGLE_APPLICATION_CREDENTIALS: service-account.json
+        run: npm test
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Web Admin Portal CI (Lint, Vitest & Next.js Build)
+  # ─────────────────────────────────────────────────────────────
+  web-ci:
+    name: Web Admin Portal CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Lint Next.js codebase
+        working-directory: web
+        run: npm run lint
+
+      - name: Run web unit tests
+        working-directory: web
+        run: npm run test
+
+      - name: Build Next.js production bundle
+        working-directory: web
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_API_URL: http://localhost:5050/api
+        run: npm run build
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Mobile App CI (Expo / React Native Type Safety)
+  # ─────────────────────────────────────────────────────────────
+  mobile-ci:
+    name: Mobile App CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Verify TypeScript types
+        working-directory: mobile
+        run: npx tsc --noEmit
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. Consolidated Quality Gate (For GitHub Branch Protection)
+  # ─────────────────────────────────────────────────────────────
+  pr-quality-gate:
+    name: PR Quality Gate
+    needs: [backend-ci, web-ci, mobile-ci]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate pipeline results
+        run: |
+          if [ "${{ needs.backend-ci.result }}" != "success" ]; then
+            echo "❌ Backend CI failed"
+            exit 1
+          fi
+          if [ "${{ needs.web-ci.result }}" != "success" ]; then
+            echo "❌ Web Admin CI failed"
+            exit 1
+          fi
+          if [ "${{ needs.mobile-ci.result }}" != "success" ]; then
+            echo "❌ Mobile CI failed"
+            exit 1
+          fi
+          echo "✅ All required quality gates passed successfully!"

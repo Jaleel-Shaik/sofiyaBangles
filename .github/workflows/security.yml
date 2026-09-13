@@ -1,0 +1,111 @@
+name: Security Scanning & Audits
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 4 * * 1' # Every Monday at 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. GitHub CodeQL SAST Analysis (JavaScript & TypeScript)
+  # ─────────────────────────────────────────────────────────────
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: +security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. NPM Audit (High/Critical Vulnerability Scanning)
+  # ─────────────────────────────────────────────────────────────
+  npm-audit:
+    name: NPM Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Audit Backend Dependencies
+        working-directory: backend
+        run: |
+          echo "Scanning backend dependencies..."
+          npm audit --audit-level=critical || true
+
+      - name: Audit Web Dependencies
+        working-directory: web
+        run: |
+          echo "Scanning web dependencies..."
+          npm audit --audit-level=critical || true
+
+      - name: Audit Mobile Dependencies
+        working-directory: mobile
+        run: |
+          echo "Scanning mobile dependencies..."
+          npm audit --audit-level=critical || true
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Trivy Filesystem & Misconfiguration Scanner
+  # ─────────────────────────────────────────────────────────────
+  trivy-scan:
+    name: Trivy Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner in repo
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy-filesystem'
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. Secret & Credential Leak Detection
+  # ─────────────────────────────────────────────────────────────
+  secret-scan:
+    name: Secret Leak Detection (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks Secret Scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
