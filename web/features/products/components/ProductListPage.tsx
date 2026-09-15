@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Zap } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { api, type Product, type Category } from "@/src/lib/api";
+import { QuickSellModal } from "./QuickSellModal";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -13,6 +14,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [quickSellOpen, setQuickSellOpen] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -54,25 +56,39 @@ export default function ProductsPage() {
   };
 
   const filtered = products.filter(p => {
-    const matchesSearch = p.product_name.toLowerCase().includes(search.toLowerCase());
+    const lower = search.toLowerCase().trim();
+    const matchesSearch =
+      !lower ||
+      p.product_name.toLowerCase().includes(lower) ||
+      (p.unique_code && p.unique_code.toLowerCase().includes(lower)) ||
+      (p.description && p.description.toLowerCase().includes(lower));
     const matchesCategory = !categoryFilter || p.category_id === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#171717]">Products</h1>
-          <p className="text-[#737373] mt-1">{products.length} total products</p>
+          <p className="text-[#737373] mt-1">{products.length} total products in catalog</p>
         </div>
-        <Link
-          href="/dashboard/products/new"
-          className="gradient-primary text-white font-semibold py-2.5 px-5 rounded-xl transition-all hover:shadow-lg hover:shadow-[#E8436E]/25 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Product
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setQuickSellOpen(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl transition-all shadow-sm flex items-center gap-2 text-sm"
+          >
+            <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
+            Quick Sell by Code
+          </button>
+          <Link
+            href="/dashboard/products/new"
+            className="gradient-primary text-white font-semibold py-2.5 px-5 rounded-xl transition-all hover:shadow-lg hover:shadow-[#E8436E]/25 flex items-center gap-2 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add Product
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-3">
@@ -81,7 +97,7 @@ export default function ProductsPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search products..."
+            placeholder="Search products by name or special code (e.g. SIL-101)..."
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E5E5E5] rounded-xl outline-none focus:border-[#E8436E] text-sm"
           />
         </div>
@@ -177,6 +193,12 @@ export default function ProductsPage() {
           })}
         </div>
       )}
+      {/* Quick Sell Modal */}
+      <QuickSellModal
+        isOpen={quickSellOpen}
+        onClose={() => setQuickSellOpen(false)}
+        onSaleSuccess={() => fetchData()}
+      />
     </div>
   );
 }

@@ -22,7 +22,9 @@ export const API_ENDPOINTS = {
     NEW_ARRIVALS: '/products/new-arrivals',
     SEARCH: '/products/search',
     BY_ID: (id: string) => `/products/${id}`,
+    LOOKUP_CODE: (code: string) => `/products/lookup/${encodeURIComponent(code)}`,
     SELL: (id: string) => `/products/${id}/sell`,
+    SELL_BY_CODE: '/products/sell-by-code',
   },
   CATEGORIES: {
     BASE: '/categories',

@@ -68,6 +68,19 @@ export function ProductBasicInfo({
           />
         </div>
         <div className="col-span-2">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-700">Special Product ID:</span>
+              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                ⚡ Auto-generated upon creation (e.g. SIL-101, GLA-101)
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">
+              Derived automatically from Model Type
+            </span>
+          </div>
+        </div>
+        <div className="col-span-2">
           <label className="block text-sm font-semibold text-[#525252] mb-1.5">Product Status *</label>
           <select
             value={form.status}

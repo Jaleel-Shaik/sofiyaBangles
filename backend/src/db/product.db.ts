@@ -8,12 +8,13 @@ export const generateNextProductSequenceDb = async (
   modelTypeId: string,
   modelTypeName: string
 ): Promise<string> => {
-  const prefix = modelTypeName.substring(0, 3).toUpperCase();
+  const cleanName = (modelTypeName || "PRD").replace(/[^a-zA-Z]/g, "").toUpperCase();
+  const prefix = cleanName.length >= 3 ? cleanName.substring(0, 3) : (cleanName || "PRD").padEnd(3, "X");
   const counterRef = db.collection("counters").doc(`model_${modelTypeId}`);
 
   return await db.runTransaction(async (t) => {
     const doc = await t.get(counterRef);
-    let nextSeq = 1001;
+    let nextSeq = 101;
     if (doc.exists) {
       const data = doc.data();
       if (data && typeof data.sequence === "number") {
@@ -54,7 +55,49 @@ export const insertProductWithRelationsDb = async (
 export const getProductByIdDb = async (id: string): Promise<Product | null> => {
   const doc = await db.collection("products").doc(id).get();
   if (!doc.exists) return null;
-  return doc.data() as Product;
+  return { ...doc.data(), id: doc.id } as Product;
+};
+
+/**
+ * Pure Database Operation: Retrieve a single product by either doc ID or unique_code.
+ */
+export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product | null> => {
+  if (!codeOrId || typeof codeOrId !== "string") return null;
+  const trimmed = codeOrId.trim();
+
+  // 1. Try finding by Firestore doc ID directly
+  const doc = await db.collection("products").doc(trimmed).get();
+  if (doc.exists) {
+    return { ...doc.data(), id: doc.id } as Product;
+  }
+
+  // 2. Query by unique_code (uppercased)
+  const codeUpper = trimmed.toUpperCase();
+  const snap = await db
+    .collection("products")
+    .where("unique_code", "==", codeUpper)
+    .limit(1)
+    .get();
+
+  if (!snap.empty) {
+    const matchedDoc = snap.docs[0];
+    return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
+  }
+
+  // 3. Fallback: query without uppercase transformation
+  if (trimmed !== codeUpper) {
+    const snapRaw = await db
+      .collection("products")
+      .where("unique_code", "==", trimmed)
+      .limit(1)
+      .get();
+    if (!snapRaw.empty) {
+      const matchedDoc = snapRaw.docs[0];
+      return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
+    }
+  }
+
+  return null;
 };
 
 /**

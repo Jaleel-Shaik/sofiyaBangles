@@ -25,12 +25,14 @@ import {
   CheckCheck,
   FileText,
   ClipboardList,
+  Zap,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/src/lib/api";
+import { QuickSellModal } from "@/features/products/components/QuickSellModal";
 
 export default function DashboardLayout({
   children,
@@ -43,6 +45,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifsOpen, setNotifsOpen] = useState(false);
+  const [quickSellOpen, setQuickSellOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -76,6 +79,18 @@ export default function DashboardLayout({
       );
     } catch {}
   };
+
+  // Global shortcut: Alt + S opens Quick Sell
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setQuickSellOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   // Redirect to login if not authenticated or not authorized
   useEffect(() => {
@@ -180,6 +195,16 @@ export default function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Quick Sell Button */}
+              <button
+                onClick={() => setQuickSellOpen(true)}
+                title="Quick Sell by Product Special ID (Alt + S)"
+                className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Zap className="w-4 h-4 fill-white" />
+                <span className="hidden sm:inline">Quick Sell</span>
+              </button>
+
               {/* Notification bell */}
               <div className="relative">
                 <button
@@ -337,6 +362,12 @@ export default function DashboardLayout({
 
         {/* Page content - Expands Full Width */}
         <main className="p-4 sm:p-6 lg:p-8 w-full flex-1">{children}</main>
+
+        {/* Global Quick Sell Modal */}
+        <QuickSellModal
+          isOpen={quickSellOpen}
+          onClose={() => setQuickSellOpen(false)}
+        />
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import {
   getRecommendedProductsService,
   getNewArrivalsService,
   sellProductService,
+  lookupProductByCodeOrIdService,
 } from "../services/product.service";
 import { NotFoundError, BadRequestError } from "../../../core/errors/app.error";
 
@@ -154,14 +155,49 @@ export const updateStock = asyncHandler(async (req: AuthRequest, res: Response) 
   }
 });
 
-export const sellProduct = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const id = getParam(req, "id");
-  const quantity = req.body.quantity ? Number(req.body.quantity) : 1;
+export const lookupProduct = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const codeOrId = getParam(req, "codeOrId");
   try {
-    const product = await sellProductService(id, quantity, req.user!.userId);
+    const product = await lookupProductByCodeOrIdService(codeOrId, req.user?.userId);
+    return sendSuccess(res, product, "Product retrieved successfully.");
+  } catch (err: any) {
+    if (err.message === "PRODUCT_NOT_FOUND") {
+      throw new NotFoundError(`Product '${codeOrId}' not found.`);
+    }
+    throw err;
+  }
+});
+
+export const sellProduct = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const idOrCode = getParam(req, "id");
+  const quantity = req.body.quantity ? Number(req.body.quantity) : 1;
+  const extra = {
+    customer_name: req.body.customer_name,
+    customer_phone: req.body.customer_phone,
+    notes: req.body.notes,
+  };
+  try {
+    const product = await sellProductService(idOrCode, quantity, req.user!.userId, extra);
     return sendSuccess(res, product, "Product sold successfully.");
   } catch (err: any) {
     if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError("Product not found.");
+    if (err.message === "INSUFFICIENT_STOCK") throw new BadRequestError("Insufficient stock.");
+    throw err;
+  }
+});
+
+export const sellProductByCode = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { code, quantity, customer_name, customer_phone, notes } = req.body;
+  try {
+    const product = await sellProductService(
+      code,
+      Number(quantity) || 1,
+      req.user!.userId,
+      { customer_name, customer_phone, notes }
+    );
+    return sendSuccess(res, product, "Product sold successfully.");
+  } catch (err: any) {
+    if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError(`Product '${code}' not found.`);
     if (err.message === "INSUFFICIENT_STOCK") throw new BadRequestError("Insufficient stock.");
     throw err;
   }

@@ -12,16 +12,31 @@ import {
   searchProducts,
   getRecommendedProducts,
   getNewArrivals,
+  lookupProduct,
+  sellProductByCode,
 } from "../controllers/product.controller";
 import { authenticate, optionalAuthenticate } from "../../../shared/middlewares/auth.middleware";
 import { requireRole } from "../../../shared/middlewares/role.middleware";
 import { upload } from "../../../shared/middlewares/upload.middleware";
 import { validate } from "../../../shared/middlewares/validate.middleware";
-import { createProductSchema, updateProductSchema } from "../validations/product.validation";
+import { createProductSchema, updateProductSchema, sellProductByCodeSchema } from "../validations/product.validation";
 
 const router = Router();
 
 // Admin routes (MUST be before /:id wildcard)
+router.get(
+  "/lookup/:codeOrId",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  lookupProduct
+);
+router.post(
+  "/sell-by-code",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  validate(sellProductByCodeSchema),
+  sellProductByCode
+);
 router.get(
   "/admin",
   authenticate,

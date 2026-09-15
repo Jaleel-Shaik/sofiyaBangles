@@ -63,6 +63,18 @@ export const updateStockSchema = z.object({
     .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative")),
 });
 
+export const sellProductByCodeSchema = z.object({
+  code: z.string().min(1, "Product special ID or code is required").trim(),
+  quantity: zStringNumber
+    .pipe(z.number().int("Quantity must be a whole number").positive("Quantity must be at least 1"))
+    .default(1),
+  customer_name: z.string().trim().optional(),
+  customer_phone: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type UpdateStockInput = z.infer<typeof updateStockSchema>;
+export type SellProductByCodeInput = z.infer<typeof sellProductByCodeSchema>;
+

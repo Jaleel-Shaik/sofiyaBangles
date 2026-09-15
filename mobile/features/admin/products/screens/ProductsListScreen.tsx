@@ -7,6 +7,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getAdminProducts, deleteProduct } from '@/src/api/admin';
+import QuickSellModal from '@/features/admin/products/components/QuickSellModal';
 
 export default function ProductsListScreen() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function ProductsListScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [showQuickSell, setShowQuickSell] = useState(false);
 
   const fetchData = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -44,8 +46,12 @@ export default function ProductsListScreen() {
   );
 
   const filteredProducts = useMemo(() => {
+    const lower = search.toLowerCase().trim();
     return products.filter(p => {
-      const matchesSearch = p.product_name.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch =
+        !lower ||
+        p.product_name.toLowerCase().includes(lower) ||
+        (p.unique_code && p.unique_code.toLowerCase().includes(lower));
       const matchesCategory = !selectedCategory || p.category_id === selectedCategory;
       return matchesSearch && matchesCategory;
     });
@@ -95,15 +101,22 @@ export default function ProductsListScreen() {
               <Text className="text-2xl font-bold text-text-primary">Products</Text>
             </View>
           </View>
-          <TouchableOpacity
-            className="bg-primary px-5 py-3 rounded-full shadow-sm shadow-primary/30"
-            onPress={() => router.push('/(admin)/(tabs)/add' as any)}
-          >
-            <View className="flex-row items-center">
-              <Ionicons name="add" size={20} color="white" />
-              <Text className="text-white font-bold text-sm ml-1.5">Add</Text>
-            </View>
-          </TouchableOpacity>
+          <View className="flex-row items-center gap-2">
+            <TouchableOpacity
+              className="bg-slate-900 px-3.5 py-2.5 rounded-full shadow-sm flex-row items-center"
+              onPress={() => setShowQuickSell(true)}
+            >
+              <Ionicons name="flash" size={16} color="#fbbf24" />
+              <Text className="text-white font-bold text-xs ml-1">Sell</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-primary px-4 py-2.5 rounded-full shadow-sm shadow-primary/30 flex-row items-center"
+              onPress={() => router.push('/(admin)/(tabs)/add' as any)}
+            >
+              <Ionicons name="add" size={18} color="white" />
+              <Text className="text-white font-bold text-xs ml-1">Add</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <Text className="text-text-hint text-xs font-medium ml-[52px]">{totalProducts} total products</Text>
       </View>
@@ -114,7 +127,7 @@ export default function ProductsListScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search products..."
+            placeholder="Search by name or code (e.g. SIL-101)..."
             placeholderTextColor="#94a3b8"
             className="flex-1 px-2.5 text-text-primary text-base"
           />
@@ -247,6 +260,13 @@ export default function ProductsListScreen() {
           }}
         />
       )}
+
+      {/* Quick Sell Modal */}
+      <QuickSellModal
+        visible={showQuickSell}
+        onClose={() => setShowQuickSell(false)}
+        onSaleSuccess={() => fetchData()}
+      />
     </View>
   );
 }

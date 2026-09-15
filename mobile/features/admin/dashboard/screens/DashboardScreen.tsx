@@ -8,6 +8,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 
 import { getCategories, Category } from '@/src/api/categories';
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
+import QuickSellModal from '@/features/admin/products/components/QuickSellModal';
 
 import { useAuthStore } from '@/src/store/authStore';
 import { getCachedApiBaseUrl } from '@/src/api/config';
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showQuickSell, setShowQuickSell] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
 
   const fetchData = async () => {
@@ -200,6 +202,28 @@ export default function AdminDashboard() {
         )}
 
         <View className="px-4 pt-5">
+          {/* Quick Sell Action Card */}
+          <TouchableOpacity
+            onPress={() => setShowQuickSell(true)}
+            activeOpacity={0.9}
+            className="mb-5 p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md flex-row items-center justify-between"
+          >
+            <View className="flex-row items-center flex-1 mr-3">
+              <View className="w-10 h-10 rounded-xl bg-amber-400/20 items-center justify-center mr-3">
+                <Ionicons name="flash" size={22} color="#fbbf24" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-bold text-sm">Quick Sell by Special ID</Text>
+                <Text className="text-slate-400 text-xs mt-0.5">
+                  Enter product code to sell & decrement stock
+                </Text>
+              </View>
+            </View>
+            <View className="bg-primary px-3 py-1.5 rounded-xl">
+              <Text className="text-white font-bold text-xs">Sell Now</Text>
+            </View>
+          </TouchableOpacity>
+
           {/* Overview Header & Filter Buttons */}
           <View className="flex-row items-center justify-between mb-3">
             <Text className="text-base font-bold text-text-primary">Overview</Text>
@@ -427,6 +451,13 @@ export default function AdminDashboard() {
           )}
         </View>
       </ScrollView>
+
+      {/* Quick Sell Modal */}
+      <QuickSellModal
+        visible={showQuickSell}
+        onClose={() => setShowQuickSell(false)}
+        onSaleSuccess={() => fetchData()}
+      />
     </View>
   );
 }

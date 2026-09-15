@@ -318,6 +318,17 @@ export default function AddProductScreen() {
             <Text className="text-lg font-bold text-text-primary">Basic Details</Text>
           </View>
           
+          {/* Special ID Info */}
+          <View className="p-3 bg-[#FAFAFA] border border-divider rounded-xl mb-4 flex-row items-center justify-between">
+            <View className="flex-row items-center">
+              <Ionicons name="flash" size={14} color="#fbbf24" />
+              <Text className="text-xs font-bold text-text-primary ml-1.5">Special ID:</Text>
+            </View>
+            <View className="bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+              <Text className="text-[10px] font-bold text-primary">Auto-generated (e.g. SIL-101)</Text>
+            </View>
+          </View>
+
           <TextInputField 
             label="Product Name *" 
             placeholder="e.g. Royal Diamond Bangle" 
