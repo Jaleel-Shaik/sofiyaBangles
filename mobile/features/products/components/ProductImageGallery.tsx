@@ -21,6 +21,8 @@ export function ProductImageGallery({ images }: ProductImageGalleryProps) {
     }
   };
 
+  const safeImages = Array.isArray(images) ? images.filter(Boolean) : [];
+
   return (
     <View
       className="bg-white"
@@ -35,7 +37,7 @@ export function ProductImageGallery({ images }: ProductImageGalleryProps) {
           onMomentumScrollEnd={onGalleryScroll}
           scrollEventThrottle={16}
         >
-          {images.map((img, index) => (
+          {safeImages.map((img, index) => (
             <View key={index} style={{ width: SCREEN_WIDTH }} className="aspect-square">
               <Image
                 source={{ uri: img }}
@@ -47,9 +49,9 @@ export function ProductImageGallery({ images }: ProductImageGalleryProps) {
         </ScrollView>
       </View>
 
-      {images.length > 1 && (
+      {safeImages.length > 1 && (
         <View className="flex-row justify-center mt-3 mb-4">
-          {images.map((_, index) => (
+          {safeImages.map((_, index) => (
             <View
               key={index}
               className={`mx-1 rounded-full ${activeImageIndex === index ? "w-6 h-2 bg-primary" : "w-2 h-2 bg-slate-300"}`}

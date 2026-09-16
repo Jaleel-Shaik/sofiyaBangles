@@ -17,11 +17,20 @@ export interface Category {
 export const getCategories = async (modelTypeId?: string): Promise<Category[]> => {
   try {
     const res = await apiClient.get(API_ENDPOINTS.CATEGORIES.BASE, { params: { model_type_id: modelTypeId } });
-    const categories: Category[] = res.data?.data || [];
-    return categories.map(c => ({
-      ...c,
-      name: c.name || c.category_name,
-    }));
+    const rawData = res.data?.data ?? res.data?.categories ?? (Array.isArray(res.data) ? res.data : []);
+    const categories: Category[] = Array.isArray(rawData) ? rawData : [];
+    return categories
+      .filter((c): c is Category => Boolean(c && typeof c === 'object'))
+      .map(c => ({
+        ...c,
+        id: String(c.id || ''),
+        category_name: c.category_name || c.name || '',
+        name: c.name || c.category_name || '',
+        image_url: c.image_url || '',
+        model_type_id: c.model_type_id || '',
+        standard_sizes: Array.isArray(c.standard_sizes) ? c.standard_sizes.filter(Boolean) : [],
+        custom_measurement_fields: Array.isArray(c.custom_measurement_fields) ? c.custom_measurement_fields : [],
+      }));
   } catch (error) {
     console.error('Error fetching categories', error);
     return [];

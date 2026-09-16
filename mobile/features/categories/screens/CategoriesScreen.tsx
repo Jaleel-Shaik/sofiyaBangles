@@ -4,10 +4,11 @@ import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshCon
 import { useState, useCallback } from 'react';
 
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import Header from '@/src/components/Header';
 import SearchInput from '@/src/components/SearchInput';
 import CategoryItem from '@/src/components/CategoryItem';
+import { AppIcon } from '@/src/constants/icons';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function CategoriesScreen() {
   const router = useRouter();
@@ -40,26 +41,30 @@ export default function CategoriesScreen() {
     fetchCats(true);
   }, []);
 
-  const filteredCategories = categories.filter(cat =>
-    cat.category_name.toLowerCase().includes(searchQuery.toLowerCase().trim())
-  );
+  const query = (searchQuery || '').toLowerCase().trim();
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const filteredCategories = safeCategories.filter((cat) => {
+    if (!cat) return false;
+    const catName = (cat.category_name || cat.name || '').toLowerCase();
+    return catName.includes(query);
+  });
 
   if (loading) {
     return (
-      <View className="flex-1 bg-[#FAFAFA]">
+      <View className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center">
-          <View className="w-16 h-16 rounded-full bg-primary/10 items-center justify-center mb-4">
-            <Ionicons name="grid-outline" size={28} color="#e11d48" />
+          <View className="w-16 h-16 rounded-full bg-rose-50 items-center justify-center mb-4 border border-rose-100">
+            <AppIcon name="gridOutline" size={28} color="#e11d48" />
           </View>
           <ActivityIndicator size="large" color="#e11d48" />
-          <Text className="mt-3 text-text-secondary font-medium">Loading categories...</Text>
+          <Text className="mt-3 text-text-secondary text-body-sm font-medium">{STRINGS.collections.loading}</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-[#FAFAFA]">
+    <View className="flex-1 bg-background">
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
@@ -70,51 +75,63 @@ export default function CategoriesScreen() {
       >
         <View className="bg-surface rounded-b-3xl shadow-sm border-b border-divider">
           <Header
-            title="Categories"
+            title={STRINGS.collections.title}
             transparent
-            titleClassName="text-2xl font-bold text-text-primary"
+            titleClassName="text-headline-lg font-bold text-text-primary"
           />
           <View className="px-5 pb-5">
             <SearchInput
-              placeholder="Search categories..."
+              placeholder={STRINGS.collections.searchPlaceholder}
               showFilter={false}
               value={searchQuery}
               onChangeText={setSearchQuery}
+              onClear={() => setSearchQuery('')}
             />
           </View>
         </View>
 
         <View className="px-4 pt-6">
-          {filteredCategories.length > 0 ? (
+          {(filteredCategories || []).length > 0 ? (
             <View className="flex-row flex-wrap" style={{ gap: 12 }}>
-              {filteredCategories.map((cat) => (
-                <View key={cat.id} style={{ width: '47%' }}>
-                  <CategoryItem
-                    name={cat.category_name}
-                    imageUrl={cat.image_url}
-                    size="large"
-                    onPress={() => router.push({
-                      pathname: '/category/[id]',
-                      params: { id: cat.id, name: cat.category_name }
-                    })}
-                  />
-                </View>
-              ))}
+              {(filteredCategories || []).map((cat, idx) => {
+                const displayName = cat?.category_name || cat?.name || 'Collection';
+                const catId = cat?.id || `cat-${idx}`;
+                return (
+                  <View key={catId} style={{ width: '47%' }}>
+                    <CategoryItem
+                      name={displayName}
+                      imageUrl={cat?.image_url}
+                      size="large"
+                      onPress={() => {
+                        if (cat?.id) {
+                          router.push({
+                            pathname: '/category/[id]',
+                            params: { id: cat.id, name: displayName }
+                          });
+                        }
+                      }}
+                    />
+                  </View>
+                );
+              })}
             </View>
           ) : (
-            <View className="w-full py-20 items-center justify-center">
-              <View className="w-20 h-20 rounded-full bg-primary/10 items-center justify-center mb-4">
-                <Ionicons name="search-outline" size={32} color="#e11d48" />
+            <View className="w-full py-16 items-center justify-center">
+              <View className="w-16 h-16 rounded-full bg-rose-50 items-center justify-center mb-4 border border-rose-100">
+                <AppIcon name="searchOutline" size={28} color="#e11d48" />
               </View>
-              <Text className="text-lg font-bold text-text-primary mb-1">No categories found</Text>
-              <Text className="text-text-secondary text-sm text-center px-8">
-                We couldn&apos;t find any categories matching &quot;{searchQuery}&quot;
+              <Text className="text-title-md font-bold text-text-primary mb-1">{STRINGS.collections.emptyTitle}</Text>
+              <Text className="text-text-secondary text-body-sm text-center px-8 leading-5">
+                {STRINGS.collections.emptyDescription(searchQuery)}
               </Text>
               <TouchableOpacity
-                className="mt-5 bg-primary px-6 py-3 rounded-full"
+                className="mt-5 bg-primary px-6 py-3 rounded-full min-h-[44px] items-center justify-center shadow-sm"
                 onPress={() => setSearchQuery('')}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={STRINGS.common.clearSearch}
               >
-                <Text className="text-white font-bold text-sm">Clear Search</Text>
+                <Text className="text-white text-label-md font-bold">{STRINGS.common.clearSearch}</Text>
               </TouchableOpacity>
             </View>
           )}

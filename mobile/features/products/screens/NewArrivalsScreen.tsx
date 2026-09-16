@@ -7,7 +7,8 @@ import { useState, useCallback } from 'react';
 import ProductCard from '@/src/components/ProductCard';
 import Header from '@/src/components/Header';
 import FilterPill from '@/src/components/FilterPill';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '@/src/constants/icons';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function NewArrivalsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -28,10 +29,12 @@ export default function NewArrivalsScreen() {
     setPage(1);
     try {
       const response = await api.products.getNewArrivals(daysAgo, 1, 20);
-      setProducts(response.products);
-      setHasMore(response.products.length >= 20);
+      const safeProducts = Array.isArray(response?.products) ? response.products.filter(Boolean) : [];
+      setProducts(safeProducts);
+      setHasMore(safeProducts.length >= 20);
     } catch (error) {
       console.error('Failed to fetch new arrivals', error);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -43,11 +46,12 @@ export default function NewArrivalsScreen() {
     const nextPage = page + 1;
     try {
       const response = await api.products.getNewArrivals(daysAgo, nextPage, 20);
-      if (response.products.length > 0) {
-        setProducts(prev => [...prev, ...response.products]);
+      const incoming = Array.isArray(response?.products) ? response.products.filter(Boolean) : [];
+      if (incoming.length > 0) {
+        setProducts(prev => [...(Array.isArray(prev) ? prev : []), ...incoming]);
         setPage(nextPage);
       }
-      if (response.products.length < 20) {
+      if (incoming.length < 20) {
         setHasMore(false);
       }
     } catch (error) {
@@ -61,28 +65,28 @@ export default function NewArrivalsScreen() {
     <View className="flex-1 bg-[#FAFAFA]">
       <View className="bg-surface rounded-b-3xl shadow-sm border-b border-divider">
         <Header
-          title="New Arrivals"
+          title={STRINGS.newArrivals.title}
           showBack
           transparent
           titleClassName="text-xl font-bold text-text-primary"
         />
         <View className="px-5 pb-5">
-          <Text className="text-text-secondary mb-3 text-sm font-medium">Filter by recent drops</Text>
+          <Text className="text-text-secondary mb-3 text-sm font-medium">{STRINGS.newArrivals.filterSubtitle}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <FilterPill
-              label="Past 24 Hours"
+              label={STRINGS.newArrivals.past24Hours}
               isActive={daysAgo === 1}
               onPress={() => setDaysAgo(1)}
               className="mr-2"
             />
             <FilterPill
-              label="Past 5 Days"
+              label={STRINGS.newArrivals.past5Days}
               isActive={daysAgo === 5}
               onPress={() => setDaysAgo(5)}
               className="mr-2"
             />
             <FilterPill
-              label="Past 7 Days"
+              label={STRINGS.newArrivals.past7Days}
               isActive={daysAgo === 7}
               onPress={() => setDaysAgo(7)}
               className="mr-2"
@@ -94,7 +98,7 @@ export default function NewArrivalsScreen() {
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#e11d48" />
-          <Text className="mt-3 text-text-secondary font-medium">Fetching the latest pieces...</Text>
+          <Text className="mt-3 text-text-secondary font-medium">{STRINGS.newArrivals.loading}</Text>
         </View>
       ) : (
         <FlatList
@@ -112,11 +116,11 @@ export default function NewArrivalsScreen() {
           ListEmptyComponent={
             <View className="items-center justify-center py-24 mt-10">
               <View className="w-20 h-20 rounded-full bg-primary/10 items-center justify-center mb-4">
-                <Ionicons name="time-outline" size={36} color="#e11d48" />
+                <AppIcon name="timeOutline" size={36} color="#e11d48" />
               </View>
-              <Text className="text-lg font-bold text-text-primary">No Recent Drops</Text>
+              <Text className="text-lg font-bold text-text-primary">{STRINGS.newArrivals.emptyTitle}</Text>
               <Text className="text-text-secondary mt-2 text-center px-10 leading-5 text-sm">
-                We haven&apos;t added any new products in the selected timeframe.
+                {STRINGS.newArrivals.emptyDescription}
               </Text>
             </View>
           }

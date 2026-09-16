@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, Image, Animated } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRef } from 'react';
+import { AppIcon, getCategoryIconFamily } from '../constants/icons';
 
 interface CategoryItemProps {
   name: string;
@@ -22,25 +22,19 @@ const CATEGORY_COLORS: Record<string, { gradient: string[]; icon: string; accent
   default: { gradient: ['#FFF0F3', '#FFE4E6'], icon: '#e11d48', accent: '#FF1F4B' },
 };
 
-const getCategoryColors = (name: string) => {
-  const lower = name.toLowerCase();
+const getCategoryColors = (name?: string) => {
+  const lower = (name || '').toLowerCase();
   for (const [key, colors] of Object.entries(CATEGORY_COLORS)) {
     if (lower.includes(key)) return colors;
   }
   return CATEGORY_COLORS.default;
 };
 
-const renderIcon = (n: string, iconSize: number, color: string) => {
-  const lower = n.toLowerCase();
-  if (lower.includes('bridal')) return <MaterialCommunityIcons name="crown-outline" size={iconSize} color={color} />;
-  if (lower.includes('glass')) return <MaterialCommunityIcons name="star-four-points-outline" size={iconSize} color={color} />;
-  if (lower.includes('stone')) return <MaterialCommunityIcons name="diamond-outline" size={iconSize} color={color} />;
-  if (lower.includes('metal')) return <MaterialCommunityIcons name="circle-outline" size={iconSize} color={color} />;
-  if (lower.includes('kids')) return <MaterialCommunityIcons name="baby-face-outline" size={iconSize} color={color} />;
-  if (lower.includes('oxidised')) return <MaterialCommunityIcons name="layers-outline" size={iconSize} color={color} />;
-  if (lower.includes('gold') || lower.includes('silver')) return <Ionicons name="sparkles" size={iconSize} color={color} />;
-  return <Ionicons name="apps-outline" size={iconSize} color={color} />;
+const renderIcon = (n?: string, iconSize: number = 24, color: string = '#e11d48') => {
+  const iconMeta = getCategoryIconFamily(n || '');
+  return <AppIcon name={iconMeta.name as any} size={iconSize} color={color} family={iconMeta.family} />;
 };
+
 
 export default function CategoryItem({
   name,
@@ -75,29 +69,31 @@ export default function CategoryItem({
     return (
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <TouchableOpacity
-          className={`rounded-2xl overflow-hidden bg-surface border border-divider ${className}`}
+          className={`rounded-2xl overflow-hidden bg-surface border border-divider shadow-sm ${className}`}
           onPress={onPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           activeOpacity={1}
+          accessibilityRole="button"
+          accessibilityLabel={`Browse ${name} collection`}
         >
-          <View className="w-full aspect-square bg-[#FAFAFA]">
+          <View className="w-full aspect-square bg-surface-secondary">
             {imageUrl ? (
               <Image source={{ uri: imageUrl }} className="w-full h-full" resizeMode="cover" />
             ) : (
-              <View className="w-full h-full items-center justify-center bg-primary/5">
-                {renderIcon(name, 48, colors.icon)}
+              <View className="w-full h-full items-center justify-center bg-rose-50/50">
+                {renderIcon(name, 44, colors.icon)}
               </View>
             )}
           </View>
-          <View className="p-3">
-            <Text className="font-bold text-text-primary text-sm text-center" numberOfLines={2}>
+          <View className="p-3.5">
+            <Text className="font-bold text-text-primary text-title-sm text-center" numberOfLines={2}>
               {name}
             </Text>
             {subtitle && (
-              <View className="flex-row items-center justify-center mt-1">
-                <View className="w-1 h-1 rounded-full" style={{ backgroundColor: colors.accent }} />
-                <Text className="text-xs font-medium ml-1.5" style={{ color: colors.accent }}>
+              <View className="flex-row items-center justify-center mt-1.5">
+                <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colors.accent }} />
+                <Text className="text-label-sm font-medium ml-1.5" style={{ color: colors.accent }}>
                   {subtitle}
                 </Text>
               </View>
@@ -115,16 +111,18 @@ export default function CategoryItem({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
+        accessibilityRole="button"
+        accessibilityLabel={`Browse ${name} collection`}
         className={`items-center ${className}`}
       >
-        <View className="w-24 h-24 rounded-2xl bg-primary/5 items-center justify-center border border-divider overflow-hidden">
+        <View className="w-24 h-24 rounded-2xl bg-rose-50/60 items-center justify-center border border-rose-100/70 overflow-hidden shadow-sm">
           {imageUrl ? (
             <Image source={{ uri: imageUrl }} className="w-full h-full" resizeMode="cover" />
           ) : (
             renderIcon(name, 32, colors.icon)
           )}
         </View>
-        <Text className="text-sm font-semibold text-text-primary mt-2 text-center" numberOfLines={1}>
+        <Text className="text-label-md font-semibold text-text-primary mt-2 text-center" numberOfLines={1}>
           {name}
         </Text>
       </TouchableOpacity>

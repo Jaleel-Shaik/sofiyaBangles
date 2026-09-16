@@ -226,15 +226,15 @@ export const restoreProduct = asyncHandler(async (req: AuthRequest, res: Respons
 });
 
 export const searchProducts = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const q = getQuery(req, "q");
+  const q = getQuery(req, "q") || getQuery(req, "search") || "";
   const limit = getQuery(req, "limit");
 
   if (!q || q.trim().length === 0) {
-    throw new BadRequestError("Search query is required.");
+    return sendSuccess(res, []);
   }
 
   const products = await searchProductsService(
-    q,
+    q.trim(),
     limit ? Number(limit) : undefined,
     req.user?.userId
   );

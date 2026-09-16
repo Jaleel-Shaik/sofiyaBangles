@@ -76,13 +76,8 @@ export default function RootLayout() {
     }
   }, [segments, isNavigating]);
 
-  // Show branded splash while navigating to dashboard after login/OTP
-  if (isNavigating) {
-    return <NavigatingSplash />;
-  }
-
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
@@ -92,11 +87,17 @@ export default function RootLayout() {
         <Stack.Screen name="new-arrivals/index" />
         <Stack.Screen name="products/[id]" />
         <Stack.Screen name="category/[id]" />
+        <Stack.Screen name="orders" />
         <Stack.Screen name="server-settings" />
         <Stack.Screen name="error-center" />
       </Stack>
+      {isNavigating && (
+        <View style={StyleSheet.absoluteFill}>
+          <NavigatingSplash />
+        </View>
+      )}
       <NetworkErrorModal />
-    </>
+    </View>
   );
 }
 

@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { AppIcon } from "@/src/constants/icons";
+import { STRINGS } from "@/src/constants/strings";
 
 interface ProductReviewSectionProps {
   reviews: any[];
@@ -28,22 +29,24 @@ export function ProductReviewSection({
   reviewSubmitted,
   handleSubmitReview,
 }: ProductReviewSectionProps) {
+  const safeReviews = Array.isArray(reviews) ? reviews.filter(Boolean) : [];
+
   return (
     <View>
       <View className="mb-6 pt-4 border-t border-divider">
         <View className="flex-row justify-between items-center mb-3">
-          <Text className="text-base font-bold text-text-primary">Reviews</Text>
-          <Text className="text-xs text-text-secondary">{reviews.length} review(s)</Text>
+          <Text className="text-base font-bold text-text-primary">{STRINGS.productDetail.reviewsTitle}</Text>
+          <Text className="text-xs text-text-secondary">{STRINGS.productDetail.reviewCount(safeReviews.length)}</Text>
         </View>
-        {reviews.length > 0 ? (
-          reviews.slice(0, 3).map((review) => (
+        {safeReviews.length > 0 ? (
+          safeReviews.slice(0, 3).map((review) => (
             <View
-              key={review.id}
+              key={review.id || `review-${Math.random()}`}
               className="mb-3 rounded-2xl bg-white p-3 border border-divider"
             >
               <View className="flex-row items-center mb-1">
-                {Array.from({ length: review.rating }).map((_, index) => (
-                  <Ionicons
+                {Array.from({ length: Math.max(0, Math.min(5, Math.floor(Number(review.rating) || 0))) }).map((_, index) => (
+                  <AppIcon
                     key={index}
                     name="star"
                     size={14}
@@ -55,25 +58,32 @@ export function ProductReviewSection({
                 <Text className="text-sm text-text-secondary">{review.comment}</Text>
               ) : null}
               {review.damage_details ? (
-                <Text className="text-xs text-text-hint mt-1">Damage note: {review.damage_details}</Text>
+                <Text className="text-xs text-text-hint mt-1">{STRINGS.productDetail.damageNotePrefix}{review.damage_details}</Text>
               ) : null}
             </View>
           ))
         ) : (
-          <Text className="text-sm text-text-secondary">No reviews yet.</Text>
+          <Text className="text-sm text-text-secondary">{STRINGS.productDetail.noReviews}</Text>
         )}
       </View>
 
       {fromOrders === "true" && (
         <View className="bg-white rounded-2xl border border-primary/20 p-4 mb-6">
-          <Text className="text-sm font-bold text-text-primary mb-2">Rate this purchase</Text>
-          <Text className="text-xs text-text-secondary mb-3">Share how it felt and any notes.</Text>
-          <View className="flex-row mb-3">
+          <Text className="text-sm font-bold text-text-primary mb-2">{STRINGS.productDetail.ratePurchaseTitle}</Text>
+          <Text className="text-xs text-text-secondary mb-3">{STRINGS.productDetail.ratePurchaseSubtitle}</Text>
+          <View className="flex-row items-center mb-3 -ml-2">
             {[1, 2, 3, 4, 5].map((value) => (
-              <TouchableOpacity key={value} onPress={() => setReviewRating(value)}>
-                <Ionicons
-                  name={value <= reviewRating ? "star" : "star-outline"}
-                  size={22}
+              <TouchableOpacity
+                key={value}
+                onPress={() => setReviewRating(value)}
+                className="w-11 h-11 items-center justify-center"
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Rate ${value} out of 5 stars`}
+              >
+                <AppIcon
+                  name={value <= reviewRating ? "star" : "starOutline"}
+                  size={24}
                   color="#f59e0b"
                 />
               </TouchableOpacity>
@@ -82,14 +92,14 @@ export function ProductReviewSection({
           <TextInput
             value={reviewText}
             onChangeText={setReviewText}
-            placeholder="Share your experience with this product"
+            placeholder={STRINGS.productDetail.shareExperiencePlaceholder}
             className="border border-divider rounded-2xl px-4 py-3 text-sm text-text-primary mb-3"
             multiline
           />
           <TextInput
             value={damageDetails}
             onChangeText={setDamageDetails}
-            placeholder="Any damage or issues? (optional)"
+            placeholder={STRINGS.productDetail.damagePlaceholder}
             className="border border-divider rounded-2xl px-4 py-3 text-sm text-text-primary mb-3"
             multiline
           />
@@ -101,11 +111,11 @@ export function ProductReviewSection({
             {isReviewSubmitting ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
-              <Text className="text-white font-bold">Submit Review</Text>
+              <Text className="text-white font-bold">{STRINGS.productDetail.submitReview}</Text>
             )}
           </TouchableOpacity>
           {reviewSubmitted && (
-            <Text className="text-xs text-success mt-2">Review saved successfully.</Text>
+            <Text className="text-xs text-success mt-2">{STRINGS.productDetail.reviewSaved}</Text>
           )}
         </View>
       )}

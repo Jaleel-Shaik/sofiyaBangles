@@ -86,7 +86,7 @@ export default function AddProductScreen() {
     if (currentCategory) {
       if (currentCategory.size_type === 'standard' || currentCategory.size_type === 'both') {
         setHasVariants(true);
-        if (currentCategory.standard_sizes && currentCategory.standard_sizes.length > 0) {
+        if (Array.isArray(currentCategory.standard_sizes) && currentCategory.standard_sizes.length > 0) {
           setVariants(currentCategory.standard_sizes.map(sz => ({
             id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             size: sz,
@@ -398,8 +398,8 @@ export default function AddProductScreen() {
               </View>
               
               <View className="mb-2">
-                {filteredCategories.length > 0 ? (
-                  filteredCategories.map((cat) => {
+                {(filteredCategories || []).length > 0 ? (
+                  (filteredCategories || []).map((cat) => {
                     const isSelected = selectedCategory === cat.id;
                     return (
                       <TouchableOpacity 
@@ -472,7 +472,7 @@ export default function AddProductScreen() {
               onPress={() => {
                 const nextVal = !hasVariants;
                 setHasVariants(nextVal);
-                if (nextVal && variants.length === 0 && currentCategory?.standard_sizes) {
+                if (nextVal && (variants || []).length === 0 && Array.isArray(currentCategory?.standard_sizes) && currentCategory.standard_sizes.length > 0) {
                   setVariants(currentCategory.standard_sizes.map(sz => ({
                     id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     size: sz,
@@ -530,12 +530,12 @@ export default function AddProductScreen() {
                 </TouchableOpacity>
               </View>
 
-              {variants.length === 0 ? (
+              {(variants || []).length === 0 ? (
                 <View className="p-5 border border-dashed border-divider rounded-2xl items-center">
                   <Text className="text-xs text-text-hint text-center">No sizes added yet. Use the field above to add sizes, or toggle Sizes OFF.</Text>
                 </View>
               ) : (
-                variants.map((v) => (
+                (variants || []).map((v) => (
                   <View key={v.id} className="flex-row items-center bg-surface p-3 rounded-2xl border border-divider mb-3">
                     <View className="bg-primary/10 border border-primary/20 px-3.5 py-2.5 rounded-xl mr-3 items-center justify-center min-w-[50px]">
                       <Text className="font-bold text-primary text-base">{v.size}</Text>
@@ -634,7 +634,7 @@ export default function AddProductScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {modelTypes.map((mt) => {
+              {(modelTypes || []).map((mt) => {
                 const isSelected = selectedModelType === mt.id;
                 return (
                   <TouchableOpacity

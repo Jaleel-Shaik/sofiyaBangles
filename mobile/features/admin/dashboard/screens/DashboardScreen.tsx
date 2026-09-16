@@ -312,7 +312,7 @@ export default function AdminDashboard() {
                   >
                     <Text className={`font-bold ${!selectedModelType ? 'text-primary' : 'text-text-primary'}`}>All Model Types</Text>
                   </TouchableOpacity>
-                  {modelTypes.map(mt => (
+                  {(modelTypes || []).map(mt => (
                     <TouchableOpacity 
                       key={mt.id}
                       className={`p-4 rounded-xl border mb-2 ${selectedModelType === mt.id ? 'bg-primary/10 border-primary' : 'border-divider'}`}
@@ -343,7 +343,7 @@ export default function AdminDashboard() {
                   >
                     <Text className={`font-bold ${!selectedCategory ? 'text-primary' : 'text-text-primary'}`}>All Categories</Text>
                   </TouchableOpacity>
-                  {filteredCategories.map(cat => (
+                  {(filteredCategories || []).map(cat => (
                     <TouchableOpacity 
                       key={cat.id}
                       className={`p-4 rounded-xl border mb-2 ${selectedCategory === cat.id ? 'bg-primary/10 border-primary' : 'border-divider'}`}
@@ -418,7 +418,7 @@ export default function AdminDashboard() {
             </View>
           ) : (
             <View className="mb-8">
-              {recentProducts.slice(0, 5).map((product) => {
+              {(recentProducts || []).slice(0, 5).map((product) => {
                 return (
                   <TouchableOpacity
                     key={product.id}

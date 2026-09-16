@@ -1,33 +1,33 @@
 import { View, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../constants/icons';
 
 interface BadgeProps {
   label: string;
   variant?: 'success' | 'danger' | 'warning' | 'info';
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: string;
   className?: string;
 }
 
 export default function Badge({ label, variant = 'success', icon, className = '' }: BadgeProps) {
 
   const variants = {
-    success: 'bg-emerald-100 text-emerald-600',
-    danger: 'bg-red-100 text-red-700',
-    warning: 'bg-orange-100 text-orange-700',
-    info: 'bg-blue-100 text-blue-700'
+    success: 'bg-emerald-50 border border-emerald-200',
+    danger: 'bg-rose-50 border border-rose-200',
+    warning: 'bg-amber-50 border border-amber-200',
+    info: 'bg-sky-50 border border-sky-200',
   };
 
   const textColors = {
-    success: '#059669', // emerald-600
-    danger: '#b91c1c',
-    warning: '#c2410c',
-    info: '#1d4ed8'
+    success: '#047857', // emerald-700 for high contrast
+    danger: '#be123c',  // rose-700
+    warning: '#b45309', // amber-700
+    info: '#0369a1',    // sky-700
   };
 
   return (
-    <View className={`flex-row items-center px-3 py-1 rounded-full ${variants[variant]} ${className}`}>
-      {icon && <Ionicons name={icon} size={12} color={textColors[variant]} className="mr-1" />}
-      <Text className={`text-xs font-bold`} style={{ color: textColors[variant] }}>
+    <View className={`flex-row items-center px-2.5 py-1 rounded-full shadow-xs ${variants[variant]} ${className}`}>
+      {icon && <AppIcon name={icon as any} size={14} color={textColors[variant]} style={{ marginRight: 4 }} />}
+      <Text className="text-label-sm font-semibold tracking-wide" style={{ color: textColors[variant] }}>
         {label}
       </Text>
     </View>

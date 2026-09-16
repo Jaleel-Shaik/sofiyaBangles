@@ -9,7 +9,6 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Badge from "@/src/components/Badge";
 import { apiClient } from "@/src/api/client";
@@ -19,6 +18,8 @@ import {
   shareProduct,
 } from "@/src/utils/whatsapp";
 import { useAuthStore } from "@/src/store/authStore";
+import { AppIcon } from "@/src/constants/icons";
+import { STRINGS } from "@/src/constants/strings";
 
 import { ProductImageGallery } from "../components/ProductImageGallery";
 import { ProductVariantSelector } from "../components/ProductVariantSelector";
@@ -61,22 +62,23 @@ export default function ProductDetailScreen() {
     try {
       setLoading(true);
       const res = await apiClient.get(`/products/${id}`);
-      const data = res.data.data;
+      const data = res.data?.data || res.data;
       setProduct(data);
 
-      if (data.has_variants && data.variants?.length > 0) {
-        const availableVariants = data.variants.filter((v: any) => v.quantity > 0);
+      const safeVariants = Array.isArray(data?.variants) ? data.variants : [];
+      if (data?.has_variants && safeVariants.length > 0) {
+        const availableVariants = safeVariants.filter((v: any) => v && (v.quantity || 0) > 0);
         if (availableVariants.length > 0) {
-          setSelectedVariantId(availableVariants[0].id);
+          setSelectedVariantId(availableVariants[0]?.id || null);
         } else {
-          setSelectedVariantId(data.variants[0].id);
+          setSelectedVariantId(safeVariants[0]?.id || null);
         }
       }
 
-      if (data.model_type_id) {
+      if (data?.model_type_id) {
         try {
           const modelTypes = await api.modelTypes.getModelTypes();
-          const modelType = modelTypes?.find((m: any) => m.id === data.model_type_id);
+          const modelType = (Array.isArray(modelTypes) ? modelTypes : []).find((m: any) => m && m.id === data.model_type_id);
           if (modelType) setProductModelTypeName(modelType.name);
         } catch (e) {}
       }
@@ -90,9 +92,10 @@ export default function ProductDetailScreen() {
   const fetchReviews = async () => {
     try {
       const reviews = await api.orders.getProductReviews(id as string);
-      setReviews(reviews || []);
+      setReviews(Array.isArray(reviews) ? reviews : []);
     } catch (error) {
       console.log(error);
+      setReviews([]);
     }
   };
 
@@ -100,13 +103,12 @@ export default function ProductDetailScreen() {
     if (!token || !user) return;
     try {
       const prefs = await api.sizes.getSizePreferences(user.id);
-      if (prefs) {
-        setPreferences(prefs.filter((p: any) => !p.is_custom) || []);
-        const profiles = prefs.filter((p: any) => p.is_custom) || [];
-        setCustomProfiles(profiles);
-        if (profiles.length > 0) {
-          setSelectedCustomProfileId(profiles[0].id);
-        }
+      const safePrefs = Array.isArray(prefs) ? prefs : [];
+      setPreferences(safePrefs.filter((p: any) => p && !p.is_custom));
+      const profiles = safePrefs.filter((p: any) => p && p.is_custom);
+      setCustomProfiles(profiles);
+      if (profiles.length > 0 && profiles[0]?.id) {
+        setSelectedCustomProfileId(profiles[0].id);
       }
     } catch (e) {
       console.log("Error fetching preferences", e);
@@ -122,8 +124,9 @@ export default function ProductDetailScreen() {
   }, [id, token]);
 
   const activeCustomProfile = useMemo(() => {
-    if (!selectedCustomProfileId && customProfiles.length > 0) return customProfiles[0];
-    return customProfiles.find((p) => p.id === selectedCustomProfileId) || null;
+    const safeProfiles = Array.isArray(customProfiles) ? customProfiles : [];
+    if (!selectedCustomProfileId && safeProfiles.length > 0) return safeProfiles[0];
+    return safeProfiles.find((p) => p && p.id === selectedCustomProfileId) || null;
   }, [selectedCustomProfileId, customProfiles]);
 
   const handleToggleFavorite = () => {
@@ -132,8 +135,8 @@ export default function ProductDetailScreen() {
   };
 
   const getActiveVariant = () => {
-    if (!product || !product.variants) return null;
-    return product.variants.find((v: any) => v.id === selectedVariantId) || null;
+    if (!product || !Array.isArray(product.variants)) return null;
+    return product.variants.find((v: any) => v && v.id === selectedVariantId) || null;
   };
 
   const getDisplayPrice = () => {
@@ -156,8 +159,8 @@ export default function ProductDetailScreen() {
 
   const getGalleryImages = () => {
     if (!product) return [];
-    return product.images && product.images.length > 0
-      ? product.images.map((img: any) => typeof img === 'string' ? img : img.image_url)
+    return Array.isArray(product.images) && product.images.length > 0
+      ? product.images.map((img: any) => typeof img === 'string' ? img : img?.image_url).filter(Boolean)
       : [product.image_url || "https://images.unsplash.com/photo-1611591437281-460bfbe1220a"];
   };
 
@@ -178,10 +181,10 @@ export default function ProductDetailScreen() {
             : (getActiveVariant()?.size || undefined),
         }]
       });
-      Alert.alert("Saved", "This product is now in your orders list.");
+      Alert.alert(STRINGS.productDetail.orderSuccessTitle, STRINGS.productDetail.orderSuccessMessage);
       router.push("/orders" as any);
     } catch (error) {
-      Alert.alert("Error", "Could not save this purchase.");
+      Alert.alert(STRINGS.productDetail.orderErrorTitle, STRINGS.productDetail.orderErrorMessage);
     } finally {
       setIsOrdering(false);
     }
@@ -200,9 +203,9 @@ export default function ProductDetailScreen() {
       setReviewSubmitted(true);
       setReviewText("");
       setDamageDetails("");
-      Alert.alert("Thanks!", "Your review has been added.");
+      Alert.alert(STRINGS.productDetail.reviewThanksTitle, STRINGS.productDetail.reviewThanksMessage);
     } catch (error) {
-      Alert.alert("Error", "Could not save the review.");
+      Alert.alert(STRINGS.productDetail.orderErrorTitle, STRINGS.productDetail.reviewErrorMessage);
     } finally {
       setIsReviewSubmitting(false);
     }
@@ -274,18 +277,18 @@ export default function ProductDetailScreen() {
       <View className="flex-1 items-center justify-center bg-white px-6">
         <View className="items-center">
           <View className="w-20 h-20 bg-rose-50 rounded-full items-center justify-center mb-5">
-            <Ionicons name="cube-outline" size={40} color="#e11d48" />
+            <AppIcon name="cubeOutline" size={40} color="#e11d48" />
           </View>
-          <Text className="text-xl font-bold text-text-primary mb-2">Product Not Available</Text>
+          <Text className="text-xl font-bold text-text-primary mb-2">{STRINGS.productDetail.notAvailableTitle}</Text>
           <Text className="text-text-secondary text-center text-sm leading-5 mb-6">
-            This product has been removed or is no longer available.{"\n"}It may have been deleted by the store admin.
+            {STRINGS.productDetail.notAvailableDescription}
           </Text>
           <View className="flex-row gap-3">
-            <TouchableOpacity onPress={() => router.back()} className="bg-primary px-6 py-3 rounded-full">
-              <Text className="text-white font-bold">Go Back</Text>
+            <TouchableOpacity onPress={() => router.back()} className="bg-primary px-6 py-3 rounded-full min-h-[44px] justify-center items-center">
+              <Text className="text-white font-bold">{STRINGS.productDetail.goBack}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/home" as any)} className="bg-surface px-6 py-3 rounded-full border border-divider">
-              <Text className="text-text-primary font-bold">Browse Products</Text>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/home" as any)} className="bg-surface px-6 py-3 rounded-full border border-divider min-h-[44px] justify-center items-center">
+              <Text className="text-text-primary font-bold">{STRINGS.productDetail.browseProducts}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -297,17 +300,38 @@ export default function ProductDetailScreen() {
   const displayStock = getDisplayStock();
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-surface">
       <View className="absolute left-0 right-0 z-10 flex-row justify-between px-4" style={{ top: Math.max(insets.top + 8, 20) }}>
-        <TouchableOpacity className="w-10 h-10 bg-white/90 rounded-full items-center justify-center shadow-sm" onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
+        <TouchableOpacity
+          className="w-11 h-11 bg-white/95 rounded-full items-center justify-center shadow-sm border border-black/5"
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={STRINGS.common.back}
+        >
+          <AppIcon name="back" size={22} color="#0f172a" />
         </TouchableOpacity>
         <View className="flex-row gap-2">
-          <TouchableOpacity className="w-10 h-10 bg-white/90 rounded-full items-center justify-center shadow-sm" onPress={handleShare}>
-            <Ionicons name="share-social-outline" size={20} color="#1e293b" />
+          <TouchableOpacity
+            className="w-11 h-11 bg-white/95 rounded-full items-center justify-center shadow-sm border border-black/5"
+            onPress={handleShare}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={STRINGS.common.share}
+          >
+            <AppIcon name="share" size={20} color="#0f172a" />
           </TouchableOpacity>
-          <TouchableOpacity className="w-10 h-10 bg-white/90 rounded-full items-center justify-center shadow-sm" onPress={handleToggleFavorite}>
-            <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#e11d48" : "#1e293b"} />
+          <TouchableOpacity
+            className="w-11 h-11 bg-white/95 rounded-full items-center justify-center shadow-sm border border-black/5"
+            onPress={handleToggleFavorite}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={isFavorite ? STRINGS.favorites.removeAccessibility : STRINGS.favorites.addAccessibility}
+          >
+            <AppIcon name={isFavorite ? "heart" : "heartOutline"} size={22} color={isFavorite ? "#e11d48" : "#0f172a"} />
           </TouchableOpacity>
         </View>
       </View>
@@ -315,26 +339,26 @@ export default function ProductDetailScreen() {
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <ProductImageGallery images={getGalleryImages()} />
 
-        <View className="bg-white px-5 pt-6 pb-32">
+        <View className="bg-surface px-5 pt-6 pb-36">
           <View className="flex-row justify-between items-start mb-2">
             <View className="flex-1 pr-4">
-              <Text className="text-2xl font-bold text-text-primary">{product.product_name}</Text>
+              <Text className="text-headline-md font-bold text-text-primary tracking-tight">{product.product_name}</Text>
               {product.unique_code && (
-                <Text className="text-sm font-medium text-text-hint mt-1">Code: {product.unique_code}</Text>
+                <Text className="text-label-sm font-medium text-text-hint mt-1">{STRINGS.productDetail.codePrefix}{product.unique_code}</Text>
               )}
             </View>
-            <View className="flex-row items-center bg-amber-50 px-2 py-1 rounded-lg">
-              <Ionicons name="star" size={14} color="#f59e0b" />
-              <Text className="text-amber-600 font-bold ml-1 text-xs">{product.rating || "4.8"}</Text>
-              <Text className="text-text-hint ml-1 text-xs">({product.reviews || 0})</Text>
+            <View className="flex-row items-center bg-amber-50 border border-amber-200/70 px-2.5 py-1 rounded-full">
+              <AppIcon name="star" size={13} color="#f59e0b" />
+              <Text className="text-amber-700 font-bold ml-1 text-label-sm">{product.rating || "4.8"}</Text>
+              <Text className="text-text-hint ml-1 text-label-sm">({product.reviews || 0})</Text>
             </View>
           </View>
 
-          <Text className="text-3xl font-extrabold text-[#C25B3E] mb-3">₹{displayPrice}</Text>
+          <Text className="text-display-md font-extrabold text-[#C25B3E] mb-3">₹{displayPrice}</Text>
 
           <View className="self-start mb-5">
             <Badge
-              label={displayStock > 0 ? (useCustomSize ? "Made to Order" : `In Stock`) : "Out of Stock"}
+              label={displayStock > 0 ? (useCustomSize ? STRINGS.common.madeToOrder : STRINGS.common.inStock) : STRINGS.common.outOfStock}
               variant={displayStock > 0 ? "success" : "danger"}
               icon={displayStock > 0 ? "checkmark-circle-outline" : "close-circle-outline"}
             />
@@ -355,23 +379,35 @@ export default function ProductDetailScreen() {
           />
 
           {displayStock > 0 && (
-            <View className="flex-row items-center mb-5">
-              <Text className="text-sm font-bold text-text-primary mr-3">Quantity</Text>
-              <View className="flex-row items-center border border-divider rounded-full bg-slate-50">
-                <TouchableOpacity className="w-10 h-10 items-center justify-center rounded-l-full" onPress={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}>
-                  <Ionicons name="remove" size={20} color="#334155" />
+            <View className="flex-row items-center mb-6">
+              <Text className="text-label-lg font-bold text-text-primary mr-4">{STRINGS.productDetail.quantityLabel}</Text>
+              <View className="flex-row items-center border border-divider rounded-full bg-slate-50 shadow-xs">
+                <TouchableOpacity
+                  className="w-11 h-11 items-center justify-center rounded-l-full"
+                  onPress={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={STRINGS.common.decreaseQuantity}
+                >
+                  <AppIcon name="remove" size={18} color="#334155" />
                 </TouchableOpacity>
-                <Text className="w-10 text-center font-bold text-text-primary text-lg">{selectedQuantity}</Text>
-                <TouchableOpacity className="w-10 h-10 items-center justify-center rounded-r-full" onPress={() => setSelectedQuantity(Math.min(displayStock, selectedQuantity + 1))}>
-                  <Ionicons name="add" size={20} color="#334155" />
+                <Text className="w-10 text-center font-bold text-text-primary text-title-md">{selectedQuantity}</Text>
+                <TouchableOpacity
+                  className="w-11 h-11 items-center justify-center rounded-r-full"
+                  onPress={() => setSelectedQuantity(Math.min(displayStock, selectedQuantity + 1))}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={STRINGS.common.increaseQuantity}
+                >
+                  <AppIcon name="add" size={18} color="#334155" />
                 </TouchableOpacity>
               </View>
             </View>
           )}
 
           <View className="mb-6">
-            <Text className="text-base font-bold text-text-primary mb-2">Description</Text>
-            <Text className="text-text-secondary leading-6">{product.description || "No description provided."}</Text>
+            <Text className="text-title-lg font-bold text-text-primary mb-2">{STRINGS.productDetail.descriptionLabel}</Text>
+            <Text className="text-text-secondary text-body-md leading-6">{product.description || STRINGS.productDetail.noDescription}</Text>
           </View>
 
           <ProductReviewSection
@@ -390,15 +426,30 @@ export default function ProductDetailScreen() {
         </View>
       </ScrollView>
 
-      <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-divider px-5 pt-3 pb-8">
-        <TouchableOpacity className="flex-row items-center justify-center py-3.5 rounded-2xl mb-2 bg-[#111827]" onPress={handleMarkBought} disabled={isOrdering}>
-          {isOrdering ? <ActivityIndicator size="small" color="white" /> : <Ionicons name="bag-outline" size={20} color="white" />}
-          <Text className="text-white font-bold text-base ml-2">Mark as Bought</Text>
+      <View className="absolute bottom-0 left-0 right-0 bg-surface border-t border-divider px-5 pt-3 pb-8 shadow-lg">
+        <TouchableOpacity
+          className="flex-row items-center justify-center min-h-[50px] py-3.5 rounded-2xl mb-2.5 bg-slate-900 shadow-sm"
+          onPress={handleMarkBought}
+          disabled={isOrdering}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={STRINGS.common.markBoughtA11y}
+        >
+          {isOrdering ? <ActivityIndicator size="small" color="white" /> : <AppIcon name="bagOutline" size={20} color="white" />}
+          <Text className="text-white font-bold text-title-sm ml-2">{STRINGS.productDetail.markAsBought}</Text>
         </TouchableOpacity>
-        <TouchableOpacity className="flex-row items-center justify-center py-3.5 rounded-2xl" style={{ backgroundColor: displayStock > 0 ? "#25D366" : "#94a3b8" }} onPress={openWhatsApp} disabled={displayStock <= 0}>
-          <Ionicons name="chatbubble-outline" size={20} color="white" />
-          <Text className="text-white font-bold text-base ml-2 mr-1">{displayStock > 0 ? "Inquire on WhatsApp" : "Out of Stock"}</Text>
-          <Ionicons name="logo-whatsapp" size={16} color="white" />
+        <TouchableOpacity
+          className="flex-row items-center justify-center min-h-[50px] py-3.5 rounded-2xl shadow-sm"
+          style={{ backgroundColor: displayStock > 0 ? "#25D366" : "#94a3b8" }}
+          onPress={openWhatsApp}
+          disabled={displayStock <= 0}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={displayStock > 0 ? STRINGS.productDetail.inquireWhatsApp : STRINGS.common.outOfStock}
+        >
+          <AppIcon name="chatbubbleOutline" size={20} color="white" />
+          <Text className="text-white font-bold text-title-sm ml-2 mr-1">{displayStock > 0 ? STRINGS.productDetail.inquireWhatsApp : STRINGS.common.outOfStock}</Text>
+          <AppIcon name="whatsapp" size={17} color="white" />
         </TouchableOpacity>
       </View>
     </View>

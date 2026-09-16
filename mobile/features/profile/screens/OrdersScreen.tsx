@@ -10,8 +10,7 @@ import {
   Image,
 } from "react-native";
 import { useState, useCallback } from "react";
-import { useRouter } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,8 +25,10 @@ export default function OrdersScreen() {
   const fetchOrders = async () => {
     try {
       const data = await api.orders.getUserOrders();
-      setOrders(data);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
+      console.warn("Failed to fetch orders:", error);
+      setOrders([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -46,6 +47,7 @@ export default function OrdersScreen() {
   };
 
   const openOrderProduct = (order: OrderItem) => {
+    if (!order?.product_id) return;
     router.push({
       pathname: "/products/[id]",
       params: { id: order.product_id, fromOrders: "true", orderId: order.id },
@@ -60,35 +62,35 @@ export default function OrdersScreen() {
     );
   }
 
+  const safeOrders = Array.isArray(orders) ? orders : [];
+
   return (
-    <View className="flex-1 bg-[#FAFAFA]">
+    <View className="flex-1 bg-background">
       <View
-        className="px-5 pb-3 bg-surface border-b border-divider"
-        style={{ paddingTop: Math.max(insets.top + 16, 40) }}
+        className="px-5 pb-4 bg-surface border-b border-divider flex-row items-center justify-between"
+        style={{ paddingTop: Math.max(insets.top + 8, 36) }}
       >
-        <View className="flex-row items-center">
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
-            <Ionicons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
-          <Text className="text-xl font-bold text-text-primary">My Orders</Text>
-          {orders.length > 0 && (
-            <View className="ml-2 bg-primary/10 px-2 py-0.5 rounded-full">
-              <Text className="text-xs font-bold text-primary">{orders.length}</Text>
-            </View>
-          )}
-        </View>
-        <Text className="text-sm text-text-secondary ml-9">Your purchased items</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="w-11 h-11 rounded-full bg-slate-50 border border-divider items-center justify-center mr-3"
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="arrow-back" size={22} color="#0f172a" />
+        </TouchableOpacity>
+        <Text className="text-xl font-bold text-text-primary flex-1">My Orders</Text>
       </View>
 
       <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}
+        className="flex-1 px-5 pt-4"
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e11d48" colors={["#e11d48"]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#e11d48"]} />
         }
       >
-        {orders.length === 0 ? (
+        {safeOrders.length === 0 ? (
           <View className="items-center justify-center pt-20">
             <View className="w-20 h-20 bg-primary/10 rounded-full items-center justify-center mb-4">
               <Ionicons name="bag-outline" size={36} color="#e11d48" />
@@ -99,13 +101,14 @@ export default function OrdersScreen() {
             </Text>
             <TouchableOpacity
               onPress={() => router.push("/(tabs)/home" as any)}
-              className="bg-[#111827] px-6 py-3 rounded-2xl"
+              className="bg-[#111827] px-6 py-3.5 rounded-2xl min-h-[44px] items-center justify-center"
+              accessibilityRole="button"
             >
               <Text className="text-white font-bold text-sm">Browse Products</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          orders.flatMap((order) => (order.items || []).map((item) => (
+          safeOrders.flatMap((order) => (order?.items || []).map((item) => (
             <TouchableOpacity
               key={item.id}
               onPress={() => openOrderProduct(item)}
@@ -136,9 +139,9 @@ export default function OrdersScreen() {
                     </View>
                   </View>
                   <Text className="text-xs text-text-hint mt-1">
-                    {new Date(order.created_at).toLocaleDateString("en-IN", {
+                    {order.created_at ? new Date(order.created_at).toLocaleDateString("en-IN", {
                       day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
-                    })}
+                    }) : ''}
                   </Text>
                 </View>
               </View>

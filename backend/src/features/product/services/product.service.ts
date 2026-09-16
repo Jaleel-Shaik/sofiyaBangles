@@ -229,10 +229,12 @@ export const getProductsService = async (options: {
   const paginatedProducts = allProducts.slice(offset, offset + limit);
 
   const categories = await getCategoriesDb();
-  const categoryMap = new Map(categories.map((c) => [c.id, c.category_name]));
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const categoryMap = new Map(safeCategories.map((c) => [c.id, c.category_name]));
 
+  const safePaginated = Array.isArray(paginatedProducts) ? paginatedProducts : [];
   const productsWithDetails = await Promise.all(
-    paginatedProducts.map(async (p) => {
+    safePaginated.map(async (p) => {
       const category_name = p.category_id ? categoryMap.get(p.category_id) : undefined;
       const is_favorited = options.userId ? await isFavoritedDb(options.userId, p.id) : false;
       const variants = await getVariantsByProductDb(p.id);
@@ -709,7 +711,7 @@ export const deleteProductsByCategoryService = async (
  */
 export const searchProductsService = async (query: string, limit?: number, userId?: string) => {
   const res = await getProductsService({ page: 1, limit: limit || 20, search: query, userId });
-  return res.products;
+  return Array.isArray(res?.products) ? res.products : [];
 };
 
 /**

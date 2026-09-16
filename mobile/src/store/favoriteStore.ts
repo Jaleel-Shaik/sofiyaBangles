@@ -16,51 +16,54 @@ export const useFavoriteStore = create<FavoriteStore>((set, get) => ({
   fetchFavorites: async () => {
     try {
       const favs: Favorite[] = await api.favorites.getFavorites();
+      const safeFavs = Array.isArray(favs) ? favs : [];
       // Only keep favorites that actually exist (backend filters deleted)
-      const ids = favs
+      const ids = safeFavs
         .filter((f) => Boolean(f?.product_id))
-        .map((f) => f.product_id);
-      const currentIds = get().favoriteIds;
+        .map((f) => String(f.product_id));
+      const currentIds = Array.isArray(get().favoriteIds) ? get().favoriteIds : [];
       // Only update if changed to avoid unnecessary re-renders
-      if (JSON.stringify(currentIds.sort()) !== JSON.stringify([...ids].sort())) {
+      if (JSON.stringify([...currentIds].sort()) !== JSON.stringify([...ids].sort())) {
         set({ favoriteIds: ids, initialized: true });
       } else {
         set({ initialized: true });
       }
     } catch (error) {
       console.error('Failed to fetch favorites for store', error);
+      set({ favoriteIds: [], initialized: true });
     }
   },
   toggleFavorite: async (productId: string) => {
-    const { favoriteIds } = get();
-    const isFav = favoriteIds.includes(productId);
+    const currentFavs = Array.isArray(get().favoriteIds) ? get().favoriteIds : [];
+    const isFav = currentFavs.includes(productId);
     
     if (isFav) {
-      set({ favoriteIds: favoriteIds.filter(id => id !== productId) });
+      set({ favoriteIds: currentFavs.filter(id => id !== productId) });
       try {
         await api.favorites.removeFavorite(productId);
       } catch {
-        set({ favoriteIds: [...favoriteIds] });
+        set({ favoriteIds: [...currentFavs] });
       }
     } else {
-      set({ favoriteIds: [...favoriteIds, productId] });
+      set({ favoriteIds: [...currentFavs, productId] });
       try {
         await api.favorites.addFavorite(productId);
       } catch {
-        set({ favoriteIds: favoriteIds.filter(id => id !== productId) });
+        set({ favoriteIds: currentFavs.filter(id => id !== productId) });
       }
     }
   },
   removeStaleFavorites: async () => {
     try {
       const favs: Favorite[] = await api.favorites.getFavorites();
+      const safeFavs = Array.isArray(favs) ? favs : [];
       const validIds = new Set(
-        favs
+        safeFavs
           .filter((f) => Boolean(f?.product_id))
-          .map((f) => f.product_id)
+          .map((f) => String(f.product_id))
       );
-      const { favoriteIds } = get();
-      const staleIds = favoriteIds.filter(id => !validIds.has(id));
+      const currentFavs = Array.isArray(get().favoriteIds) ? get().favoriteIds : [];
+      const staleIds = currentFavs.filter(id => !validIds.has(id));
       if (staleIds.length > 0) {
         set({ favoriteIds: Array.from(validIds) });
       }

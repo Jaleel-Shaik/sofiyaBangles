@@ -33,10 +33,10 @@ export default function ManageCategoriesScreen() {
     try {
       const [catsRes, mtsRes] = await Promise.allSettled([api.categories.getCategories(), getModelTypes()]);
       if (catsRes.status === 'fulfilled') {
-        setCategories(catsRes.value || []);
+        setCategories(Array.isArray(catsRes.value) ? catsRes.value : []);
       }
       if (mtsRes.status === 'fulfilled') {
-        setModelTypes(mtsRes.value || []);
+        setModelTypes(Array.isArray(mtsRes.value) ? mtsRes.value : []);
       }
     } catch (e) {
       console.error(e);
@@ -65,10 +65,10 @@ export default function ManageCategoriesScreen() {
 
   const handleEditCategory = (cat: Category) => {
     setEditingCategoryId(cat.id);
-    setName(cat.category_name);
+    setName(cat.category_name || cat.name || '');
     setSelectedModelTypeId(cat.model_type_id || '');
     setImageUri(cat.image_url || null);
-    if (cat.standard_sizes) setNewModelStandardSizes(cat.standard_sizes.join(', '));
+    if (Array.isArray(cat.standard_sizes)) setNewModelStandardSizes(cat.standard_sizes.join(', '));
     else setNewModelStandardSizes('');
     setIsCreatingNewModel(false);
     setIsAdding(true);
@@ -120,7 +120,7 @@ export default function ManageCategoriesScreen() {
           return;
         }
 
-        const standard_sizes = newModelStandardSizes.split(',').map(s => s.trim()).filter(s => s);
+        const standard_sizes = (newModelStandardSizes || '').split(',').map(s => s.trim()).filter(Boolean);
 
         if (standard_sizes.length === 0) {
           Alert.alert('Error', 'Please enter at least one standard size.');
@@ -131,7 +131,7 @@ export default function ManageCategoriesScreen() {
         const newModelType = await api.admin.createModelType({ name: newModelName });
         finalModelTypeId = newModelType.id;
       } else {
-        const standard_sizes = newModelStandardSizes.split(',').map(s => s.trim()).filter(s => s);
+        const standard_sizes = (newModelStandardSizes || '').split(',').map(s => s.trim()).filter(Boolean);
 
         if (standard_sizes.length === 0) {
           Alert.alert('Error', 'Please enter at least one standard size.');
@@ -140,7 +140,7 @@ export default function ManageCategoriesScreen() {
         }
       }
 
-      const standard_sizes = newModelStandardSizes.split(',').map(s => s.trim()).filter(s => s);
+      const standard_sizes = (newModelStandardSizes || '').split(',').map(s => s.trim()).filter(Boolean);
 
       if (editingCategoryId) {
         await api.admin.updateCategoryWithImage(
@@ -180,10 +180,13 @@ export default function ManageCategoriesScreen() {
       >
         <View className="flex-row items-center">
           <TouchableOpacity
-            className="w-10 h-10 bg-surface rounded-full items-center justify-center mr-3 border border-divider"
+            className="w-11 h-11 bg-surface rounded-full items-center justify-center mr-3 border border-divider"
             onPress={() => router.push('/(tabs)/profile')}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
-            <Ionicons name="arrow-back" size={24} color="#e11d48" />
+            <Ionicons name="arrow-back" size={22} color="#e11d48" />
           </TouchableOpacity>
           <View>
             <Text className="text-primary font-medium text-xs uppercase tracking-wider">Admin Panel</Text>
@@ -217,7 +220,7 @@ export default function ManageCategoriesScreen() {
 
               <Text className="text-xs font-bold text-text-hint mb-2 uppercase">Select or Create Model Type</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-                {modelTypes.map((mt) => (
+                {(modelTypes || []).map((mt) => (
                   <TouchableOpacity
                     key={mt.id}
                     onPress={() => { setSelectedModelTypeId(mt.id); setIsCreatingNewModel(false); }}
@@ -293,10 +296,11 @@ export default function ManageCategoriesScreen() {
           )}
 
           <View className="flex-row flex-wrap" style={{ margin: -6 }}>
-            {categories.map(cat => {
-              const mt = modelTypes.find(m => m.id === cat.model_type_id);
+            {(categories || []).map((cat, idx) => {
+              const mt = (modelTypes || []).find(m => m && m.id === cat?.model_type_id);
+              const catId = cat?.id || `admin-cat-${idx}`;
               return (
-                <View key={cat.id} className="w-1/2" style={{ padding: 6 }}>
+                <View key={catId} className="w-1/2" style={{ padding: 6 }}>
                   <View className="bg-surface rounded-2xl border border-divider overflow-hidden">
                     <View className="aspect-[4/3] bg-surface overflow-hidden">
                       {cat.image_url ? (
@@ -321,12 +325,18 @@ export default function ManageCategoriesScreen() {
                           <TouchableOpacity
                             onPress={() => handleEditCategory(cat)}
                             className="w-7 h-7 bg-surface rounded-full items-center justify-center border border-divider"
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Edit ${cat.category_name}`}
                           >
                             <Ionicons name="pencil" size={14} color="#e11d48" />
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => handleDeleteCategory(cat.id)}
                             className="w-7 h-7 bg-error/10 rounded-full items-center justify-center"
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Delete ${cat.category_name}`}
                           >
                             <Ionicons name="trash" size={14} color="#e11d48" />
                           </TouchableOpacity>

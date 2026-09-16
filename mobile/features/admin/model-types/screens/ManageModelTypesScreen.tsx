@@ -5,7 +5,6 @@ import { useState, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { createModelType, updateModelType, deleteModelType } from '@/src/api/admin';
 
@@ -30,9 +29,10 @@ export default function ManageModelTypesScreen() {
     if (!isRefresh) setLoading(true);
     try {
       const data = await api.modelTypes.getModelTypes();
-      setModelTypes(data);
+      setModelTypes(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
+      setModelTypes([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -169,7 +169,7 @@ export default function ManageModelTypesScreen() {
             </View>
           )}
 
-          {modelTypes.map(mt => (
+          {(modelTypes || []).map(mt => (
             <View key={mt.id} className="bg-surface p-5 rounded-2xl mb-4 border border-divider flex-row items-center justify-between">
               {editingId === mt.id ? (
                 <View className="flex-1 mr-2">

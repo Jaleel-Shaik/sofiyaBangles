@@ -28,10 +28,10 @@ export default function ProductsListScreen() {
         api.categories.getCategories(),
       ]);
       if (prodRes.status === 'fulfilled') {
-        setProducts(prodRes.value.products || []);
+        setProducts(Array.isArray(prodRes.value?.products) ? prodRes.value.products : []);
       }
       if (catsRes.status === 'fulfilled') {
-        setCategories(catsRes.value || []);
+        setCategories(Array.isArray(catsRes.value) ? catsRes.value : []);
       }
     } catch (error) {
       console.error('Failed to load products', error);
@@ -47,11 +47,12 @@ export default function ProductsListScreen() {
 
   const filteredProducts = useMemo(() => {
     const lower = search.toLowerCase().trim();
-    return products.filter(p => {
-      const matchesSearch =
-        !lower ||
-        p.product_name.toLowerCase().includes(lower) ||
-        (p.unique_code && p.unique_code.toLowerCase().includes(lower));
+    const safeProducts = Array.isArray(products) ? products : [];
+    return safeProducts.filter(p => {
+      if (!p) return false;
+      const pName = (p.product_name || '').toLowerCase();
+      const pCode = (p.unique_code || '').toLowerCase();
+      const matchesSearch = !lower || pName.includes(lower) || pCode.includes(lower);
       const matchesCategory = !selectedCategory || p.category_id === selectedCategory;
       return matchesSearch && matchesCategory;
     });
@@ -148,13 +149,13 @@ export default function ProductsListScreen() {
           >
             <Text className={`text-xs font-bold ${!selectedCategory ? 'text-white' : 'text-text-secondary'}`}>All</Text>
           </TouchableOpacity>
-          {categories.map(cat => (
+          {(categories || []).map((cat, idx) => (
             <TouchableOpacity
-              key={cat.id}
-              onPress={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-full mr-2 ${selectedCategory === cat.id ? 'bg-primary' : 'bg-surface border border-divider'}`}
+              key={cat?.id || `admin-prod-cat-${idx}`}
+              onPress={() => setSelectedCategory(cat?.id || '')}
+              className={`px-4 py-2 rounded-full mr-2 ${selectedCategory === cat?.id ? 'bg-primary' : 'bg-surface border border-divider'}`}
             >
-              <Text className={`text-xs font-bold ${selectedCategory === cat.id ? 'text-white' : 'text-text-secondary'}`}>{cat.category_name}</Text>
+              <Text className={`text-xs font-bold ${selectedCategory === cat?.id ? 'text-white' : 'text-text-secondary'}`}>{cat?.category_name || cat?.name || 'Category'}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>

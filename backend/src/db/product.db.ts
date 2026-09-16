@@ -114,7 +114,7 @@ export const getActiveProductsDb = async (categoryId?: string): Promise<Product[
     }
 
     const snapshot = await query.get();
-    return snapshot.docs.map((doc) => doc.data() as Product);
+    return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as Product));
   } catch (err: any) {
     return [];
   }
@@ -253,7 +253,7 @@ export const getVariantsByProductDb = async (productId: string): Promise<Product
     .where("product_id", "==", productId)
     .get();
 
-  const variants = snapshot.docs.map((doc) => doc.data() as ProductVariant);
+  const variants = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as ProductVariant));
   return variants.filter((v) => v.status === "active" || v.status === "out_of_stock");
 };
 
@@ -266,7 +266,7 @@ export const getImagesByProductDb = async (productId: string): Promise<ProductIm
     .where("product_id", "==", productId)
     .get();
 
-  const images = snapshot.docs.map((doc) => doc.data() as ProductImage);
+  const images = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as ProductImage));
   return images.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
 };
 

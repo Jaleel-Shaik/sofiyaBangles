@@ -13,7 +13,7 @@ export const getCategoriesDb = async (modelTypeId?: string): Promise<Category[]>
     }
 
     const snapshot = await query.get();
-    const categories = snapshot.docs.map((doc) => doc.data() as Category);
+    const categories = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as Category));
     categories.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
     return categories;
   } catch (err: any) {
@@ -27,7 +27,7 @@ export const getCategoriesDb = async (modelTypeId?: string): Promise<Category[]>
 export const getCategoryByIdDb = async (id: string): Promise<Category | null> => {
   const doc = await db.collection("categories").doc(id).get();
   if (!doc.exists) return null;
-  return doc.data() as Category;
+  return { ...doc.data(), id: doc.id } as Category;
 };
 
 /**
@@ -45,7 +45,7 @@ export const findCategoryByNameDb = async (
     return cat.category_name.toLowerCase() === name.toLowerCase().trim();
   });
 
-  return found ? (found.data() as Category) : null;
+  return found ? ({ ...found.data(), id: found.id } as Category) : null;
 };
 
 /**
@@ -68,7 +68,7 @@ export const updateCategoryDocDb = async (
 
   await db.collection("categories").doc(id).update(updateData);
   const doc = await db.collection("categories").doc(id).get();
-  return doc.data() as Category;
+  return { ...doc.data(), id: doc.id } as Category;
 };
 
 /**
