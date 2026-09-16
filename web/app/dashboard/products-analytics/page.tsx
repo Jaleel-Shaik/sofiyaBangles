@@ -1,20 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, Search, Download, Eye, TrendingUp } from "lucide-react";
+import { Package, Download, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/src/lib/api";
 import { ProductAnalyticsItem } from "@/src/lib/api/types";
+import { STRINGS } from "@/src/constants/strings";
 
 type ProductAnalyticsTab = "all" | "best_sellers" | "low_stock" | "out_of_stock" | "unsold";
-
-const ANALYTICS_TABS: Array<{ id: ProductAnalyticsTab; label: string }> = [
-  { id: "all", label: "All Products" },
-  { id: "best_sellers", label: "Best Sellers" },
-  { id: "low_stock", label: "Low Stock Alert" },
-  { id: "out_of_stock", label: "Out of Stock" },
-  { id: "unsold", label: "Unsold Items" },
-];
 
 export default function ProductsAnalyticsPage() {
   const [products, setProducts] = useState<ProductAnalyticsItem[]>([]);
@@ -22,6 +15,14 @@ export default function ProductsAnalyticsPage() {
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<ProductAnalyticsTab>("all");
   const [loading, setLoading] = useState(true);
+
+  const analyticsTabs: Array<{ id: ProductAnalyticsTab; label: string }> = [
+    { id: "all", label: STRINGS.productsAnalytics.tabAll },
+    { id: "best_sellers", label: STRINGS.productsAnalytics.tabBestSellers },
+    { id: "low_stock", label: STRINGS.productsAnalytics.tabLowStock },
+    { id: "out_of_stock", label: STRINGS.productsAnalytics.tabOutOfStock },
+    { id: "unsold", label: STRINGS.productsAnalytics.tabUnsold },
+  ];
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -54,10 +55,10 @@ export default function ProductsAnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Package className="w-6 h-6 text-rose-600" /> Products Financial Analytics
+            <Package className="w-6 h-6 text-rose-600" /> {STRINGS.productsAnalytics.title}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Individual product sales, stock levels, and SuperAdmin 30% revenue share breakdown.
+            {STRINGS.productsAnalytics.subtitle}
           </p>
         </div>
 
@@ -65,19 +66,19 @@ export default function ProductsAnalyticsPage() {
           href={api.superAdmin.exportProductsCsvUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors"
+          className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold transition-colors"
         >
-          <Download className="w-4 h-4" /> Export Products CSV
+          <Download className="w-4 h-4" /> {STRINGS.productsAnalytics.exportCsv}
         </a>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-1">
-        {ANALYTICS_TABS.map((t) => (
+        {analyticsTabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+            className={`px-4 py-2.5 min-h-[44px] text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
               tab === t.id
                 ? "bg-rose-600 text-white shadow-sm"
                 : "text-slate-600 hover:bg-slate-100"
@@ -91,22 +92,22 @@ export default function ProductsAnalyticsPage() {
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-slate-400 text-sm">Loading product analytics...</div>
+          <div className="p-8 text-center text-slate-400 text-sm">{STRINGS.productsAnalytics.loading}</div>
         ) : filteredProducts.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm font-medium">No products match this filter.</div>
+          <div className="p-12 text-center text-slate-400 text-sm font-medium">{STRINGS.productsAnalytics.empty}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold">
                 <tr>
-                  <th className="p-4">Product</th>
-                  <th className="p-4">Code</th>
-                  <th className="p-4">Price</th>
-                  <th className="p-4">Stock</th>
-                  <th className="p-4">Gross Revenue</th>
-                  <th className="p-4 text-emerald-600">Admin 70%</th>
-                  <th className="p-4 text-rose-600">SuperAdmin 30%</th>
-                  <th className="p-4 text-right">Drilldown</th>
+                  <th className="p-4">{STRINGS.productsAnalytics.tableProduct}</th>
+                  <th className="p-4">{STRINGS.productsAnalytics.tableCode}</th>
+                  <th className="p-4">{STRINGS.productsAnalytics.tablePrice}</th>
+                  <th className="p-4">{STRINGS.productsAnalytics.tableStock}</th>
+                  <th className="p-4">{STRINGS.productsAnalytics.tableGrossRevenue}</th>
+                  <th className="p-4 text-emerald-600">{STRINGS.productsAnalytics.tableAdminShare}</th>
+                  <th className="p-4 text-rose-600">{STRINGS.productsAnalytics.tableSuperAdminShare}</th>
+                  <th className="p-4 text-right">{STRINGS.productsAnalytics.tableDrilldown}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -131,7 +132,7 @@ export default function ProductsAnalyticsPage() {
                         (p.quantity || 0) <= 10 ? "bg-amber-100 text-amber-800" :
                         "bg-emerald-100 text-emerald-800"
                       }`}>
-                        {p.quantity || 0} left
+                        {p.quantity || 0} {STRINGS.productsAnalytics.leftSuffix}
                       </span>
                     </td>
                     <td className="p-4 font-bold text-slate-900">₹{p.gross_revenue || 0}</td>
@@ -140,9 +141,9 @@ export default function ProductsAnalyticsPage() {
                     <td className="p-4 text-right">
                       <Link
                         href={`/dashboard/products-analytics/${p.id}`}
-                        className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-700 font-bold"
+                        className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-700 font-bold py-1 px-2 rounded-lg hover:bg-rose-50 min-h-[36px]"
                       >
-                        <TrendingUp className="w-3.5 h-3.5" /> Drilldown
+                        <TrendingUp className="w-3.5 h-3.5" /> {STRINGS.productsAnalytics.drilldownAction}
                       </Link>
                     </td>
                   </tr>

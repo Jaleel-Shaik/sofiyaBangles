@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, ExternalLink, Link2, CheckCircle2, Shield, Plus, Sparkles } from "lucide-react";
+import { FileText, ExternalLink, Link2, CheckCircle2, Shield, Sparkles } from "lucide-react";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { STRINGS } from "@/src/constants/strings";
 
 export default function FormsPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -26,15 +27,17 @@ export default function FormsPage() {
         <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Shield className="w-6 h-6" />
         </div>
-        <h2 className="text-lg font-bold text-slate-900 mb-2">SuperAdmin Access Required</h2>
+        <h2 className="text-lg font-bold text-slate-900 mb-2">
+          {STRINGS.superAdminAuth.accessRequiredTitle}
+        </h2>
         <p className="text-xs text-slate-500 mb-6">
-          Accessing external integration forms is restricted to Super-Administrators.
+          {STRINGS.superAdminAuth.formsAccessRequiredDesc}
         </p>
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 bg-[#E8436E] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#CC3366] transition-colors"
+          className="inline-flex items-center justify-center gap-2 bg-[#E8436E] text-white px-5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold hover:bg-[#CC3366] transition-colors"
         >
-          Return to Store Dashboard
+          {STRINGS.superAdminAuth.returnToDashboard}
         </Link>
       </div>
     );
@@ -46,14 +49,14 @@ export default function FormsPage() {
       localStorage.removeItem("sofiya_google_form_url");
       setSavedUrl("");
       setIsEditing(false);
-      toast.success("Google Form unlinked");
+      toast.success(STRINGS.forms.unlinkedToast);
       return;
     }
 
     localStorage.setItem("sofiya_google_form_url", formUrl.trim());
     setSavedUrl(formUrl.trim());
     setIsEditing(false);
-    toast.success("Google Form link saved successfully!");
+    toast.success(STRINGS.forms.savedToast);
   };
 
   return (
@@ -62,10 +65,10 @@ export default function FormsPage() {
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-[#E8436E]" /> Google Forms & Inquiries
+            <FileText className="w-6 h-6 text-[#E8436E]" /> {STRINGS.forms.title}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Manage your external Google Forms for custom bridal bangle requests, bulk orders, and customer feedback.
+            {STRINGS.forms.subtitle}
           </p>
         </div>
 
@@ -74,9 +77,9 @@ export default function FormsPage() {
             href={savedUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-[#E8436E] hover:bg-[#CC3366] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-all"
+            className="inline-flex items-center gap-2 bg-[#E8436E] hover:bg-[#CC3366] text-white px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold shadow-sm transition-all"
           >
-            <ExternalLink className="w-4 h-4" /> Open Google Form
+            <ExternalLink className="w-4 h-4" /> {STRINGS.forms.openGoogleForm}
           </a>
         )}
       </div>
@@ -91,7 +94,7 @@ export default function FormsPage() {
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-900">Google Form Connected</p>
+                <p className="text-xs font-bold text-slate-900">{STRINGS.forms.connectedStatus}</p>
                 <p className="text-[11px] font-mono text-slate-500 truncate max-w-md">{savedUrl}</p>
               </div>
             </div>
@@ -99,17 +102,17 @@ export default function FormsPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsEditing(true)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                className="px-3 py-2 min-h-[44px] rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
               >
-                Change URL
+                {STRINGS.forms.changeUrl}
               </button>
               <a
                 href={savedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 min-h-[44px] rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors flex items-center gap-1.5"
               >
-                <ExternalLink className="w-3.5 h-3.5" /> View Form
+                <ExternalLink className="w-3.5 h-3.5" /> {STRINGS.forms.viewForm}
               </a>
             </div>
           </div>
@@ -117,13 +120,13 @@ export default function FormsPage() {
           {/* Embedded Form Preview or Frame */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
             <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500 px-4">
-              <span className="font-semibold text-slate-700">Live Form Preview</span>
-              <span>Google Forms Integration</span>
+              <span className="font-semibold text-slate-700">{STRINGS.forms.livePreviewTitle}</span>
+              <span>{STRINGS.forms.integrationBadge}</span>
             </div>
             <iframe
               src={savedUrl}
               className="w-full flex-1 border-0 min-h-[600px]"
-              title="Google Form"
+              title={STRINGS.forms.title}
             />
           </div>
         </div>
@@ -135,9 +138,9 @@ export default function FormsPage() {
           </div>
 
           <div className="max-w-md mx-auto space-y-2">
-            <h2 className="text-lg font-bold text-slate-900">Google Forms Tab</h2>
+            <h2 className="text-lg font-bold text-slate-900">{STRINGS.forms.emptyTitle}</h2>
             <p className="text-xs text-slate-500 leading-relaxed">
-              This tab is reserved for your Google Form. You can link any Google Form for custom customer bangle orders, bridal customization requests, or feedback surveys.
+              {STRINGS.forms.emptyDesc}
             </p>
           </div>
 
@@ -146,7 +149,7 @@ export default function FormsPage() {
               <Link2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
               <input
                 type="url"
-                placeholder="https://docs.google.com/forms/d/e/.../viewform"
+                placeholder={STRINGS.forms.urlPlaceholder}
                 value={formUrl}
                 onChange={(e) => setFormUrl(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#E8436E] focus:ring-1 focus:ring-[#E8436E]"
@@ -155,17 +158,17 @@ export default function FormsPage() {
             <div className="flex items-center justify-center gap-2">
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#E8436E] to-[#CC3366] text-white text-xs font-semibold shadow-md shadow-[#E8436E]/20 hover:brightness-105 transition-all"
+                className="px-5 py-2.5 min-h-[44px] rounded-xl bg-gradient-to-r from-[#E8436E] to-[#CC3366] text-white text-xs font-semibold shadow-md shadow-[#E8436E]/20 hover:brightness-105 transition-all"
               >
-                {savedUrl ? "Update Form Link" : "Connect Google Form"}
+                {savedUrl ? STRINGS.forms.updateButton : STRINGS.forms.connectButton}
               </button>
               {isEditing && (
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2.5 min-h-[44px] rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                 >
-                  Cancel
+                  {STRINGS.forms.cancelButton}
                 </button>
               )}
             </div>
@@ -173,7 +176,7 @@ export default function FormsPage() {
 
           <div className="pt-4 border-t border-slate-100 max-w-sm mx-auto flex items-center justify-center gap-2 text-[11px] text-slate-400">
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Currently kept clean and lightweight as requested</span>
+            <span>{STRINGS.forms.cleanLightweightBadge}</span>
           </div>
         </div>
       )}

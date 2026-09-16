@@ -3,8 +3,8 @@
 import { motion } from "framer-motion";
 import { User, Store, ChevronRight, Shield, Settings } from "lucide-react";
 import Link from "next/link";
-
 import { useAuth } from "@/features/auth/lib/auth-context";
+import { STRINGS } from "@/src/constants/strings";
 
 interface SettingItem {
   icon: React.ComponentType<{ className?: string }>;
@@ -15,26 +15,44 @@ interface SettingItem {
   badge?: string;
 }
 
-const baseSettingsItems: SettingItem[] = [
-  { icon: User, label: "My Profile", desc: "Manage profile picture, name & contact info", color: "bg-purple-50 text-purple-600", href: "/dashboard/settings/profile" },
-  { icon: Store, label: "Store Profile", desc: "Edit name, description, location & hours", color: "bg-indigo-50 text-indigo-600", href: "/dashboard/settings/store-profile" },
-  { icon: Shield, label: "Account Security & 2FA", desc: "Review 2-step verification, password & active sessions", color: "bg-emerald-50 text-emerald-600", href: "/dashboard/settings/security" },
-];
-
 export default function SettingsPage() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
+
+  const baseSettingsItems: SettingItem[] = [
+    {
+      icon: User,
+      label: STRINGS.settings.myProfile,
+      desc: STRINGS.settings.myProfileDesc,
+      color: "bg-purple-50 text-purple-600",
+      href: "/dashboard/settings/profile",
+    },
+    {
+      icon: Store,
+      label: STRINGS.settings.storeProfile,
+      desc: STRINGS.settings.storeProfileDesc,
+      color: "bg-indigo-50 text-indigo-600",
+      href: "/dashboard/settings/store-profile",
+    },
+    {
+      icon: Shield,
+      label: STRINGS.settings.security,
+      desc: STRINGS.settings.securityDesc,
+      color: "bg-emerald-50 text-emerald-600",
+      href: "/dashboard/settings/security",
+    },
+  ];
 
   const items: SettingItem[] = isSuperAdmin
     ? [
         ...baseSettingsItems,
         {
           icon: Settings,
-          label: "70/30 Platform Commission Split",
-          desc: "Configure profit allocation ratio between Admins and SuperAdmin",
+          label: STRINGS.settings.commissionSplit,
+          desc: STRINGS.settings.commissionSplitDesc,
           color: "bg-rose-50 text-[#E8436E]",
           href: "/dashboard/settings/commission",
-          badge: "SuperAdmin Only",
+          badge: STRINGS.settings.superAdminOnlyBadge,
         },
       ]
     : baseSettingsItems;
@@ -42,9 +60,9 @@ export default function SettingsPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#171717]">Settings & Preferences</h1>
+        <h1 className="text-2xl font-bold text-[#171717]">{STRINGS.settings.title}</h1>
         <p className="text-[#737373] mt-1 text-sm">
-          Manage your account, platform commission rules, and store configuration
+          {STRINGS.settings.subtitle}
         </p>
       </div>
 

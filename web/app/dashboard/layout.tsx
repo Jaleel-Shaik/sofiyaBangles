@@ -33,6 +33,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/src/lib/api";
 import { QuickSellModal } from "@/features/products/components/QuickSellModal";
+import { STRINGS } from "@/src/constants/strings";
 
 export default function DashboardLayout({
   children,
@@ -102,7 +103,7 @@ export default function DashboardLayout({
           router.push("/");
         });
       } else if (user && !isSuperAdmin && superAdminOnlyPaths.some((p) => pathname.startsWith(p))) {
-        toast.error("Access restricted to Super Administrators");
+        toast.error(STRINGS.superAdminAuth.accessRestrictedToast);
         router.replace("/dashboard");
       }
     }
@@ -114,7 +115,7 @@ export default function DashboardLayout({
       await logout();
       router.push("/");
     } catch {
-      toast.error("Logout failed");
+      toast.error(STRINGS.common.logoutFailed);
     } finally {
       setLoggingOut(false);
     }
@@ -125,7 +126,7 @@ export default function DashboardLayout({
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-[#E8436E] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#737373]">Loading dashboard...</p>
+          <p className="text-[#737373]">{STRINGS.adminDashboard.loadingDashboard}</p>
         </div>
       </div>
     );
@@ -188,7 +189,8 @@ export default function DashboardLayout({
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden text-[#525252] hover:text-[#171717] transition-colors p-2 rounded-xl hover:bg-slate-100"
+                aria-label={STRINGS.common.actions}
+                className="md:hidden text-[#525252] hover:text-[#171717] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-slate-100"
               >
                 <Menu className="w-6 h-6" />
               </button>
@@ -199,21 +201,22 @@ export default function DashboardLayout({
               <button
                 onClick={() => setQuickSellOpen(true)}
                 title="Quick Sell by Product Special ID (Alt + S)"
-                className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Zap className="w-4 h-4 fill-white" />
-                <span className="hidden sm:inline">Quick Sell</span>
+                <span className="hidden sm:inline">{STRINGS.common.quickSell}</span>
               </button>
 
               {/* Notification bell */}
               <div className="relative">
                 <button
                   onClick={() => setNotifsOpen(!notifsOpen)}
-                  className="p-2.5 rounded-xl bg-[#F5F5F5] hover:bg-[#E5E5E5] transition-colors relative"
+                  aria-label={STRINGS.notifications.title}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-[#F5F5F5] hover:bg-[#E5E5E5] transition-colors relative"
                 >
                   <Bell className="w-5 h-5 text-[#525252]" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#E8436E] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#E8436E] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
@@ -230,11 +233,11 @@ export default function DashboardLayout({
                     >
                       <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                          <Bell className="w-4 h-4 text-[#E8436E]" /> Notifications
+                          <Bell className="w-4 h-4 text-[#E8436E]" /> {STRINGS.notifications.title}
                         </h3>
                         {unreadCount > 0 && (
                           <span className="text-[10px] bg-rose-50 text-[#E8436E] font-bold px-2 py-0.5 rounded-full">
-                            {unreadCount} new
+                            {STRINGS.notifications.newBadge(unreadCount)}
                           </span>
                         )}
                       </div>
@@ -242,7 +245,7 @@ export default function DashboardLayout({
                       <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
                         {notifications.length === 0 ? (
                           <div className="p-6 text-center text-xs text-slate-400">
-                            No notifications right now
+                            {STRINGS.notifications.empty}
                           </div>
                         ) : (
                           notifications.slice(0, 10).map((n) => (
@@ -259,8 +262,8 @@ export default function DashboardLayout({
                                 {!n.is_read && (
                                   <button
                                     onClick={() => handleMarkRead(n.id)}
-                                    title="Mark as read"
-                                    className="text-[#E8436E] hover:text-rose-700 p-0.5"
+                                    title={STRINGS.notifications.markAsRead}
+                                    className="text-[#E8436E] hover:text-rose-700 p-1 min-h-[32px] min-w-[32px] flex items-center justify-center rounded-lg hover:bg-rose-50"
                                   >
                                     <CheckCheck className="w-3.5 h-3.5" />
                                   </button>
@@ -280,7 +283,8 @@ export default function DashboardLayout({
               <div className="relative">
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center gap-3 p-1.5 rounded-xl hover:bg-[#F5F5F5] transition-colors"
+                  aria-label={STRINGS.navigation.profile}
+                  className="flex items-center gap-3 p-1.5 min-h-[44px] rounded-xl hover:bg-[#F5F5F5] transition-colors"
                 >
                   <div className="w-8 h-8 bg-gradient-to-br from-[#E8436E] to-[#CC3366] rounded-full flex items-center justify-center text-white text-sm font-semibold overflow-hidden shadow-sm">
                     {user?.avatar_url ? (
@@ -324,7 +328,7 @@ export default function DashboardLayout({
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#525252] hover:bg-[#F5F5F5] transition-colors"
                       >
                         <User className="w-4 h-4" />
-                        Profile
+                        {STRINGS.navigation.profile}
                       </Link>
                       <Link
                         href="/dashboard/settings/security"
@@ -332,7 +336,7 @@ export default function DashboardLayout({
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#525252] hover:bg-[#F5F5F5] transition-colors"
                       >
                         <Shield className="w-4 h-4" />
-                        Security
+                        {STRINGS.navigation.security}
                       </Link>
                       <Link
                         href="/dashboard/settings"
@@ -340,7 +344,7 @@ export default function DashboardLayout({
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#525252] hover:bg-[#F5F5F5] transition-colors"
                       >
                         <Settings className="w-4 h-4" />
-                        Settings
+                        {STRINGS.navigation.settings}
                       </Link>
                       <div className="border-t border-[#E5E5E5] mt-1 pt-1">
                         <button
@@ -349,7 +353,7 @@ export default function DashboardLayout({
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
                         >
                           <LogOut className="w-4 h-4" />
-                          {loggingOut ? "Logging out..." : "Sign out"}
+                          {loggingOut ? STRINGS.common.signingOut : STRINGS.common.signOut}
                         </button>
                       </div>
                     </motion.div>
@@ -390,26 +394,26 @@ function SidebarContent({
 
   // Regular Store Admin Navigation (6 core store management links only)
   const adminNavLinks = [
-    { label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-    { label: "Products Catalog", icon: Package, href: "/dashboard/products" },
-    { label: "Orders & WhatsApp", icon: ShoppingBag, href: "/dashboard/orders" },
-    { label: "Categories & Sizing", icon: Layers, href: "/dashboard/categories" },
-    { label: "Model Types", icon: Layers, href: "/dashboard/model-types" },
-    { label: "Store Settings", icon: Settings, href: "/dashboard/settings" },
+    { label: STRINGS.navigation.overview, icon: LayoutDashboard, href: "/dashboard" },
+    { label: STRINGS.navigation.productsCatalog, icon: Package, href: "/dashboard/products" },
+    { label: STRINGS.navigation.ordersWhatsApp, icon: ShoppingBag, href: "/dashboard/orders" },
+    { label: STRINGS.navigation.collectionsCategories, icon: Layers, href: "/dashboard/categories" },
+    { label: STRINGS.navigation.modelTypes, icon: Layers, href: "/dashboard/model-types" },
+    { label: STRINGS.navigation.storeSettings, icon: Settings, href: "/dashboard/settings" },
   ];
 
   // Super-Admin Navigation (Store operations + full governance suite)
   const superAdminNavLinks = [
-    { label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-    { label: "Products Catalog", icon: Package, href: "/dashboard/products" },
-    { label: "Orders & WhatsApp", icon: ShoppingBag, href: "/dashboard/orders" },
-    { label: "Categories & Sizing", icon: Layers, href: "/dashboard/categories" },
-    { label: "Model Types", icon: Layers, href: "/dashboard/model-types" },
-    { label: "Product Operations Log", icon: ClipboardList, href: "/dashboard/activity" },
-    { label: "70/30 Revenue Ledger", icon: TrendingUp, href: "/dashboard/revenue" },
-    { label: "Staff Admins", icon: UserCheck, href: "/dashboard/admins" },
-    { label: "Google Forms", icon: FileText, href: "/dashboard/forms" },
-    { label: "Store Settings", icon: Settings, href: "/dashboard/settings" },
+    { label: STRINGS.navigation.overview, icon: LayoutDashboard, href: "/dashboard" },
+    { label: STRINGS.navigation.productsCatalog, icon: Package, href: "/dashboard/products" },
+    { label: STRINGS.navigation.ordersWhatsApp, icon: ShoppingBag, href: "/dashboard/orders" },
+    { label: STRINGS.navigation.collectionsCategories, icon: Layers, href: "/dashboard/categories" },
+    { label: STRINGS.navigation.modelTypes, icon: Layers, href: "/dashboard/model-types" },
+    { label: STRINGS.navigation.operationsLog, icon: ClipboardList, href: "/dashboard/activity" },
+    { label: STRINGS.navigation.revenueLedger, icon: TrendingUp, href: "/dashboard/revenue" },
+    { label: STRINGS.navigation.staffAdmins, icon: UserCheck, href: "/dashboard/admins" },
+    { label: STRINGS.navigation.googleForms, icon: FileText, href: "/dashboard/forms" },
+    { label: STRINGS.navigation.storeSettings, icon: Settings, href: "/dashboard/settings" },
   ];
 
   const navLinks = isSuperAdmin ? superAdminNavLinks : adminNavLinks;
@@ -424,16 +428,17 @@ function SidebarContent({
           </div>
           <div>
             <h2 className="text-base font-bold text-[#171717] leading-tight tracking-tight">
-              Sofiya Bangles
+              {STRINGS.navigation.brandTitle}
             </h2>
             <p className="text-[10px] font-semibold text-slate-400 tracking-wider">
-              Store Management
+              {STRINGS.navigation.brandSubtitle}
             </p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="md:hidden text-[#A3A3A3] hover:text-[#525252] transition-colors p-1"
+          aria-label={STRINGS.common.close}
+          className="md:hidden text-[#A3A3A3] hover:text-[#525252] transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl hover:bg-slate-100"
         >
           <X className="w-5 h-5" />
         </button>
@@ -451,7 +456,7 @@ function SidebarContent({
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`group relative flex items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold transition-all ${
                 active
                   ? "bg-rose-50 text-[#E8436E] font-bold shadow-sm shadow-rose-100/50"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium"
@@ -476,10 +481,10 @@ function SidebarContent({
         <Link
           href="/dashboard/products/new"
           onClick={onClose}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-[#E8436E] to-[#CC3366] text-white shadow-md shadow-[#E8436E]/20 hover:brightness-105 transition-all"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-gradient-to-r from-[#E8436E] to-[#CC3366] text-white shadow-md shadow-[#E8436E]/20 hover:brightness-105 transition-all"
         >
           <PlusCircle className="w-4 h-4" />
-          Add New Bangles
+          {STRINGS.navigation.addNewBangles}
         </Link>
 
         <div className="flex items-center gap-3 px-1 pt-1">
@@ -501,8 +506,9 @@ function SidebarContent({
           <button
             onClick={onLogout}
             disabled={loggingOut}
-            title="Sign out"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+            title={STRINGS.common.signOut}
+            aria-label={STRINGS.common.signOut}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
           >
             <LogOut className="w-4 h-4" />
           </button>
