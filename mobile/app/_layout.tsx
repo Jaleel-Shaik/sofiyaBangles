@@ -55,7 +55,9 @@ export default function RootLayout() {
     // super_admin is not allowed on mobile — force logout immediately
     if (user.role === "super_admin") {
       useAuthStore.getState().forceLogout();
-      router.replace("/login");
+      if (segments?.[0] !== "login") {
+        router.replace("/login");
+      }
       return;
     }
 
@@ -87,6 +89,7 @@ export default function RootLayout() {
         <Stack.Screen name="new-arrivals/index" />
         <Stack.Screen name="products/[id]" />
         <Stack.Screen name="category/[id]" />
+        <Stack.Screen name="search" />
         <Stack.Screen name="orders" />
         <Stack.Screen name="server-settings" />
         <Stack.Screen name="error-center" />

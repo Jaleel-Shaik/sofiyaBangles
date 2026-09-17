@@ -7,7 +7,6 @@ import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getAdminProducts, deleteProduct } from '@/src/api/admin';
-import QuickSellModal from '@/features/admin/products/components/QuickSellModal';
 
 export default function ProductsListScreen() {
   const router = useRouter();
@@ -18,7 +17,6 @@ export default function ProductsListScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [showQuickSell, setShowQuickSell] = useState(false);
 
   const fetchData = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -105,14 +103,14 @@ export default function ProductsListScreen() {
           <View className="flex-row items-center gap-2">
             <TouchableOpacity
               className="bg-slate-900 px-3.5 py-2.5 rounded-full shadow-sm flex-row items-center"
-              onPress={() => setShowQuickSell(true)}
+              onPress={() => router.push('/(admin)/quick-sell')}
             >
               <Ionicons name="flash" size={16} color="#fbbf24" />
               <Text className="text-white font-bold text-xs ml-1">Sell</Text>
             </TouchableOpacity>
             <TouchableOpacity
               className="bg-primary px-4 py-2.5 rounded-full shadow-sm shadow-primary/30 flex-row items-center"
-              onPress={() => router.push('/(admin)/(tabs)/add' as any)}
+              onPress={() => router.push('/(admin)/(tabs)/add')}
             >
               <Ionicons name="add" size={18} color="white" />
               <Text className="text-white font-bold text-xs ml-1">Add</Text>
@@ -213,7 +211,7 @@ export default function ProductsListScreen() {
               <TouchableOpacity
                 className="flex-1 bg-surface rounded-2xl mb-3 border border-divider overflow-hidden shadow-sm"
                 activeOpacity={0.95}
-                onPress={() => router.push({ pathname: '/(admin)/(tabs)/product-detail/[id]', params: { id: item.id } } as any)}
+                onPress={() => router.push({ pathname: '/(admin)/(tabs)/product-detail/[id]', params: { id: item.id } })}
               >
                 <View className="aspect-[4/3] bg-[#FAFAFA] overflow-hidden relative">
                   <Image
@@ -242,8 +240,20 @@ export default function ProductsListScreen() {
                   </View>
                   <View className="flex-row items-center gap-2 mt-2.5 pt-2.5 border-t border-divider">
                     <TouchableOpacity
-                      onPress={() => router.push({ pathname: '/(admin)/(tabs)/edit-product/[id]', params: { id: item.id } } as any)}
+                      onPress={() => router.push({
+                        pathname: '/(admin)/quick-sell',
+                        params: { code: item.unique_code || item.id, id: item.id },
+                      })}
+                      className="flex-row items-center justify-center py-2 px-3 bg-slate-900 rounded-xl"
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="flash" size={13} color="#fbbf24" />
+                      <Text className="text-white font-bold text-xs ml-1">Sell</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: '/(admin)/(tabs)/edit-product/[id]', params: { id: item.id } })}
                       className="flex-1 flex-row items-center justify-center py-2 bg-primary/10 rounded-xl"
+                      activeOpacity={0.8}
                     >
                       <Ionicons name="pencil" size={14} color="#e11d48" />
                       <Text className="text-primary font-bold text-xs ml-1">Edit</Text>
@@ -251,6 +261,7 @@ export default function ProductsListScreen() {
                     <TouchableOpacity
                       onPress={() => handleDelete(item)}
                       className="flex-row items-center justify-center py-2 px-3 bg-error/10 rounded-xl"
+                      activeOpacity={0.8}
                     >
                       <Ionicons name="trash-outline" size={14} color="#ef4444" />
                     </TouchableOpacity>
@@ -261,13 +272,6 @@ export default function ProductsListScreen() {
           }}
         />
       )}
-
-      {/* Quick Sell Modal */}
-      <QuickSellModal
-        visible={showQuickSell}
-        onClose={() => setShowQuickSell(false)}
-        onSaleSuccess={() => fetchData()}
-      />
     </View>
   );
 }

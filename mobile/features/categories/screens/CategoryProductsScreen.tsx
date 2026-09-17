@@ -2,7 +2,7 @@ import type { Product } from '@/src/api/products';
 import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSizeStore } from '@/src/store/sizeStore';
 import { useAuthStore } from '@/src/store/authStore';
 
@@ -23,6 +23,7 @@ export default function CategoryScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchQueryRef = useRef('');
   const [selectedSizeFilter, setSelectedSizeFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -64,19 +65,27 @@ export default function CategoryScreen() {
         return;
       }
 
-      // Immediate fetch if no search query
-      if (!searchQuery.trim()) {
+      if (!searchQueryRef.current.trim()) {
         fetchInitialProducts();
-        return;
       }
-
-      // Debounce active search query typing
-      const delayDebounceFn = setTimeout(() => {
-        fetchInitialProducts();
-      }, 400);
-      return () => clearTimeout(delayDebounceFn);
-    }, [categoryId, searchQuery, token, user?.role])
+    }, [categoryId, token, user?.role])
   );
+
+  // Dedicated search debouncing effect - runs independently of navigation listeners
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+    if (!categoryId) return;
+    if (!searchQuery.trim()) {
+      fetchInitialProducts();
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(() => {
+      fetchInitialProducts();
+    }, 350);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [categoryId, searchQuery]);
 
   const loadMore = async () => {
     if (!hasMore || isFetchingMore || !categoryId) return;

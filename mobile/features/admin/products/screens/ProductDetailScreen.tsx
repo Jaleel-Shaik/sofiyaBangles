@@ -95,8 +95,17 @@ export default function ProductDetailScreen() {
           </TouchableOpacity>
           <View className="flex-row gap-2">
             <TouchableOpacity
+              className="w-10 h-10 bg-slate-900 rounded-full items-center justify-center shadow-xs"
+              onPress={() => router.push({
+                pathname: '/(admin)/quick-sell',
+                params: { code: product.unique_code || product.id, id: product.id },
+              })}
+            >
+              <Ionicons name="flash" size={18} color="#fbbf24" />
+            </TouchableOpacity>
+            <TouchableOpacity
               className="w-10 h-10 bg-surface rounded-full items-center justify-center border border-divider"
-              onPress={() => router.push({ pathname: '/(admin)/(tabs)/edit-product/[id]', params: { id: product.id } } as any)}
+              onPress={() => router.push({ pathname: '/(admin)/(tabs)/edit-product/[id]', params: { id: product.id } })}
             >
               <Ionicons name="pencil" size={20} color="#e11d48" />
             </TouchableOpacity>
@@ -234,6 +243,18 @@ export default function ProductDetailScreen() {
               <Text className="text-text-hint text-xs text-center mt-2">
                 Decrements stock by {sellQty} (remaining: {product.quantity - sellQty})
               </Text>
+              <TouchableOpacity
+                className="mt-3 py-3 rounded-2xl items-center flex-row justify-center border border-divider bg-[#FAFAFA]"
+                onPress={() => router.push({
+                  pathname: '/(admin)/quick-sell',
+                  params: { code: product.unique_code || product.id, id: product.id },
+                })}
+              >
+                <Ionicons name="flash" size={16} color="#fbbf24" />
+                <Text className="text-text-primary font-bold text-xs ml-1.5">
+                  Open in Quick Sell Counter
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>

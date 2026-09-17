@@ -24,21 +24,48 @@ async function reset2FA() {
     }
 
     const email = emailInput;
-    const snap = await db.collection('admins').where('email', '==', email).limit(1).get();
-    if (snap.empty) {
-      console.log(`No admin found with email: ${email}`);
+    let targetDoc = null;
+    let targetCollection = 'admins';
+
+    let snap = await db.collection('admins').where('email', '==', email).limit(1).get();
+    if (!snap.empty) {
+      targetDoc = snap.docs[0];
+    } else {
+      snap = await db.collection('users').where('email', '==', email).limit(1).get();
+      if (!snap.empty) {
+        targetDoc = snap.docs[0];
+        targetCollection = 'users';
+      }
+    }
+
+    if (!targetDoc) {
+      console.log(`No account found with email: ${email}`);
       return;
     }
-    const adminDoc = snap.docs[0];
     
-    console.log(`Resetting 2FA for Admin: ${email}`);
+    console.log(`Resetting 2FA for account: ${email} in collection: ${targetCollection}`);
     
-    await db.collection('admins').doc(adminDoc.id).update({
+    await db.collection(targetCollection).doc(targetDoc.id).update({
       is_2fa_enabled: false,
-      two_fa_secret: null
+      twoFactorEnabled: false,
+      two_fa_secret: null,
+      twoFactorSecretEncrypted: null,
+      pendingTwoFactorSecretEncrypted: null,
+      backupCodesHash: [],
+      accountLockedUntil: null,
+      failedOtpAttempts: 0,
+      failed_attempts: 0,
+      two_fa_updated_at: null,
+      twoFactorEnabledAt: null,
     });
+
+    // Also clear any active login challenges for this user
+    const chalSnap = await db.collection('login_challenges').where('email', '==', email).get();
+    for (const cDoc of chalSnap.docs) {
+      await cDoc.ref.delete();
+    }
     
-    console.log(`Successfully disabled 2FA for ${email}. Next login will prompt for a new 2FA setup QR code.`);
+    console.log(`Successfully reset 2FA for ${email}. Next login will prompt for a fresh 2FA setup QR code.`);
   } catch (error) {
     console.error('Error resetting 2FA:', error);
   }

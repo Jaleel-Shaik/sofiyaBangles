@@ -23,7 +23,9 @@ export default function TabLayout() {
     }
   }, [favInit, notifInit, fetchFavorites, fetchNotifications]);
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
+  }
 
   if (!token) return <Redirect href="/login" />;
 

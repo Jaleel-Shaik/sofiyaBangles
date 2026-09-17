@@ -8,6 +8,7 @@ import {
   Vibration,
   Platform,
   Keyboard,
+  StyleSheet,
 } from "react-native";
 
 export interface OTPDigitInputProps {
@@ -21,9 +22,9 @@ export interface OTPDigitInputProps {
 
 /**
  * OTP Digit Input Component
- * Uses a hidden TextInput with a pressable overlay.
- * Tapping anywhere on the container focuses the hidden input.
- * The digit boxes are purely visual; all input goes through the TextInput.
+ * Uses an invisible overlaid TextInput that captures all keyboard interactions,
+ * while accurately rendering 6 luxury digit boxes with a perfectly positioned
+ * blinking cursor in the active slot.
  */
 export const OTPDigitInput: React.FC<OTPDigitInputProps> = ({
   initialDigits = ["", "", "", "", "", ""],
@@ -38,6 +39,7 @@ export const OTPDigitInput: React.FC<OTPDigitInputProps> = ({
   ]);
   const inputRef = useRef<TextInput>(null);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const cursorOpacity = useRef(new Animated.Value(1)).current;
   const isCompleteRef = useRef(false);
   const previousErrorRef = useRef(error);
   const [isFocused, setIsFocused] = useState(false);
@@ -49,6 +51,7 @@ export const OTPDigitInput: React.FC<OTPDigitInputProps> = ({
     isCompleteRef.current = false;
   }, [initialDigits]);
 
+  // Shake animation on error
   useEffect(() => {
     if (error && error !== previousErrorRef.current) {
       previousErrorRef.current = error;
@@ -84,9 +87,34 @@ export const OTPDigitInput: React.FC<OTPDigitInputProps> = ({
     previousErrorRef.current = error;
   }, [error, shakeAnim]);
 
+  // Blinking cursor in active slot
+  useEffect(() => {
+    if (isFocused && !disabled) {
+      const blink = Animated.loop(
+        Animated.sequence([
+          Animated.timing(cursorOpacity, {
+            toValue: 0,
+            duration: 450,
+            useNativeDriver: true,
+          }),
+          Animated.timing(cursorOpacity, {
+            toValue: 1,
+            duration: 450,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      blink.start();
+      return () => blink.stop();
+    } else {
+      cursorOpacity.setValue(0);
+    }
+  }, [isFocused, disabled, cursorOpacity]);
+
+  // Auto focus input on mount
   useEffect(() => {
     if (!disabled) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 100);
+      const timer = setTimeout(() => inputRef.current?.focus(), 150);
       return () => clearTimeout(timer);
     }
   }, [disabled]);
@@ -109,12 +137,13 @@ export const OTPDigitInput: React.FC<OTPDigitInputProps> = ({
       .slice(0, 6);
     setLocalDigits(newDigits);
     notifyParent(newDigits);
+
     if (cleaned.length === 6) {
       Keyboard.dismiss();
       if (Platform.OS !== "web") {
         import("expo-haptics")
           .then((mod) =>
-            mod.notificationAsync(mod.NotificationFeedbackType.Success),
+            mod.notificationAsync(mod.NotificationFeedbackType.Success)
           )
           .catch(() => {});
       }
@@ -140,83 +169,182 @@ export const OTPDigitInput: React.FC<OTPDigitInputProps> = ({
     }
   };
 
+  const currentRawValue = localDigits.join("");
   const digitCount = localDigits.filter((d) => d !== "").length;
 
   return (
-    <View>
+    <View style={styles.container}>
+      {/* Invisible TextInput that captures all touches and native keyboard events */}
       <TextInput
         ref={inputRef}
-        value={localDigits.join("")}
+        value={currentRawValue}
         onChangeText={handleTextChange}
         keyboardType="number-pad"
         maxLength={6}
         editable={!disabled}
         autoComplete="one-time-code"
         textContentType="oneTimeCode"
-        placeholder="Enter 6-digit code"
-        placeholderTextColor="#94a3b8"
         autoFocus={!disabled}
+        caretHidden={true}
         returnKeyType="done"
         onSubmitEditing={() => onCompleteRef.current?.()}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        className="mb-4 rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3 text-center text-lg font-semibold text-slate-800"
-        style={{ fontSize: 18 }}
+        style={styles.hiddenInput}
       />
 
+      {/* Visual 6 OTP Boxes with Perfectly Placed Animated Blinking Cursor */}
       <TouchableOpacity
         activeOpacity={1}
         onPress={focusInput}
-        className="relative"
+        style={styles.touchOverlay}
+        accessibilityRole="none"
       >
         <Animated.View
-          style={{ transform: [{ translateX: shakeAnim }] }}
+          style={[styles.boxesRow, { transform: [{ translateX: shakeAnim }] }]}
           pointerEvents="none"
-          className="flex-row justify-center gap-2.5 mb-3"
         >
           {localDigits.map((digit, index) => {
             const isActiveSlot = index === digitCount && digitCount < 6;
+            const hasDigit = Boolean(digit);
+
+            let boxStyle = styles.boxDefault;
+            let textStyle = styles.digitText;
+
+            if (error) {
+              boxStyle = styles.boxError;
+              textStyle = styles.digitTextError;
+            } else if (isActiveSlot && isFocused) {
+              boxStyle = styles.boxActive;
+            } else if (hasDigit) {
+              boxStyle = styles.boxFilled;
+            }
+
             return (
-              <View
-                key={index}
-                className={`w-12 h-14 rounded-xl border-2 items-center justify-center ${
-                  error
-                    ? "border-red-400 bg-red-50"
-                    : isActiveSlot && isFocused
-                      ? "border-[#FF1F4B] bg-rose-50 shadow-md"
-                      : digit
-                        ? "border-[#FF1F4B] bg-rose-50"
-                        : isFocused && digitCount === 0 && index === 0
-                          ? "border-[#FF1F4B] bg-rose-50/30"
-                          : "border-rose-200 bg-white"
-                } shadow-sm`}
-              >
-                {digit ? (
-                  <Text
-                    className={`text-xl font-bold ${
-                      error ? "text-red-600" : "text-slate-800"
-                    }`}
-                  >
-                    {digit}
-                  </Text>
+              <View key={index} style={[styles.boxBase, boxStyle]}>
+                {hasDigit ? (
+                  <Text style={textStyle}>{digit}</Text>
                 ) : isActiveSlot && isFocused ? (
-                  <View className="w-0.5 h-6 bg-[#FF1F4B] rounded-full" />
+                  <Animated.View
+                    style={[styles.cursorLine, { opacity: cursorOpacity }]}
+                  />
                 ) : (
-                  <Text className="text-lg text-slate-300">•</Text>
+                  <Text style={styles.placeholderDot}>•</Text>
                 )}
               </View>
             );
           })}
         </Animated.View>
-        {localDigits.some((d) => d !== "") && !disabled && (
+
+        {digitCount > 0 && !disabled && (
           <TouchableOpacity
             onPress={handleClear}
-            className="self-center py-1 active:opacity-60"
+            hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+            style={styles.clearButton}
           >
-            <Text className="text-rose-400 text-xs font-medium">Clear</Text>
+            <Text style={styles.clearText}>Clear</Text>
           </TouchableOpacity>
         )}
       </TouchableOpacity>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    position: "relative",
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hiddenInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0,
+    fontSize: 1,
+    color: "transparent",
+  },
+  touchOverlay: {
+    width: "100%",
+    alignItems: "center",
+  },
+  boxesRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 6,
+  },
+  boxBase: {
+    width: 48,
+    height: 56,
+    borderRadius: 14,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  boxDefault: {
+    borderColor: "#fecdd3", // rose-200
+    backgroundColor: "#ffffff",
+  },
+  boxActive: {
+    borderColor: "#e11d48", // rose-600
+    backgroundColor: "#fff1f2", // rose-50
+    shadowColor: "#e11d48",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  boxFilled: {
+    borderColor: "#e11d48",
+    backgroundColor: "#ffffff",
+  },
+  boxError: {
+    borderColor: "#ef4444", // red-500
+    backgroundColor: "#fef2f2", // red-50
+  },
+  digitText: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#0f172a", // slate-900
+    includeFontPadding: false,
+    textAlign: "center",
+  },
+  digitTextError: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#dc2626", // red-600
+    includeFontPadding: false,
+    textAlign: "center",
+  },
+  cursorLine: {
+    width: 2.5,
+    height: 24,
+    borderRadius: 1.5,
+    backgroundColor: "#e11d48",
+  },
+  placeholderDot: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#cbd5e1", // slate-300
+    includeFontPadding: false,
+    textAlign: "center",
+  },
+  clearButton: {
+    alignSelf: "center",
+    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  clearText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#e11d48",
+  },
+});

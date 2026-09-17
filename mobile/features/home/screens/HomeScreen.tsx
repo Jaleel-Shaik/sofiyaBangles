@@ -21,7 +21,6 @@ import { useSizeStore } from "@/src/store/sizeStore";
 import { getCategories, Category } from "@/src/api/categories";
 import { getUserOrders } from "@/src/api/orders";
 import ProductCard from "@/src/components/ProductCard";
-import SearchInput from "@/src/components/SearchInput";
 import CategoryItem from "@/src/components/CategoryItem";
 import { AppIcon } from "@/src/constants/icons";
 import { STRINGS } from "@/src/constants/strings";
@@ -38,7 +37,6 @@ export default function HomeScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedSizeFilter, setSelectedSizeFilter] = useState<string>("all");
   const [purchasedProductIds, setPurchasedProductIds] = useState<string[]>([]);
 
@@ -46,13 +44,12 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
 
-  const fetchInitialData = async (query = searchQuery) => {
+  const fetchInitialData = async () => {
     try {
       setLoading(true);
       setPage(1);
-      const cleanQuery = (query || "").trim();
       const [productsResult, categoriesResult] = await Promise.allSettled([
-        api.products.getRecommendedProducts(1, 50, cleanQuery),
+        api.products.getRecommendedProducts(1, 50),
         getCategories(),
       ]);
 
@@ -89,7 +86,7 @@ export default function HomeScreen() {
     setIsFetchingMore(true);
     const nextPage = page + 1;
     try {
-      const response = await api.products.getRecommendedProducts(nextPage, 10, searchQuery.trim());
+      const response = await api.products.getRecommendedProducts(nextPage, 10);
       const incoming = Array.isArray(response?.products) ? response.products : [];
       if (incoming.length > 0) {
         setProducts((prev) => [...(Array.isArray(prev) ? prev : []), ...incoming]);
@@ -130,23 +127,14 @@ export default function HomeScreen() {
         loadPurchasedProducts();
       }
 
-      if (!searchQuery.trim()) {
-        fetchInitialData("");
-        return;
-      }
-
-      const delayDebounceFn = setTimeout(() => {
-        fetchInitialData(searchQuery);
-      }, 400);
-
-      return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery, token, user?.role])
+      fetchInitialData();
+    }, [token, user?.role])
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchInitialData(searchQuery);
-  }, [searchQuery]);
+    fetchInitialData();
+  }, []);
 
   const getDisplayName = () => {
     if (!user) return STRINGS.home.roles.user;
@@ -501,9 +489,7 @@ export default function HomeScreen() {
 
       <View className="px-5 mt-5 mb-3">
         <Text className="text-title-lg font-bold text-text-primary">
-          {searchQuery.trim()
-            ? STRINGS.home.searchResults(searchQuery.trim())
-            : STRINGS.home.sections.recommended}
+          {STRINGS.home.sections.recommended}
         </Text>
       </View>
     </>
@@ -560,6 +546,18 @@ export default function HomeScreen() {
 
           {/* Right Column: Action Buttons */}
           <View className="flex-row items-center">
+            {/* Dedicated Search Option Button */}
+            <TouchableOpacity
+              onPress={() => router.push("/search" as any)}
+              className="w-11 h-11 rounded-full bg-white shadow-sm border border-rose-100 items-center justify-center mr-2.5 relative"
+              activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel={STRINGS.common.search}
+            >
+              <AppIcon name="search" size={20} color="#e11d48" />
+            </TouchableOpacity>
+
             {/* Orders Bag Button */}
             <TouchableOpacity
               onPress={() => router.push("/orders" as any)}
@@ -601,19 +599,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Centralized Search Bar on HomeScreen */}
-        <View className="mt-3.5">
-          <SearchInput
-            placeholder={STRINGS.home.searchPlaceholder}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onClear={() => setSearchQuery("")}
-            onSubmitEditing={() => fetchInitialData(searchQuery)}
-            onSearchPress={() => fetchInitialData(searchQuery)}
-            returnKeyType="search"
-          />
-        </View>
       </LinearGradient>
 
       <FlatList
@@ -653,29 +638,6 @@ export default function HomeScreen() {
                 {STRINGS.home.states.loadingRecommendations}
               </Text>
             </View>
-          ) : searchQuery.trim() ? (
-            <View className="py-16 items-center justify-center px-6">
-              <View className="w-16 h-16 rounded-full bg-rose-50 items-center justify-center mb-3 border border-rose-100">
-                <AppIcon name="searchOutline" size={28} color="#e11d48" />
-              </View>
-              <Text className="text-title-md font-bold text-text-primary mb-1">
-                {STRINGS.home.states.noSearchTitle}
-              </Text>
-              <Text className="text-caption text-text-secondary text-center mb-5 px-6 leading-5">
-                {STRINGS.home.states.noSearchDescription(searchQuery.trim())}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                className="bg-primary px-6 py-3 rounded-full min-h-[44px] items-center justify-center shadow-sm"
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel={STRINGS.common.clearSearch}
-              >
-                <Text className="text-white text-label-md font-bold">
-                  {STRINGS.common.clearSearch}
-                </Text>
-              </TouchableOpacity>
-            </View>
           ) : (
             <View className="py-16 items-center justify-center px-6">
               <View className="w-16 h-16 rounded-full bg-rose-50 items-center justify-center mb-3 border border-rose-100">
@@ -688,7 +650,7 @@ export default function HomeScreen() {
                 {STRINGS.home.states.noProductsDescription}
               </Text>
               <TouchableOpacity
-                onPress={() => fetchInitialData("")}
+                onPress={fetchInitialData}
                 className="bg-primary px-5 py-2.5 rounded-full"
                 activeOpacity={0.8}
                 accessibilityRole="button"

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, TextInputProps } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, TextInput, TouchableOpacity, TextInputProps, StyleSheet } from 'react-native';
 import { AppIcon } from '../constants/icons';
 import { STRINGS } from '../constants/strings';
 
@@ -22,6 +22,7 @@ export default function SearchInput({
   ...props
 }: SearchInputProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const hasValue = Boolean(value && value.length > 0);
 
   const handleClear = () => {
@@ -33,35 +34,42 @@ export default function SearchInput({
     }
   };
 
+  const handleSearchIconPress = () => {
+    inputRef.current?.focus();
+    if (onSearchPress) {
+      onSearchPress();
+    }
+  };
+
   return (
     <View
-      className={`flex-row items-center bg-surface h-12 px-3.5 rounded-2xl border ${
-        isFocused
-          ? 'border-primary/60 bg-white shadow-sm ring-1 ring-primary/20'
-          : 'border-divider shadow-xs'
-      } ${className}`}
+      style={[
+        styles.container,
+        isFocused ? styles.focused : styles.unfocused,
+      ]}
+      className={className}
     >
-      {/* Leading Search Icon */}
+      {/* Leading Search Icon / Button */}
       <TouchableOpacity
-        onPress={onSearchPress}
-        disabled={!onSearchPress}
+        onPress={handleSearchIconPress}
         activeOpacity={0.7}
-        className="w-8 h-8 items-center justify-center -ml-0.5 mr-2"
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={styles.searchIconButton}
         accessibilityRole="button"
         accessibilityLabel={STRINGS.common.search}
       >
         <AppIcon
           name="search"
-          size={19}
+          size={20}
           color={isFocused ? '#e11d48' : '#94a3b8'}
         />
       </TouchableOpacity>
 
       {/* Main Text Input */}
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
-        className="flex-1 h-full text-text-primary text-body-md py-0"
         placeholderTextColor="#94a3b8"
         accessibilityRole="search"
         selectionColor="#e11d48"
@@ -75,30 +83,30 @@ export default function SearchInput({
           setIsFocused(false);
           props.onBlur?.(e);
         }}
-        style={[{ includeFontPadding: false }, style]}
+        style={[styles.input, style]}
         {...props}
       />
 
       {/* Trailing Clear Button */}
       {hasValue && (
         <TouchableOpacity
-          className="w-8 h-8 items-center justify-center rounded-full"
+          style={styles.trailingButton}
           onPress={handleClear}
           activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel={STRINGS.common.clearSearch}
         >
-          <AppIcon name="closeCircleFilled" size={17} color="#94a3b8" />
+          <AppIcon name="closeCircleFilled" size={18} color="#94a3b8" />
         </TouchableOpacity>
       )}
 
       {/* Trailing Filter Button */}
       {showFilter && (
         <>
-          <View className="w-[1px] h-5 bg-divider mx-2" />
+          <View style={styles.divider} />
           <TouchableOpacity
-            className="w-8 h-8 bg-rose-50 rounded-full items-center justify-center border border-rose-100"
+            style={styles.filterButton}
             onPress={onFilterPress}
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -112,3 +120,72 @@ export default function SearchInput({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: '#ffffff',
+  },
+  focused: {
+    borderColor: '#e11d48',
+    backgroundColor: '#ffffff',
+    shadowColor: '#e11d48',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  unfocused: {
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  searchIconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -4,
+    marginRight: 6,
+  },
+  input: {
+    flex: 1,
+    height: '100%',
+    color: '#0f172a',
+    fontSize: 15,
+    paddingVertical: 0,
+    includeFontPadding: false,
+  },
+  trailingButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+  },
+  divider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#e2e8f0',
+    marginHorizontal: 8,
+  },
+  filterButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#ffe4e6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

@@ -8,7 +8,9 @@ export default function AdminTabsLayout() {
   const insets = useSafeAreaInsets();
   const { token, user, isLoading } = useAuthStore();
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
+  }
 
   if (!token) return <Redirect href="/login" />;
 

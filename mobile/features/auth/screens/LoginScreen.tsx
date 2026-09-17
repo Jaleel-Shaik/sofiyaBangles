@@ -2,7 +2,7 @@ import { api } from "@/src/api";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Alert, AppState } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { useRouter, useRootNavigationState } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import {
   getAuth,
@@ -25,6 +25,8 @@ import {
 export default function LoginScreen() {
   const { login, set2faPending, clear2faPending, token, user, forceLogout } =
     useAuthStore();
+  const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
 
   const [authStep, setAuthStep] = useState("login");
   const [email, setEmail] = useState("");
@@ -112,11 +114,11 @@ export default function LoginScreen() {
 
   // Deferred navigation
   useEffect(() => {
-    if (pendingRedirect && navigationReady) {
+    if (pendingRedirect && rootNavigationState?.key) {
       router.replace(pendingRedirect as any);
       setPendingRedirect(null);
     }
-  }, [pendingRedirect, navigationReady]);
+  }, [pendingRedirect, rootNavigationState?.key, router]);
 
   // Navigate by role after successful login
   const navigateAfterLogin = useCallback(() => {
@@ -128,16 +130,20 @@ export default function LoginScreen() {
     }
     const href = getDashboardHref(u, t);
     if (href !== "/login") {
-      setPendingRedirect(href as string);
+      if (rootNavigationState?.key) {
+        router.replace(href as any);
+      } else {
+        setPendingRedirect(href as string);
+      }
     }
-  }, []);
+  }, [router, rootNavigationState?.key]);
 
   // Watch for login state changes to navigate
   useEffect(() => {
-    if (token && user && authStep !== "login" && authStep !== "register") {
+    if (token && user && authStep !== "login" && authStep !== "register" && rootNavigationState?.key) {
       navigateAfterLogin();
     }
-  }, [token, user, authStep, navigateAfterLogin]);
+  }, [token, user, authStep, rootNavigationState?.key, navigateAfterLogin]);
 
   // Check if a super_admin token was restored from storage
   useEffect(() => {

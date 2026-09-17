@@ -86,6 +86,18 @@ export default function CategoriesScreen() {
               value={searchQuery}
               onChangeText={setSearchQuery}
               onClear={() => setSearchQuery('')}
+              onSubmitEditing={() => {
+                if (searchQuery.trim()) {
+                  router.push({ pathname: '/search', params: { q: searchQuery.trim() } } as any);
+                }
+              }}
+              onSearchPress={() => {
+                router.push({
+                  pathname: '/search',
+                  params: searchQuery.trim() ? { q: searchQuery.trim() } : undefined
+                } as any);
+              }}
+              returnKeyType="search"
             />
           </View>
         </View>

@@ -8,7 +8,6 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 
 import { getCategories, Category } from '@/src/api/categories';
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
-import QuickSellModal from '@/features/admin/products/components/QuickSellModal';
 
 import { useAuthStore } from '@/src/store/authStore';
 import { getCachedApiBaseUrl } from '@/src/api/config';
@@ -28,7 +27,6 @@ export default function AdminDashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [showQuickSell, setShowQuickSell] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
 
   const fetchData = async () => {
@@ -204,7 +202,7 @@ export default function AdminDashboard() {
         <View className="px-4 pt-5">
           {/* Quick Sell Action Card */}
           <TouchableOpacity
-            onPress={() => setShowQuickSell(true)}
+            onPress={() => router.push('/(admin)/quick-sell')}
             activeOpacity={0.9}
             className="mb-5 p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md flex-row items-center justify-between"
           >
@@ -425,7 +423,7 @@ export default function AdminDashboard() {
                     className="bg-surface p-3 rounded-2xl flex-row items-center mb-3 border border-divider"
                     activeOpacity={0.9}
                     onPress={() => {
-                      router.push({ pathname: '/(admin)/(tabs)/product-detail/[id]', params: { id: product.id } } as any);
+                      router.push({ pathname: '/(admin)/(tabs)/product-detail/[id]', params: { id: product.id } });
                     }}
                   >
                     <Image
@@ -443,7 +441,21 @@ export default function AdminDashboard() {
                         </View>
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#e11d48" style={{ marginLeft: 8 }} />
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        router.push({
+                          pathname: '/(admin)/quick-sell',
+                          params: { code: product.unique_code || product.id, id: product.id },
+                        });
+                      }}
+                      className="bg-slate-900 px-3 py-2 rounded-xl flex-row items-center ml-2 shadow-xs"
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="flash" size={12} color="#fbbf24" />
+                      <Text className="text-white font-bold text-xs ml-1">Sell</Text>
+                    </TouchableOpacity>
+                    <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 );
               })}
@@ -451,13 +463,6 @@ export default function AdminDashboard() {
           )}
         </View>
       </ScrollView>
-
-      {/* Quick Sell Modal */}
-      <QuickSellModal
-        visible={showQuickSell}
-        onClose={() => setShowQuickSell(false)}
-        onSaleSuccess={() => fetchData()}
-      />
     </View>
   );
 }

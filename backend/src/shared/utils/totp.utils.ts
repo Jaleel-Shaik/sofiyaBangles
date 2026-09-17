@@ -50,9 +50,9 @@ export const generateQrCodeDataUrl = async (otpauthUrl: string): Promise<string>
 
 /**
  * Verifies a 6-digit TOTP code against an unencrypted secret.
- * Uses ±30 second clock tolerance (epochTolerance: 30).
+ * Uses ±60 second clock tolerance (epochTolerance: 60) to prevent clock drift issues.
  */
-export const verifyTotpCode = (secret: string, token: string, tolerance = 30): boolean => {
+export const verifyTotpCode = (secret: string, token: string, tolerance = 60): boolean => {
   try {
     const result = verifySync({ token, secret, epochTolerance: tolerance });
     return result.valid;
