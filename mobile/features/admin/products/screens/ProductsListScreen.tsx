@@ -7,6 +7,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getAdminProducts, deleteProduct } from '@/src/api/admin';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function ProductsListScreen() {
   const router = useRouter();
@@ -138,14 +139,14 @@ export default function ProductsListScreen() {
         </View>
       </View>
 
-      {/* Category Filter - Horizontal Scroll */}
+      {/* Collection Filter - Horizontal Scroll */}
       <View className="pb-2" style={{ maxHeight: 44 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-5" contentContainerStyle={{ alignItems: 'center' }}>
           <TouchableOpacity
             onPress={() => setSelectedCategory('')}
             className={`px-4 py-2 rounded-full mr-2 ${!selectedCategory ? 'bg-primary' : 'bg-surface border border-divider'}`}
           >
-            <Text className={`text-xs font-bold ${!selectedCategory ? 'text-white' : 'text-text-secondary'}`}>All</Text>
+            <Text className={`text-xs font-bold ${!selectedCategory ? 'text-white' : 'text-text-secondary'}`}>{STRINGS.admin.products.filterAll}</Text>
           </TouchableOpacity>
           {(categories || []).map((cat, idx) => (
             <TouchableOpacity
@@ -153,7 +154,7 @@ export default function ProductsListScreen() {
               onPress={() => setSelectedCategory(cat?.id || '')}
               className={`px-4 py-2 rounded-full mr-2 ${selectedCategory === cat?.id ? 'bg-primary' : 'bg-surface border border-divider'}`}
             >
-              <Text className={`text-xs font-bold ${selectedCategory === cat?.id ? 'text-white' : 'text-text-secondary'}`}>{cat?.category_name || cat?.name || 'Category'}</Text>
+              <Text className={`text-xs font-bold ${selectedCategory === cat?.id ? 'text-white' : 'text-text-secondary'}`}>{cat?.category_name || cat?.name || STRINGS.admin.collections.title}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>

@@ -10,6 +10,7 @@ import TextInputField from '@/src/components/TextInputField';
 import Button from '@/src/components/Button';
 
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
+import { STRINGS } from '@/src/constants/strings';
 
 
 export default function AddProductScreen() {
@@ -140,7 +141,7 @@ export default function AddProductScreen() {
     if (!price) newErrors.price = 'Price is required';
     else if (parseFloat(price) <= 0) newErrors.price = 'Price must be a positive number';
     if (!selectedModelType) newErrors.model_type_id = 'Model Type is required';
-    if (!selectedCategory) newErrors.category = 'Category is required';
+    if (!selectedCategory) newErrors.category = STRINGS.admin.products.pleaseSelectCollection;
     if (imageUrls.length === 0) newErrors.images = 'At least one image is required';
 
     if (hasVariants && variants.length === 0) {
@@ -362,7 +363,7 @@ export default function AddProductScreen() {
             <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
               <Ionicons name="grid" size={16} color="#e11d48" />
             </View>
-            <Text className="text-lg font-bold text-text-primary">Categorization</Text>
+            <Text className="text-lg font-bold text-text-primary">{STRINGS.admin.products.categorization}</Text>
           </View>
 
           <View className="flex-row items-center justify-between mb-3 px-1">
@@ -386,7 +387,7 @@ export default function AddProductScreen() {
             <>
               <View className="flex-row items-center justify-between mb-3 px-1 mt-2">
                 <View className="flex-row items-center">
-                  <Text className="text-sm font-bold text-text-secondary">Select Category *</Text>
+                  <Text className="text-sm font-bold text-text-secondary">{STRINGS.admin.products.selectCollection}</Text>
                   {errors.category && <Text className="text-xs font-bold text-red-500"> - {errors.category}</Text>}
                 </View>
                 <TouchableOpacity 
@@ -449,7 +450,7 @@ export default function AddProductScreen() {
                 ) : (
                   <View className="bg-surface p-6 rounded-2xl items-center border border-divider border-dashed">
                     <Ionicons name="folder-open-outline" size={32} color="#cbd5e1" />
-                    <Text className="text-text-hint font-medium mt-2">No categories found for this model.</Text>
+                    <Text className="text-text-hint font-medium mt-2">{STRINGS.admin.products.noCollectionsFound}</Text>
                   </View>
                 )}
               </View>

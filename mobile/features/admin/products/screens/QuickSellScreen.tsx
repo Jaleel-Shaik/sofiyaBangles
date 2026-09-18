@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { lookupProductByCode, sellProductByCode } from '@/src/api/admin';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function QuickSellScreen() {
   const router = useRouter();
@@ -393,7 +394,7 @@ export default function QuickSellScreen() {
                       {product.product_name}
                     </Text>
                     <Text className="text-xs text-text-secondary mt-0.5">
-                      {product.model_type_name || 'Model'} • {product.category_name || 'Category'}
+                      {product.model_type_name || 'Model'} • {product.category_name || STRINGS.admin.collections.collection}
                     </Text>
                     <Text className="text-base font-extrabold text-[#C25B3E] mt-1">
                       ₹{product.price} <Text className="text-xs font-normal text-text-hint">/ unit</Text>

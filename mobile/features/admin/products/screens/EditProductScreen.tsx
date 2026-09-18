@@ -10,6 +10,7 @@ import TextInputField from '@/src/components/TextInputField';
 import Button from '@/src/components/Button';
 
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
+import { STRINGS } from '@/src/constants/strings';
 
 import { getProductById } from '@/src/api/products';
 
@@ -178,7 +179,7 @@ export default function EditProductScreen() {
     if (!price) newErrors.price = 'Price is required';
     else if (parseFloat(price) <= 0) newErrors.price = 'Price must be a positive number';
     if (!selectedModelType) newErrors.model_type_id = 'Model Type is required';
-    if (!selectedCategory) newErrors.category = 'Category is required';
+    if (!selectedCategory) newErrors.category = STRINGS.admin.products.pleaseSelectCollection;
     if (imageUrls.length === 0) newErrors.images = 'At least one image is required';
 
     if (Object.keys(newErrors).length > 0) {
@@ -398,7 +399,7 @@ export default function EditProductScreen() {
             <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
               <Ionicons name="grid" size={16} color="#e11d48" />
             </View>
-            <Text className="text-lg font-bold text-text-primary">Categorization</Text>
+            <Text className="text-lg font-bold text-text-primary">{STRINGS.admin.products.categorization}</Text>
           </View>
           <View className="flex-row items-center justify-between mb-3 px-1">
             <Text className="text-sm font-bold text-text-secondary">Model Type *</Text>
@@ -420,7 +421,7 @@ export default function EditProductScreen() {
         {selectedModelType ? (
           <>
             <View className="flex-row items-center mb-2 ml-1">
-              <Text className="text-sm font-bold text-text-secondary mr-2">Select Category *</Text>
+              <Text className="text-sm font-bold text-text-secondary mr-2">{STRINGS.admin.products.selectCollection}</Text>
               {errors.category && <Text className="text-xs font-bold text-red-500">{errors.category}</Text>}
             </View>
             <View className="mb-4">
@@ -484,7 +485,7 @@ export default function EditProductScreen() {
                   );
                 })
               ) : (
-                <Text className="text-text-secondary italic ml-1">No categories found for this model type.</Text>
+                <Text className="text-text-secondary italic ml-1">{STRINGS.admin.products.noCollectionsFound}</Text>
               )}
             </View>
           </>

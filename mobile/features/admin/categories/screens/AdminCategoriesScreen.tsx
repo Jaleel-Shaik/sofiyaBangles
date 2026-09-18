@@ -7,8 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
-
 import * as ImagePicker from 'expo-image-picker';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function ManageCategoriesScreen() {
   const router = useRouter();
@@ -76,8 +76,8 @@ export default function ManageCategoriesScreen() {
 
   const handleDeleteCategory = (catId: string) => {
     Alert.alert(
-      "Delete Category",
-      "Are you sure you want to delete this category?",
+      STRINGS.admin.collections.deleteConfirmTitle,
+      STRINGS.admin.collections.deleteConfirmMsg,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -87,7 +87,7 @@ export default function ManageCategoriesScreen() {
             try {
               await api.admin.deleteCategory(catId);
               await fetchData();
-              Alert.alert('Success', 'Category deleted successfully.');
+              Alert.alert('Success', STRINGS.admin.collections.deleteSuccess);
             } catch (error: any) {
               Alert.alert('Error', error.message);
             }
@@ -100,12 +100,12 @@ export default function ManageCategoriesScreen() {
   const handleSave = async () => {
     if (saving) return;
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a name for the Category.');
+      Alert.alert('Error', STRINGS.admin.collections.enterCollectionName);
       return;
     }
 
     if (!selectedModelTypeId && !isCreatingNewModel) {
-      Alert.alert('Error', 'Please select a Model Type or create a new one.');
+      Alert.alert('Error', STRINGS.admin.collections.selectModelTypePrompt);
       return;
     }
 
@@ -115,7 +115,7 @@ export default function ManageCategoriesScreen() {
     try {
       if (isCreatingNewModel) {
         if (!newModelName.trim()) {
-          Alert.alert('Error', 'Please enter a name for the new Model Type.');
+          Alert.alert('Error', STRINGS.admin.collections.enterModelTypeName);
           setSaving(false);
           return;
         }
@@ -123,7 +123,7 @@ export default function ManageCategoriesScreen() {
         const standard_sizes = (newModelStandardSizes || '').split(',').map(s => s.trim()).filter(Boolean);
 
         if (standard_sizes.length === 0) {
-          Alert.alert('Error', 'Please enter at least one standard size.');
+          Alert.alert('Error', STRINGS.admin.collections.enterStandardSize);
           setSaving(false);
           return;
         }
@@ -134,7 +134,7 @@ export default function ManageCategoriesScreen() {
         const standard_sizes = (newModelStandardSizes || '').split(',').map(s => s.trim()).filter(Boolean);
 
         if (standard_sizes.length === 0) {
-          Alert.alert('Error', 'Please enter at least one standard size.');
+          Alert.alert('Error', STRINGS.admin.collections.enterStandardSize);
           setSaving(false);
           return;
         }
@@ -164,7 +164,7 @@ export default function ManageCategoriesScreen() {
       setNewModelStandardSizes('');
 
       fetchData();
-      Alert.alert('Success', 'Category created successfully.');
+      Alert.alert('Success', editingCategoryId ? STRINGS.admin.collections.updateSuccess : STRINGS.admin.collections.createSuccess);
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
@@ -189,8 +189,8 @@ export default function ManageCategoriesScreen() {
             <Ionicons name="arrow-back" size={22} color="#e11d48" />
           </TouchableOpacity>
           <View>
-            <Text className="text-primary font-medium text-xs uppercase tracking-wider">Admin Panel</Text>
-            <Text className="text-xl font-bold text-text-primary">Categories</Text>
+            <Text className="text-primary font-medium text-xs uppercase tracking-wider">{STRINGS.admin.collections.badge}</Text>
+            <Text className="text-xl font-bold text-text-primary">{STRINGS.admin.collections.title}</Text>
           </View>
         </View>
         {!isAdding && (
@@ -216,9 +216,9 @@ export default function ManageCategoriesScreen() {
         <ScrollView className="flex-1 px-5 pt-5" showsVerticalScrollIndicator={false}>
           {isAdding && (
             <View className="bg-surface p-5 rounded-2xl mb-5 border border-divider">
-              <Text className="text-base font-bold text-text-primary mb-4">{editingCategoryId ? 'Edit Category' : 'Step 1: Model Type'}</Text>
+              <Text className="text-base font-bold text-text-primary mb-4">{editingCategoryId ? STRINGS.admin.collections.editTitle : STRINGS.admin.collections.addTitle}</Text>
 
-              <Text className="text-xs font-bold text-text-hint mb-2 uppercase">Select or Create Model Type</Text>
+              <Text className="text-xs font-bold text-text-hint mb-2 uppercase">{STRINGS.admin.collections.modelTypeSelectOrCreate}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
                 {(modelTypes || []).map((mt) => (
                   <TouchableOpacity
@@ -239,7 +239,7 @@ export default function ManageCategoriesScreen() {
 
               {isCreatingNewModel && (
                 <View className="bg-surface p-4 rounded-2xl mb-5 border border-divider">
-                  <Text className="font-bold text-text-primary mb-2">Define New Model Type</Text>
+                  <Text className="font-bold text-text-primary mb-2">{STRINGS.admin.collections.defineNewModelType}</Text>
                   <TextInput
                     value={newModelName}
                     onChangeText={setNewModelName}
@@ -249,9 +249,9 @@ export default function ManageCategoriesScreen() {
                 </View>
               )}
 
-              <Text className="text-base font-bold text-text-primary mb-4 mt-2">Step 2: Category Details</Text>
+              <Text className="text-base font-bold text-text-primary mb-4 mt-2">{STRINGS.admin.collections.stepDetails}</Text>
 
-              <Text className="text-xs font-bold text-text-hint mb-2 uppercase">Category Name</Text>
+              <Text className="text-xs font-bold text-text-hint mb-2 uppercase">{STRINGS.admin.collections.nameLabel}</Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
@@ -259,7 +259,7 @@ export default function ManageCategoriesScreen() {
                 className="bg-surface border border-divider rounded-2xl p-4 text-text-primary font-bold mb-4"
               />
 
-              <Text className="text-xs font-bold text-text-hint mb-2 uppercase">Category Image</Text>
+              <Text className="text-xs font-bold text-text-hint mb-2 uppercase">{STRINGS.admin.collections.imageLabel}</Text>
               <TouchableOpacity
                 onPress={pickImage}
                 className="h-40 bg-surface border border-divider border-dashed rounded-2xl items-center justify-center mb-4 overflow-hidden"
@@ -269,14 +269,14 @@ export default function ManageCategoriesScreen() {
                 ) : (
                   <>
                     <Ionicons name="image-outline" size={32} color="#94a3b8" />
-                    <Text className="text-text-hint font-medium mt-2">Tap to upload image</Text>
+                    <Text className="text-text-hint font-medium mt-2">{STRINGS.admin.collections.uploadImageHint}</Text>
                   </>
                 )}
               </TouchableOpacity>
 
-              <Text className="text-base font-bold text-text-primary mb-4 mt-2">Step 3: Category Sizing</Text>
+              <Text className="text-base font-bold text-text-primary mb-4 mt-2">{STRINGS.admin.collections.stepSizing}</Text>
 
-              <Text className="text-xs font-bold text-text-hint mb-2 uppercase">Available Sizes</Text>
+              <Text className="text-xs font-bold text-text-hint mb-2 uppercase">{STRINGS.admin.collections.standardSizesLabel}</Text>
               <TextInput
                 value={newModelStandardSizes}
                 onChangeText={setNewModelStandardSizes}
@@ -289,7 +289,7 @@ export default function ManageCategoriesScreen() {
                   <Text className="text-text-secondary font-bold">Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleSave} disabled={saving} className="bg-primary px-6 py-3 rounded-full flex-row items-center">
-                  {saving ? <ActivityIndicator size="small" color="white" /> : <Text className="text-white font-bold">Save</Text>}
+                  {saving ? <ActivityIndicator size="small" color="white" /> : <Text className="text-white font-bold">{STRINGS.admin.collections.saveBtn}</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -320,7 +320,7 @@ export default function ManageCategoriesScreen() {
                         </View>
                       )}
                       <View className="flex-row items-center justify-between mt-2 pt-2 border-t border-divider">
-                        <Text className="text-[10px] text-text-hint">Category</Text>
+                        <Text className="text-[10px] text-text-hint">{STRINGS.admin.collections.collection}</Text>
                         <View className="flex-row items-center gap-1">
                           <TouchableOpacity
                             onPress={() => handleEditCategory(cat)}

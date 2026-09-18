@@ -1,16 +1,14 @@
 import type { Product } from '@/src/api/products';
 import { api } from "@/src/api";
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useState, useCallback, useMemo, useEffect } from 'react';
-
-import { getCategories, Category } from '@/src/api/categories';
-import { getModelTypes, ModelType } from '@/src/api/modelTypes';
+import { useState, useCallback } from 'react';
 
 import { useAuthStore } from '@/src/store/authStore';
 import { getCachedApiBaseUrl } from '@/src/api/config';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -18,28 +16,19 @@ export default function AdminDashboard() {
   const { user } = useAuthStore();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [modelTypes, setModelTypes] = useState<ModelType[]>([]);
-  const [selectedModelType, setSelectedModelType] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [showModelPicker, setShowModelPicker] = useState(false);
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
 
   const fetchData = async () => {
     setConnectionError(false);
     try {
       const results = await Promise.allSettled([
-        api.admin.getOverviewAnalytics(selectedCategory || undefined, selectedModelType || undefined),
+        api.admin.getOverviewAnalytics(),
         api.admin.getAdminProducts(1, 5),
-        getCategories(),
-        getModelTypes()
       ]);
 
-      const [statsRes, productsRes, catsRes, mtsRes] = results;
+      const [statsRes, productsRes] = results;
       let anySucceeded = false;
 
       if (statsRes.status === 'fulfilled') {
@@ -56,21 +45,6 @@ export default function AdminDashboard() {
         console.warn("Dashboard products fetch issue:", productsRes.reason);
       }
 
-      if (catsRes.status === 'fulfilled') {
-        setCategories(catsRes.value || []);
-        anySucceeded = true;
-      } else {
-        console.warn("Dashboard categories fetch issue:", catsRes.reason);
-      }
-
-      if (mtsRes.status === 'fulfilled') {
-        setModelTypes(mtsRes.value || []);
-        anySucceeded = true;
-      } else {
-        console.warn("Dashboard model types fetch issue:", mtsRes.reason);
-      }
-
-      // Only show connection error if all 4 requests failed
       if (!anySucceeded) {
         setConnectionError(true);
       }
@@ -89,33 +63,10 @@ export default function AdminDashboard() {
     }, [])
   );
 
-  const filteredCategories = useMemo(() => {
-    if (!selectedModelType) return categories;
-    return categories.filter(c => c.model_type_id === selectedModelType);
-  }, [categories, selectedModelType]);
-
-  const updateFilteredStats = async () => {
-    setStatsLoading(true);
-    try {
-      const data = await api.admin.getOverviewAnalytics(selectedCategory || undefined, selectedModelType || undefined);
-      setStats(data);
-    } catch (err) {
-      console.error("Failed to update stats", err);
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!loading) {
-      updateFilteredStats();
-    }
-  }, [selectedModelType, selectedCategory]);
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
-  }, [selectedModelType, selectedCategory]);
+  }, []);
 
   const StatCard = ({ title, value, icon, color, accent }: { title: string, value: string, icon: any, color: string, accent?: string }) => (
     <View className="w-[48%] bg-surface p-4 rounded-2xl mb-3 border border-divider">
@@ -222,49 +173,11 @@ export default function AdminDashboard() {
             </View>
           </TouchableOpacity>
 
-          {/* Overview Header & Filter Buttons */}
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-base font-bold text-text-primary">Overview</Text>
-            {(selectedModelType || selectedCategory) && (
-              <TouchableOpacity 
-                onPress={() => { setSelectedModelType(''); setSelectedCategory(''); }}
-                className="bg-red-50 px-2 py-1 rounded-lg border border-red-200 flex-row items-center"
-              >
-                <Text className="text-[10px] font-bold text-red-600 mr-1">Reset Filters</Text>
-                <Ionicons name="close-circle" size={12} color="#dc2626" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Filter Chips */}
-          <View className="flex-row items-center mb-4">
-            <TouchableOpacity 
-              onPress={() => setShowModelPicker(true)}
-              className={`flex-1 flex-row items-center justify-between p-3 rounded-xl border mr-2 bg-surface ${
-                selectedModelType ? 'border-primary bg-primary/5' : 'border-divider'
-              }`}
-            >
-              <Text className={`text-xs font-bold ${selectedModelType ? 'text-primary' : 'text-text-secondary'}`} numberOfLines={1}>
-                {selectedModelType ? modelTypes.find(m => m.id === selectedModelType)?.name || 'Model Type' : 'All Models'}
-              </Text>
-              <Ionicons name="chevron-down" size={14} color={selectedModelType ? "#e11d48" : "#94a3b8"} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              onPress={() => setShowCategoryPicker(true)}
-              className={`flex-1 flex-row items-center justify-between p-3 rounded-xl border ml-2 bg-surface ${
-                selectedCategory ? 'border-primary bg-primary/5' : 'border-divider'
-              }`}
-            >
-              <Text className={`text-xs font-bold ${selectedCategory ? 'text-primary' : 'text-text-secondary'}`} numberOfLines={1}>
-                {selectedCategory ? categories.find(c => c.id === selectedCategory)?.category_name || 'Category' : 'All Categories'}
-              </Text>
-              <Ionicons name="chevron-down" size={14} color={selectedCategory ? "#e11d48" : "#94a3b8"} />
-            </TouchableOpacity>
-          </View>
+          {/* Overview Header */}
+          <Text className="text-base font-bold text-text-primary mb-3">Overview</Text>
 
           {/* Stats */}
-          {loading || statsLoading ? (
+          {loading ? (
             <View className="py-10 items-center">
               <ActivityIndicator size="large" color="#e11d48" />
             </View>
@@ -293,68 +206,6 @@ export default function AdminDashboard() {
             </View>
           )}
 
-          {/* Model Type Picker Modal */}
-          <Modal visible={showModelPicker} transparent animationType="slide">
-            <TouchableOpacity className="flex-1 bg-black/50 justify-end" activeOpacity={1} onPress={() => setShowModelPicker(false)}>
-              <View className="bg-surface rounded-t-3xl p-6 max-h-[60%]">
-                <View className="flex-row justify-between items-center mb-4 border-b border-divider pb-3">
-                  <Text className="text-lg font-bold text-text-primary">Filter by Model Type</Text>
-                  <TouchableOpacity onPress={() => setShowModelPicker(false)}>
-                    <Ionicons name="close" size={24} color="#64748b" />
-                  </TouchableOpacity>
-                </View>
-                <ScrollView>
-                  <TouchableOpacity 
-                    className={`p-4 rounded-xl border mb-2 ${!selectedModelType ? 'bg-primary/10 border-primary' : 'border-divider'}`}
-                    onPress={() => { setSelectedModelType(''); setSelectedCategory(''); setShowModelPicker(false); }}
-                  >
-                    <Text className={`font-bold ${!selectedModelType ? 'text-primary' : 'text-text-primary'}`}>All Model Types</Text>
-                  </TouchableOpacity>
-                  {(modelTypes || []).map(mt => (
-                    <TouchableOpacity 
-                      key={mt.id}
-                      className={`p-4 rounded-xl border mb-2 ${selectedModelType === mt.id ? 'bg-primary/10 border-primary' : 'border-divider'}`}
-                      onPress={() => { setSelectedModelType(mt.id); setSelectedCategory(''); setShowModelPicker(false); }}
-                    >
-                      <Text className={`font-bold ${selectedModelType === mt.id ? 'text-primary' : 'text-text-primary'}`}>{mt.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-
-          {/* Category Picker Modal */}
-          <Modal visible={showCategoryPicker} transparent animationType="slide">
-            <TouchableOpacity className="flex-1 bg-black/50 justify-end" activeOpacity={1} onPress={() => setShowCategoryPicker(false)}>
-              <View className="bg-surface rounded-t-3xl p-6 max-h-[60%]">
-                <View className="flex-row justify-between items-center mb-4 border-b border-divider pb-3">
-                  <Text className="text-lg font-bold text-text-primary">Filter by Category</Text>
-                  <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
-                    <Ionicons name="close" size={24} color="#64748b" />
-                  </TouchableOpacity>
-                </View>
-                <ScrollView>
-                  <TouchableOpacity 
-                    className={`p-4 rounded-xl border mb-2 ${!selectedCategory ? 'bg-primary/10 border-primary' : 'border-divider'}`}
-                    onPress={() => { setSelectedCategory(''); setShowCategoryPicker(false); }}
-                  >
-                    <Text className={`font-bold ${!selectedCategory ? 'text-primary' : 'text-text-primary'}`}>All Categories</Text>
-                  </TouchableOpacity>
-                  {(filteredCategories || []).map(cat => (
-                    <TouchableOpacity 
-                      key={cat.id}
-                      className={`p-4 rounded-xl border mb-2 ${selectedCategory === cat.id ? 'bg-primary/10 border-primary' : 'border-divider'}`}
-                      onPress={() => { setSelectedCategory(cat.id); setShowCategoryPicker(false); }}
-                    >
-                      <Text className={`font-bold ${selectedCategory === cat.id ? 'text-primary' : 'text-text-primary'}`}>{cat.category_name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-
           {/* Quick Actions */}
           <Text className="text-base font-bold text-text-primary mb-4">Quick Actions</Text>
           <View className="flex-row mb-3">
@@ -377,10 +228,10 @@ export default function AdminDashboard() {
           <View className="flex-row mb-6">
             <TouchableOpacity
               className="flex-1 bg-surface p-4 rounded-2xl items-center border border-divider mr-2"
-              onPress={() => router.push('/(admin)/(tabs)/categories' as any)}
+              onPress={() => router.push('/(admin)/(tabs)/categories')}
             >
               <Ionicons name="folder-open-outline" size={24} color="#f59e0b" />
-              <Text className="text-text-primary font-bold mt-2">Categories</Text>
+              <Text className="text-text-primary font-bold mt-2">{STRINGS.admin.quickActions.collections}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               className="flex-1 bg-surface p-4 rounded-2xl items-center border border-divider ml-2"
@@ -455,7 +306,6 @@ export default function AdminDashboard() {
                       <Ionicons name="flash" size={12} color="#fbbf24" />
                       <Text className="text-white font-bold text-xs ml-1">Sell</Text>
                     </TouchableOpacity>
-                    <Ionicons name="chevron-forward" size={18} color="#94a3b8" style={{ marginLeft: 6 }} />
                   </TouchableOpacity>
                 );
               })}
