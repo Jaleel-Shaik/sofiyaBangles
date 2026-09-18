@@ -42,6 +42,38 @@ export default function Setup2FAScreen() {
   const [acknowledgedBackup, setAcknowledgedBackup] = useState(false);
   const savedAuthResultRef = useRef<Verify2FAResponse | null>(null);
 
+  // RFC 6238 Epoch-Synchronized TOTP 30-second Countdown Timer
+  const [totpCountdown, setTotpCountdown] = useState<number>(() => {
+    const epochSeconds = Math.floor(Date.now() / 1000);
+    const rem = 30 - (epochSeconds % 30);
+    return rem === 0 ? 30 : rem;
+  });
+
+  useEffect(() => {
+    if (currentStep !== "verify") return;
+
+    const syncTimer = () => {
+      const epochSeconds = Math.floor(Date.now() / 1000);
+      const rem = 30 - (epochSeconds % 30);
+      setTotpCountdown(rem === 0 ? 30 : rem);
+    };
+
+    syncTimer();
+    const interval = setInterval(syncTimer, 500);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncTimer();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [currentStep]);
+
   // QR expiry timer (10 min)
   useEffect(() => {
     if (currentStep !== "qr") return;
@@ -451,6 +483,23 @@ export default function Setup2FAScreen() {
                     />
                   </motion.div>
                 ))}
+              </div>
+
+              <div className="mb-6 text-center">
+                {totpCountdown <= 5 ? (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    Code rotating in {totpCountdown}s...
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#737373] flex items-center justify-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#E8436E]/60" />
+                    Code refreshes in{" "}
+                    <span className="text-[#E8436E] font-semibold">
+                      {totpCountdown}s
+                    </span>
+                  </p>
+                )}
               </div>
 
               {error && (

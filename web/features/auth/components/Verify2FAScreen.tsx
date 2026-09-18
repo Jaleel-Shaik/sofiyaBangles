@@ -23,19 +23,38 @@ export default function Verify2FAScreen() {
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutMessage, setLockoutMessage] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [countdown, setCountdown] = useState(30);
-  const [canResend, setCanResend] = useState(false);
+  // RFC 6238 Epoch-Synchronized TOTP 30-second Countdown Timer
+  // Synchronized to UTC seconds so it ticks in exact lockstep with Google Authenticator
+  const [countdown, setCountdown] = useState<number>(() => {
+    const epochSeconds = Math.floor(Date.now() / 1000);
+    const rem = 30 - (epochSeconds % 30);
+    return rem === 0 ? 30 : rem;
+  });
 
-  // Countdown timer for OTP
   useEffect(() => {
     if (mode !== "otp") return;
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
-    } else {
-      setCanResend(true);
-    }
-  }, [countdown, mode]);
+
+    const syncTimer = () => {
+      const epochSeconds = Math.floor(Date.now() / 1000);
+      const rem = 30 - (epochSeconds % 30);
+      setCountdown(rem === 0 ? 30 : rem);
+    };
+
+    syncTimer();
+    const interval = setInterval(syncTimer, 500);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncTimer();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [mode]);
 
   // Focus input on mount or mode change
   useEffect(() => {
@@ -122,8 +141,6 @@ export default function Verify2FAScreen() {
       if (!isBackup) {
         setOtp(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
-        setCountdown(30);
-        setCanResend(false);
       }
     }
   };
@@ -295,12 +312,20 @@ export default function Verify2FAScreen() {
               </button>
 
               <div className="mt-4 text-center">
-                <p className="text-xs text-[#A3A3A3]">
-                  Code refreshes in{" "}
-                  <span className="text-[#E8436E] font-semibold">
-                    {countdown}s
-                  </span>
-                </p>
+                {countdown <= 5 ? (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    Code rotating in {countdown}s...
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#A3A3A3] flex items-center justify-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#E8436E]/60" />
+                    Code refreshes in{" "}
+                    <span className="text-[#E8436E] font-semibold">
+                      {countdown}s
+                    </span>
+                  </p>
+                )}
               </div>
             </>
           ) : (
