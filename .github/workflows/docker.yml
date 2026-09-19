@@ -78,15 +78,16 @@ jobs:
             type=sha,prefix=sha-,enable=true
 
       - name: Build and optionally push Backend Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
+          load: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=min,scope=backend
 
   # ─────────────────────────────────────────────────────────────
   # 3. Build Web Admin Portal Container Image
@@ -120,14 +121,15 @@ jobs:
             type=sha,prefix=sha-,enable=true
 
       - name: Build and optionally push Web Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./web
           file: ./web/Dockerfile
+          load: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta-web.outputs.tags }}
           labels: ${{ steps.meta-web.outputs.labels }}
           build-args: |
             NEXT_PUBLIC_API_URL=https://api.sofiyabangles.com/api
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=min,scope=web
