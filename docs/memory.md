@@ -67,6 +67,26 @@
 * **Context**: Writing `"extends": "expo/tsconfig.base.json"` breaks TypeScript module resolution.
 * **Decision**: Must extend `"expo/tsconfig.base"` and include `"baseUrl": "."` so that path aliases (`"@/*": ["./*"]`) resolve cleanly across both IDE and CLI.
 
+### ADR-007: Unified Design Token & Typography Source of Truth
+* **Context**: Inconsistencies between visual documentation and the active codebase lead to styling regressions, broken color contrasts, and inaccurate typography choices across Web and Mobile.
+* **Decision**:
+  1. **Brand Colors**:
+     * **Primary (Sofiya Rose)**: Web `#E8436E` (`--color-primary-500`), Mobile `#e11d48` (`primary-500`).
+     * **Secondary (Sapphire / Indigo)**: Web `#2563EB` (`--color-secondary-500`), Mobile `#6366f1` (`secondary-500`).
+     * **Jewelry Accent (Bangle Gold)**: `#D4AF37` across all platforms for ratings, badges, and special product codes.
+     * **Price Accent (Terracotta)**: `#C25B3E` for warm, prominent product pricing.
+     * **Surfaces**: Web `#FAFAFA` / Mobile `#F8FAFC`; Card: `#FFFFFF`.
+     * **Text**: Primary `#0F172A` (Slate-900), Secondary `#475569` / `#64748B`, Muted `#94A3B8`.
+  2. **Typography**:
+     * **Web Editorial Headings**: `'Playfair Display', Georgia, serif` (luxury jewelry identity).
+     * **Web & Mobile Body/UI**: `'Inter', system-ui, -apple-system, sans-serif`.
+     * **Web Monospace / Codes**: `'Fira Code', 'Courier New', monospace`.
+     * **Mobile Semantic Ramp**: 17 strict type styles from `display-xl` ($48\text{px}$) to `overline` ($10\text{px}$).
+  3. **Touch Ergonomics & Hit Targets**:
+     * Minimum $44 \times 44\text{ pt}$ touch targets (`space-11`) on all mobile interactive elements with `hitSlop: 10`.
+     * Minimum $36\text{px}$ height on desktop interactive elements.
+  4. **Strict Token Consumption**: Never use ad-hoc inline hex colors or font declarations; always import and use tokens from `@/src/theme/tokens` or Tailwind theme variables.
+
 ---
 
 ## 🛡️ Critical Security Invariants

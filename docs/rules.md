@@ -173,7 +173,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <Card className={variant === 'compact' ? 'p-3' : 'p-6'}>
       <img src={imageUrl} alt={name} className="w-full aspect-square object-cover rounded-md" />
       <h3 className="text-body-md font-semibold text-text-primary mt-2">{name}</h3>
-      <p className="text-title-sm font-bold text-brand-primary">₹{price.toLocaleString('en-IN')}</p>
+      <p className="text-title-sm font-bold text-primary-500">₹{price.toLocaleString('en-IN')}</p>
       <Button variant="primary" onClick={() => onAddToCart(id)} className="w-full mt-3">
         Add to Bag
       </Button>
@@ -181,6 +181,43 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   );
 };
 ```
+
+---
+
+## 🎨 Styling Standards & CSS Tokens
+
+All components must consume centralized design tokens from `tailwind.config` or CSS variables, never hardcoded visual values:
+
+```css
+@theme {
+  /* Sofiya Rose Palette */
+  --color-primary-50: #FFF0F3;
+  --color-primary-100: #FFD6DE;
+  --color-primary-200: #FFB3C2;
+  --color-primary-300: #FF8099;
+  --color-primary-400: #FF4D70;
+  --color-primary-500: #E8436E; /* Primary Brand Rose */
+  --color-primary-600: #CC3366;
+  --color-primary-700: #B3245A;
+
+  /* Sapphire Secondary */
+  --color-secondary-500: #2563EB;
+  --color-secondary-600: #1D4ED8;
+
+  /* Surfaces & Neutrals */
+  --color-surface-bg: #FAFAFA;
+  --color-surface-card: #FFFFFF;
+  --color-surface-muted: #F8FAFC;
+  --color-border-default: #E2E8F0;
+  --color-border-strong: #CBD5E1;
+}
+```
+
+### Styling Audit Checklist
+* `[ ]` **No Inline Styles**: Avoid `style={{ ... }}` except for truly dynamic runtime values (e.g. animated offsets).
+* `[ ]` **Touch Target Minima**: All buttons and tappable controls must adhere to `min-tap` ($44 \times 44\text{ pt}$ on mobile, $36\text{px}$ on desktop).
+* `[ ]` **Mobile-First CSS**: Base classes define mobile layout; `sm:`, `md:`, `lg:`, `xl:` enhance for larger viewports.
+* `[ ]` **No `!important` Abuse**: Specificity is managed via Tailwind utility cascades.
 
 ---
 

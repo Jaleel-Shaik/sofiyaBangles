@@ -1,19 +1,23 @@
 # 🎨 Sofiya Bangles — UI/UX Design System & Typography Constitution
 
-> **Document Version**: 2.0.0  
+> **Document Version**: 2.1.0  
 > **Target Audience**: UI/UX Designers, Frontend Engineers, Mobile Engineers, AI Design Agents  
-> **Status**: Mandatory Living Design System  
-> **Last Updated**: September 2026  
+> **Status**: Single Source of Truth for Visual Design Decisions  
+> **Last Verified Against Codebase**: September 2026  
 
 ---
 
 ## 📑 Table of Contents
 1. [Design North Star](#-design-north-star)
-2. [Color Palette & Semantic Tokens](#-color-palette--semantic-tokens)
-   - [Theme A: Light (Ivory & Royal Gold)](#1-theme-a-light-ivory--royal-gold)
-   - [Theme B: Dark (Onyx & Champagne Gold)](#2-theme-b-dark-onyx--champagne-gold)
-   - [Theme C: High Contrast & Accessibility](#3-theme-c-high-contrast--accessibility)
+2. [Color System & Semantic Tokens](#-color-system--semantic-tokens)
+   - [Brand Primary: Sofiya Rose Palette](#1-brand-primary-sofiya-rose-palette)
+   - [Secondary: Sapphire & Indigo Accents](#2-secondary-sapphire--indigo-accents)
+   - [Jewelry Accents: Gold & Terracotta](#3-jewelry-accents-gold--terracotta)
+   - [Surface & Neutral Scale](#4-surface--neutral-scale)
+   - [Semantic Status Colors](#5-semantic-status-colors)
 3. [Typography System & Type Ramp](#-typography-system--type-ramp)
+   - [Font Families](#font-families)
+   - [Standard Type Ramp (Web & Mobile)](#standard-type-ramp-web--mobile)
 4. [8pt / 4pt Spacing & Layout Grid](#-8pt--4pt-spacing--layout-grid)
 5. [Container Constraints & Responsive Breakpoints](#-container-constraints--responsive-breakpoints)
 6. [Component Design Standards](#-component-design-standards)
@@ -21,166 +25,224 @@
    - [Input Fields & Form States](#2-input-fields--form-states)
    - [Cards & Media Ratios](#3-cards--media-ratios)
    - [Empty, Loading & Error States](#4-empty-loading--error-states)
-7. [Iconography & Media Principles](#-iconography--media-principles)
-8. [Accessibility (a11y) & Ergonomics Matrix](#-accessibility-a11y--ergonomics-matrix)
+7. [Touch Ergonomics & Hit Targets](#-touch-ergonomics--hit-targets)
+8. [Iconography & Media Principles](#-iconography--media-principles)
+9. [Accessibility (a11y) & Ergonomics Matrix](#-accessibility-a11y--ergonomics-matrix)
 
 ---
 
 ## 🌟 Design North Star
 
-Every screen across **Sofiya Bangles** (Mobile App and Web Portal) MUST satisfy these core principles:
+Every screen across **Sofiya Bangles** (Customer Mobile App and Web Admin Portal) MUST strictly satisfy these foundational principles:
 
 1. **Clarity before decoration**: Bangles and jewelry must be the visual hero; UI chrome should be elegant, refined, and unobtrusive.
 2. **Hierarchy before density**: Never overwhelm the shopper or cashier with competing visual weights.
 3. **Consistency before novelty**: Reusable design tokens govern all margins, radius, shadows, and typography.
-4. **Touch & Pointer Ergonomics**: Strict compliance with $44 \times 44\text{ pt}$ touch targets on mobile to ensure comfortable one-handed navigation.
+4. **Touch & Pointer Ergonomics**: Strict compliance with $44 \times 44\text{ pt}$ touch targets (`space-11`) on mobile to ensure comfortable one-handed navigation.
 5. **Universal Accessibility**: WCAG 2.2 AA compliant contrast, screen reader compatibility, and reduced-motion support.
 
 ---
 
-## 🎨 Color Palette & Semantic Tokens
+## 🎨 Color System & Semantic Tokens
 
-The color system transitions from raw primitives to semantic roles, ensuring consistent theme propagation:
+The color architecture is synchronized across [`web/src/theme/tokens.ts`](file:///c:/Local%20Disk%20D_8252026651/startUp/sofiya_bangles/web/src/theme/tokens.ts) and [`mobile/src/theme/tokens.ts`](file:///c:/Local%20Disk%20D_8252026651/startUp/sofiya_bangles/mobile/src/theme/tokens.ts):
 
-```
-Primitive Colors (e.g. Gold-500)  ──▶  Semantic Roles (e.g. brand-primary)  ──▶  Component Tokens (e.g. button-cta-bg)
-```
+### 1. Brand Primary: Sofiya Rose Palette
+*Represents elegance, femininity, and bridal heritage.*
 
-### 1. Theme A: Light (Ivory & Royal Gold)
-*Primary daytime retail experience evoking luxury, purity, and South Asian bridal heritage.*
+| Token | Web Hex | Mobile Hex | CSS Variable | Semantic Role |
+| :--- | :--- | :--- | :--- | :--- |
+| `primary-50` | `#FFF0F3` | `#FFF0F3` | `--color-primary-50` | Soft blush tint, OTP active background, card highlights |
+| `primary-100`| `#FFD6DE` | `#FFD6DE` | `--color-primary-100`| Light blush badge backgrounds, subtle borders |
+| `primary-200`| `#FFB3C2` | — | `--color-primary-200`| Gradient stops, pill hover states |
+| `primary-300`| `#FF8099` | — | `--color-primary-300`| Shimmer highlights, gradient text |
+| `primary-400`| `#FF4D70` | — | `--color-primary-400`| Accent strokes, secondary button borders |
+| **`primary-500`**| **`#E8436E`** | **`#e11d48`** | `--color-primary-500` | **Primary Brand Color**: Primary CTAs, active tab icons |
+| `primary-600`| `#CC3366` | `#be123c` | `--color-primary-600` | CTA hover state, active button gradients |
+| `primary-700`| `#B3245A` | — | `--color-primary-700` | Pressed button state, deep rose accents |
+| `primary-800`| `#991A4D` | — | `--color-primary-800` | Deep burgundy brand borders |
+| `primary-900`| `#7A0D3C` | — | `--color-primary-900` | High-contrast brand headers |
 
-| Token Name | Hex Value | Semantic Purpose |
+### 2. Secondary: Sapphire & Indigo Accents
+*Represents trust, analytics precision, and platform balance.*
+
+| Token | Web Hex | Mobile Hex | CSS Variable | Semantic Role |
+| :--- | :--- | :--- | :--- | :--- |
+| `secondary-50` | `#F0F7FF` | `#e0e7ff` | `--color-secondary-50` | Table row hover, info backgrounds |
+| `secondary-100`| `#DBECFF` | — | `--color-secondary-100`| Info badge backgrounds |
+| `secondary-300`| `#85B8FF` | — | `--color-secondary-300`| Chart accent lines |
+| **`secondary-500`**| **`#2563EB`** | **`#6366f1`** | `--color-secondary-500` | **Secondary Brand**: Analytics, links, admin actions |
+| `secondary-600`| `#1D4ED8` | — | `--color-secondary-600` | Link hover states, primary chart bars |
+| `secondary-700`| `#1E40AF` | — | `--color-secondary-700` | Deep blue table headers |
+
+### 3. Jewelry Accents: Gold & Terracotta
+
+| Token | Hex Value | Application |
 | :--- | :--- | :--- |
-| `--color-brand-primary` | `#D4AF37` | Royal Gold: Primary CTAs, active highlights, badges |
-| `--color-brand-secondary`| `#B8860B` | Dark Goldenrod: Borders, hover states, accents |
-| `--color-bg-primary` | `#FDFBF7` | Warm Ivory: Primary page canvas |
-| `--color-bg-surface` | `#FFFFFF` | Pure White: Card containers, dialogs, dropdowns |
-| `--color-text-primary` | `#1A1815` | Deep Charcoal: Main headings and body text |
-| `--color-text-muted` | `#6B665E` | Warm Grey: Subtitles, metadata, captions |
-| `--color-border-subtle` | `#E8E2D5` | Soft Warm Border: Dividers, card strokes |
+| `accent.gold` | `#D4AF37` | **Bangle Gold Accent**: Rating stars, premium bridal badges, special ID code tags |
+| `text.price` | `#C25B3E` | **Terracotta Warm Price**: Product pricing displays for maximum visual warmth |
+| `accent.orange` | `#EA580C` | Web promotional tags, discount badges |
 
-### 2. Theme B: Dark (Onyx & Champagne Gold)
-*Refined evening ambiance with layered dark surfaces to prevent eye fatigue while preserving gold brilliance.*
+### 4. Surface & Neutral Scale
 
-| Token Name | Hex Value | Semantic Purpose |
-| :--- | :--- | :--- |
-| `--color-brand-primary` | `#E5C158` | Champagne Gold: High-contrast golden highlights |
-| `--color-bg-primary` | `#121212` | Deep Onyx: Base canvas (never pure #000000) |
-| `--color-bg-surface` | `#1E1E1E` | Layered Charcoal: Elevated cards and sheets |
-| `--color-text-primary` | `#F7F5F0` | Off-White: High legibility text |
-| `--color-text-muted` | `#9E988D` | Muted Khaki Grey: Supporting copy |
-| `--color-border-subtle` | `#2D2B27` | Subtle border stroke for surface separation |
+| Token | Web Hex | Mobile Hex | Semantic Role |
+| :--- | :--- | :--- | :--- |
+| `surface.bg` | `#FAFAFA` | `#F8FAFC` | Main canvas background |
+| `surface.card` | `#FFFFFF` | `#FFFFFF` | Card containers, modals, bottom sheets |
+| `surface.muted` | `#F1F5F9` | `#F1F5F9` | Table headers, secondary search inputs |
+| `text.primary` | `#0F172A` | `#0F172A` | Slate-900: High-contrast headings and body text |
+| `text.secondary`| `#475569` | `#64748B` | Slate-600/500: Subtitles, metadata, timestamps |
+| `text.muted` | `#64748B` | `#94A3B8` | Slate-500/400: Placeholders, disabled text |
+| `border.default`| `#E2E8F0` | `#F1F5F9` | Default card and divider borders |
+| `border.strong` | `#CBD5E1` | `#CBD5E1` | Input focus outlines, table borders |
 
-### 3. Theme C: High Contrast & Accessibility
-*High-visibility mode for outdoor brightness or visual impairments.*
-* **Canvas**: Pure Black (`#000000`) / Pure White (`#FFFFFF`).
-* **Borders**: High-visibility $2\text{px}$ solid strokes (`#FFFFFF` in dark, `#000000` in light).
-* **Text Contrast**: Exceeds $7:1$ contrast ratio (WCAG AAA).
+### 5. Semantic Status Colors
+
+| State | Background | Text Color | Border Color | Dot Indicator |
+| :--- | :--- | :--- | :--- | :--- |
+| **Success** | `#ECFDF5` | `#047857` | `#A7F3D0` | `#10B981` (Emerald) |
+| **Warning** | `#FFFBEB` | `#B45309` | `#FDE68A` | `#F59E0B` (Amber) |
+| **Danger / Error** | `#FEF2F2` | `#B91C1C` | `#FECACA` | `#EF4444` (Rose Red) |
+| **Info** | `#EFF6FF` | `#1D4ED8` | `#BFDBFE` | `#3B82F6` (Blue) |
 
 ---
 
 ## ✍️ Typography System & Type Ramp
 
-The type system is anchored in **Outfit** (display headings) and **Inter** (body, numerals, and data).
+### Font Families
+* **Web Editorial Headings**: `'Playfair Display', Georgia, serif` (Evoking timeless luxury jewelry).
+* **Web & Mobile Body**: `'Inter', system-ui, -apple-system, sans-serif` (Crisp digital legibility).
+* **Web Monospace / Codes**: `'Fira Code', 'Courier New', monospace` (For special product codes e.g. `PRD-GLD-0042`).
+
+### Standard Type Ramp (Web & Mobile)
 
 ```mermaid
 graph TD
-    subgraph TypeScale[" Responsive Type Ramp "]
-        D1["Display XL — 48px / 56px (Hero Headings)"]
-        D2["Headline LG — 28px / 36px (Screen Titles)"]
-        T1["Title MD — 18px / 24px (Card Headings)"]
-        B1["Body MD — 16px / 24px (Standard Paragraphs)"]
-        L1["Label SM — 12px / 16px (Badges & Tags)"]
-        C1["Caption — 12px / 16px (Metadata & Helper)"]
+    subgraph TypeScale[" Unified Type Ramp "]
+        D1["Display XL — 48px / 56px (Weight: 800)"]
+        D2["Display LG — 40px / 48px (Weight: 800)"]
+        D3["Display MD — 36px / 44px (Weight: 700)"]
+        H1["Headline XL — 32px / 40px (Weight: 700)"]
+        H2["Headline LG — 28px / 36px (Weight: 700)"]
+        H3["Headline MD — 24px / 32px (Weight: 700)"]
+        H4["Headline SM — 22px / 28px (Weight: 600)"]
+        T1["Title LG — 20px / 28px (Weight: 600)"]
+        T2["Title MD — 18px / 24px (Weight: 600)"]
+        T3["Title SM — 16px / 22px (Weight: 600)"]
+        B1["Body LG — 18px / 28px (Weight: 400)"]
+        B2["Body MD — 16px / 24px (Weight: 400)"]
+        B3["Body SM — 14px / 20px (Weight: 400)"]
+        L1["Label LG — 14px / 20px (Weight: 600)"]
+        L2["Label MD — 13px / 18px (Weight: 600)"]
+        L3["Label SM — 12px / 16px (Weight: 600)"]
+        C1["Caption — 12px / 16px (Weight: 400)"]
+        O1["Overline — 10px / 14px (Weight: 700, UPPERCASE)"]
     end
 ```
 
-| Type Token | Font Size | Line Height | Font Weight | Typical Application |
-| :--- | :--- | :--- | :--- | :--- |
-| `display-xl` | $48\text{px}$ | $56\text{px}$ | Bold (700) | Home hero banners, promotional splash |
-| `headline-lg`| $28\text{px}$ | $36\text{px}$ | SemiBold (600) | Screen titles, Category headers |
-| `title-lg` | $20\text{px}$ | $28\text{px}$ | SemiBold (600) | Modal headers, product detail title |
-| `title-md` | $18\text{px}$ | $24\text{px}$ | Medium (500) | Product card titles, Section headers |
-| `body-lg` | $18\text{px}$ | $28\text{px}$ | Regular (400) | Lead introductory paragraphs |
-| `body-md` | $16\text{px}$ | $24\text{px}$ | Regular (400) | Default body text, descriptions |
-| `body-sm` | $14\text{px}$ | $20\text{px}$ | Regular (400) | Sizing notes, address items |
-| `label-md` | $13\text{px}$ | $18\text{px}$ | SemiBold (600) | Button text, form field labels |
-| `label-sm` | $12\text{px}$ | $16\text{px}$ | Medium (500) | Stock badges, size tag pills |
-| `caption` | $12\text{px}$ | $16\text{px}$ | Regular (400) | Timestamps, audit logs, disclaimer |
+| Type Token | Font Size | Line Height | Letter Spacing | Weight | Typical Usage |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `display-xl` | `3rem` (48px) | `3.5rem` (56px) | `-0.025em` | 800 (Bold) | Marketing hero banners, splash screens |
+| `display-lg` | `2.5rem` (40px)| `3rem` (48px) | `-0.025em` | 800 (Bold) | Category showcase headers |
+| `display-md` | `2.25rem` (36px)| `2.75rem` (44px)| `-0.02em` | 700 (Bold) | Section hero headers |
+| `headline-xl`| `2rem` (32px) | `2.5rem` (40px) | `-0.02em` | 700 (Bold) | Main screen titles, modal headers |
+| `headline-lg`| `1.75rem` (28px)| `2.25rem` (36px)| `-0.015em`| 700 (Bold) | Screen titles on mobile |
+| `headline-md`| `1.5rem` (24px) | `2rem` (32px) | `-0.015em`| 700 (Bold) | Dashboard KPI card titles |
+| `headline-sm`| `1.375rem` (22px)| `1.75rem` (28px)| `-0.01em` | 600 (SemiBold)| Card group headers |
+| `title-lg` | `1.25rem` (20px)| `1.75rem` (28px)| `-0.01em` | 600 (SemiBold)| Product detail page titles |
+| `title-md` | `1.125rem` (18px)| `1.5rem` (24px) | `-0.005em`| 600 (SemiBold)| Product card titles |
+| `title-sm` | `1rem` (16px) | `1.375rem` (22px)| `0em` | 600 (SemiBold)| Sub-section titles |
+| `body-lg` | `1.125rem` (18px)| `1.75rem` (28px)| `0em` | 400 (Regular) | Lead introductory paragraphs |
+| `body-md` | `1rem` (16px) | `1.5rem` (24px) | `0em` | 400 (Regular) | Default body copy, descriptions |
+| `body-sm` | `0.875rem` (14px)| `1.25rem` (20px)| `0em` | 400 (Regular) | Sizing notes, address items |
+| `label-lg` | `0.875rem` (14px)| `1.25rem` (20px)| `0.01em` | 600 (SemiBold)| Primary button labels |
+| `label-md` | `0.8125rem` (13px)| `1.125rem` (18px)| `0.01em` | 600 (SemiBold)| Input labels, filter chips |
+| `label-sm` | `0.75rem` (12px)| `1rem` (16px) | `0.02em` | 600 (SemiBold)| Size pill tags, stock status badges |
+| `caption` | `0.75rem` (12px)| `1rem` (16px) | `0.02em` | 400 (Regular) | Helper text, timestamps |
+| `overline` | `0.6875rem` (11px)| `0.875rem` (14px)| `0.06em` | 700 (Bold) | Uppercase category tags |
 
 ---
 
 ## 📏 8pt / 4pt Spacing & Layout Grid
 
-All padding, margin, and gap values MUST be derived from the $8\text{pt}$ / $4\text{pt}$ scale:
+All layout dimensions MUST use the $8\text{pt} / 4\text{pt}$ scale:
 
-$$\text{Spacing}(n) = n \times 4\text{px}$$
-
-| Token | Pixels | Application |
-| :--- | :--- | :--- |
-| `space-1` | $4\text{px}$ | Micro spacing: icon-to-text gap, badge inner padding |
-| `space-2` | $8\text{px}$ | Tight spacing: between form label and input |
-| `space-3` | $12\text{px}$| Compact spacing: card internal padding on mobile |
-| `space-4` | $16\text{px}$| Default gutter: screen horizontal edge padding, list gaps |
-| `space-6` | $24\text{px}$| Section spacing: gap between product grid and banner |
-| `space-8` | $32\text{px}$| Major section dividers: header to main content |
-| `space-12`| $48\text{px}$| Hero padding: desktop banner top/bottom margins |
+| Spacing Token | Web Rem / Pixels | Mobile Native | Semantic Application |
+| :--- | :--- | :--- | :--- |
+| `space-0` | `0px` | `0` | Reset / zero spacing |
+| `space-1` | `0.25rem` (4px) | `4` | Micro spacing: icon-to-label gap |
+| `space-2` | `0.5rem` (8px) | `8` | Tight spacing: between label and input |
+| `space-3` | `0.75rem` (12px)| `12` | Compact padding: internal card padding |
+| `space-4` | `1rem` (16px) | `16` | **Standard Gutter**: Screen edge margin, list spacing |
+| `space-5` | `1.25rem` (20px)| `20` | Medium gap: between form sections |
+| `space-6` | `1.5rem` (24px) | `24` | Section spacing: grid gaps |
+| `space-8` | `2rem` (32px) | `32` | Major section break |
+| `space-10`| `2.5rem` (40px) | `40` | Large section divider |
+| **`space-11`**| **`2.75rem` (44px)**| **`44`** | **Minimum Touch Target Boundary** |
+| `space-12`| `3rem` (48px) | `48` | Modal header-to-content padding |
+| `space-16`| `4rem` (64px) | `64` | Hero top/bottom margins |
 
 ---
 
 ## 📐 Container Constraints & Responsive Breakpoints
 
-Content should never stretch unconstrained across ultra-wide monitors.
-
-```mermaid
-graph LR
-    Mobile["Compact (< 640px)<br/>100% Fluid • 16px Gutter"] --> Tablet["Medium (640px - 1024px)<br/>2-3 Column Grid • 24px Gutter"]
-    Tablet --> Desktop["Expanded (1024px - 1440px)<br/>Max-Width 1280px • Sidebar + Grid"]
-    Desktop --> Ultrawide["Wide (>= 1440px)<br/>Max-Width 1440px Centered"]
-```
-
-| Breakpoint | Width Range | Layout Behavior |
+| Viewport Size | Width Range | Layout Strategy |
 | :--- | :--- | :--- |
-| **Mobile (`sm`)** | $< 640\text{px}$ | Single column, bottom navigation bar, full-width sheets |
-| **Tablet (`md`)** | $640\text{px} - 1023\text{px}$ | 2-3 column product grid, navigation rail or collapsible header |
-| **Desktop (`lg`)** | $1024\text{px} - 1279\text{px}$ | Persistent sidebar, 4-column product grid, top utility bar |
-| **Wide (`xl`)** | $\ge 1280\text{px}$ | Constrained $1440\text{px}$ centered container with multi-pane layout |
+| **Mobile (`sm`)** | $< 640\text{px}$ | Single column, sticky bottom navigation, full-width modal sheets |
+| **Tablet (`md`)** | $640\text{px} - 1023\text{px}$ | 2-3 column product grid, collapsible navigation rail |
+| **Desktop (`lg`)** | $1024\text{px} - 1279\text{px}$ | Persistent sidebar, 4-column product grid, top action bar |
+| **Wide (`xl`)** | $\ge 1280\text{px}$ | Constrained $1440\text{px}$ centered container (`max-w-[1440px] mx-auto`) |
 
 ---
 
 ## 🧩 Component Design Standards
 
 ### 1. Buttons & Interactive Targets
-* **Touch Target**: Minimum $44 \times 44\text{ pt}$ on mobile; $36\text{px}$ height on desktop.
+* **Touch Target**: Strict minimum $44 \times 44\text{ pt}$ on mobile; minimum $36\text{px}$ height on web.
 * **Hierarchy**:
-  * **Primary**: Filled Royal Gold (`#D4AF37`) with dark text (`#1A1815`) for high legibility.
-  * **Secondary**: Outlined warm stroke (`#D4AF37`) with transparent background.
-  * **Destructive**: Ruby Red (`#E11D48`) for delete and discard actions.
-* **States**: `default`, `hover`, `active`, `focused` (visible $2\text{px}$ focus ring), `disabled` (40% opacity), `loading` (spinner replacing label, prevents double submit).
+  * **Primary**: `gradient-primary` (`#E8436E` $\rightarrow$ `#CC3366` $\rightarrow$ `#B3245A`) with white text.
+  * **Secondary**: Outlined stroke (`border: 1px solid #E2E8F0`, hover: `#E8436E`).
+  * **Destructive**: Ruby Red (`#FEF2F2` bg, `#B91C1C` text, `#FECACA` border).
+  * **Icon Button**: Enclosed in a $44 \times 44\text{ pt}$ hit box with `hitSlop: 10`.
 
 ### 2. Input Fields & Form States
-* **Structure**: Mandatory visible Label $\rightarrow$ Input field $\rightarrow$ Helper text / Error message.
-* **States**: `default`, `focus` (gold border + glow), `error` (crimson border + error icon), `disabled`.
-* **Never use placeholder as the sole label.**
+* **OTP Input**: Dedicated $48 \times 56\text{px}$ digit boxes with `border: 2px solid #E2E8F0`. On focus: `border-color: #E8436E`, `box-shadow: 0 0 0 3px rgba(232, 67, 110, 0.15)`. Filled state: `#FFF0F3` background.
+* **Text Inputs**: Visible floating label $\rightarrow$ input box $\rightarrow$ helper text/error state.
 
 ### 3. Cards & Media Ratios
-* **Aspect Ratios**:
-  * Product Thumbnails: **1:1** (Square) for bangles symmetry.
-  * Hero Banners: **16:9** on desktop, **4:3** on mobile.
-* **Visual Treatment**: Subtle border (`1px solid #E8E2D5`) + gentle shadow (`0 2px 8px rgba(0,0,0,0.04)`). Never combine heavy dark shadows with thick borders.
+* **Product Cards**: Aspect ratio **1:1** (Square) for symmetrical bangle photography.
+* **Border Radius**:
+  * Buttons & Inputs: `rounded-lg` ($12\text{px}$) on mobile, `rounded-md` ($8\text{px}$) on web.
+  * Cards: `rounded-xl` ($16\text{px}$ on mobile, $12\text{px}$ on web).
+  * Modal Sheets: `rounded-2xl` ($24\text{px}$).
 
 ### 4. Empty, Loading & Error States
-* **Empty State**: Must state (1) What is missing, (2) Why it is empty, and (3) Actionable CTA button (e.g. "Explore Bridal Collection").
-* **Loading State**: Shimmer skeletons matching the card geometry to eliminate Cumulative Layout Shift (CLS).
-* **Error State**: Actionable explanation with "Retry" button. Never display raw HTTP `500` or database exceptions.
+* **Empty State**: Displays an illustrative vector, clear explanation, and primary action button.
+* **Loading State**: Shimmer animation (`background: linear-gradient(...)`) preserving card geometry.
+* **Error State**: Actionable card with retry button and direct error bus reporting.
+
+---
+
+## 📱 Touch Ergonomics & Hit Targets
+
+From [`mobile/src/theme/tokens.ts`](file:///c:/Local%20Disk%20D_8252026651/startUp/sofiya_bangles/mobile/src/theme/tokens.ts#L118-L123):
+```typescript
+export const touchTargets = {
+  minWidth: 44,
+  minHeight: 44,
+  hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
+  largeHitSlop: { top: 14, bottom: 14, left: 14, right: 14 },
+} as const;
+```
+All interactive elements (buttons, navigation tabs, back arrows, favorite hearts) must apply `touchTargets.hitSlop` to ensure comfortable one-handed thumb interaction.
 
 ---
 
 ## 💎 Iconography & Media Principles
 
-* **Icon Family**: Exclusively use **Lucide Icons** (Web: `lucide-react`, Mobile: Lucide native SVG components).
-* **Consistency**: $2\text{px}$ stroke width, rounded caps and joins.
-* **Accessibility**: Every icon button must have an `aria-label` (web) or `accessibilityLabel` (mobile).
+* **Unified Family**: Exclusively use **Lucide Icons** (`lucide-react` on web, Lucide native SVGs on mobile).
+* **Stroke Width**: Standardized $2\text{px}$ stroke width across all screen densities.
+* **Accessible Labels**: All icon-only buttons must have `aria-label` (web) or `accessibilityLabel` (mobile).
 
 ---
 
@@ -189,7 +251,7 @@ graph LR
 | Accessibility Area | Standard | Implementation Rule |
 | :--- | :--- | :--- |
 | **Color Contrast** | WCAG 2.2 AA | Normal text $\ge 4.5:1$; Large text $\ge 3:1$; UI controls $\ge 3:1$. |
-| **Touch Ergonomics** | Apple HIG / Material | Minimum interactive hit area $44 \times 44\text{ pt}$ on mobile devices. |
-| **Keyboard Navigation** | WAI-ARIA 1.2 | Full tab traversal, Enter/Space activation, Escape to close modals. |
+| **Touch Ergonomics** | Apple HIG / Material | Minimum interactive hit area $44 \times 44\text{ pt}$ (`space-11`). |
+| **Keyboard Navigation** | WAI-ARIA 1.2 | Full tab traversal, Enter/Space activation, Escape to dismiss modals. |
 | **Screen Readers** | VoiceOver / TalkBack | Semantic HTML (`<main>`, `<nav>`, `<button>`) + meaningful labels. |
 | **Motion Sensitivity** | `prefers-reduced-motion` | Disable decorative transitions and spring animations when active. |

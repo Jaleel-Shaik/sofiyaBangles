@@ -109,7 +109,7 @@ For in-depth guides, inspect the dedicated documents in the [`docs/`](docs/) dir
 * 📄 **[Product Requirements Document (PRD)](docs/prd.md)** — Full business goals, user personas, functional matrices, and release roadmap.
 * 🏗️ **[System Architecture](docs/architecture.md)** — Clean architecture layering, dependency graphs, distributed database topology, and API contracts.
 * 📜 **[Engineering Constitution & Rules](docs/rules.md)** — Code standards, anti-patterns to flag, async patterns, component reusability, and testing pyramid.
-* 🎨 **[UI/UX Design System & Typography](docs/design.md)** — 3-theme color roles (Ivory, Onyx, High Contrast), Outfit/Inter type ramp, and 8pt layout grid.
+* 🎨 **[UI/UX Design System & Typography](docs/design.md)** — Sofiya Rose & Bangle Gold palette, Playfair Display & Inter typography, 44pt touch targets, and 8pt layout grid.
 * 🧠 **[Agent Memory & Decision Log](docs/memory.md)** — Immutable architectural decision records (ADRs), known gotchas, and security invariants.
 * 💾 **[Database Architecture & Schema Guide](DATABASE_SCHEMA_DOCUMENTATION.md)** — Comprehensive documentation of the 12 Firestore collections and PostgreSQL ledgers.
 * 🐳 **[Docker Setup & Deployment Guide](DOCKER_GUIDE.md)** — Container buildx commands, environment files, and compose instructions.
