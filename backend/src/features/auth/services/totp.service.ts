@@ -208,10 +208,9 @@ export const initiateLoginService = async (
 };
 
 /**
- * Resolves the login challenge by challengeId or legacy JWT token payload.
+ * Resolves the login challenge by challengeId.
  */
-const resolveLoginChallenge = async (bodyChallengeId: string | undefined, decodedToken: any) => {
-  const challengeId = bodyChallengeId || decodedToken?.challengeId;
+const resolveLoginChallenge = async (challengeId: string | undefined) => {
   if (!challengeId) {
     throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
   }
@@ -251,19 +250,23 @@ export const verify2FAOtpService = async (
   bodyEmail?: string,
   useBackupCode?: boolean
 ) => {
-  let decoded: any = null;
-  if (otpPendingToken) {
-    try {
-      decoded = jwt.verify(otpPendingToken, env.JWT_SECRET);
-    } catch {
-      // If bodyChallengeId is provided, we can continue without valid JWT
-      if (!bodyChallengeId) {
-        throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
-      }
-    }
+  if (!otpPendingToken) {
+    throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
   }
 
-  const challenge = await resolveLoginChallenge(bodyChallengeId, decoded);
+  let decoded: any;
+  try {
+    decoded = jwt.verify(otpPendingToken, env.JWT_SECRET);
+  } catch {
+    throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
+  }
+
+  if (bodyChallengeId && decoded.challengeId && bodyChallengeId !== decoded.challengeId) {
+    throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
+  }
+
+  const challengeId = decoded.challengeId || bodyChallengeId;
+  const challenge = await resolveLoginChallenge(challengeId);
   const rawUserId = challenge.user_id || challenge.userId;
   if (!rawUserId) {
     throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
