@@ -4,17 +4,13 @@ import { AppIcon } from '../constants/icons';
 import { STRINGS } from '../constants/strings';
 
 interface SearchInputProps extends TextInputProps {
-  onFilterPress?: () => void;
   onSearchPress?: () => void;
   onClear?: () => void;
-  showFilter?: boolean;
 }
 
 export default function SearchInput({
-  onFilterPress,
   onSearchPress,
   onClear,
-  showFilter = false,
   className = '',
   value,
   onChangeText,
@@ -100,23 +96,6 @@ export default function SearchInput({
           <AppIcon name="closeCircleFilled" size={18} color="#94a3b8" />
         </TouchableOpacity>
       )}
-
-      {/* Trailing Filter Button */}
-      {showFilter && (
-        <>
-          <View style={styles.divider} />
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={onFilterPress}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel={STRINGS.common.filter}
-          >
-            <AppIcon name="filter" size={17} color="#e11d48" />
-          </TouchableOpacity>
-        </>
-      )}
     </View>
   );
 }
@@ -171,21 +150,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-  },
-  divider: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#e2e8f0',
-    marginHorizontal: 8,
-  },
-  filterButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#fff1f2',
-    borderWidth: 1,
-    borderColor: '#ffe4e6',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

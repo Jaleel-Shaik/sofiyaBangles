@@ -82,7 +82,6 @@ export default function CategoriesScreen() {
           <View className="px-5 pb-5">
             <SearchInput
               placeholder={STRINGS.collections.searchPlaceholder}
-              showFilter={false}
               value={searchQuery}
               onChangeText={setSearchQuery}
               onClear={() => setSearchQuery('')}

@@ -157,14 +157,10 @@ export default function HomeScreen() {
   const bannerScrollRef = useRef<ScrollView>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
 
+  const [avatarError, setAvatarError] = useState(false);
+
   // Define banners FIRST so snapOffsets and JSX always have valid array
   const banners = [
-    {
-      ...STRINGS.home.banners.newArrivals,
-      gradient: ["#e11d48", "#be123c", "#881337"],
-      textColor: "text-[#e11d48]",
-      icon: "sparkles",
-    },
     {
       ...STRINGS.home.banners.collections,
       gradient: ["#4f46e5", "#4338ca", "#312e81"],
@@ -178,6 +174,21 @@ export default function HomeScreen() {
       icon: "ruler",
     },
   ];
+
+  const validPurchasedCount = useMemo(() => {
+    return Array.isArray(purchasedProductIds)
+      ? purchasedProductIds.filter(Boolean).length
+      : 0;
+  }, [purchasedProductIds]);
+
+  const isValidAvatar = useMemo(() => {
+    return (
+      !avatarError &&
+      typeof user?.avatar_url === "string" &&
+      user.avatar_url.trim().length > 0 &&
+      (user.avatar_url.startsWith("http://") || user.avatar_url.startsWith("https://"))
+    );
+  }, [user?.avatar_url, avatarError]);
 
   const BANNER_WIDTH = Math.max(windowWidth - 40, 280);
   const BANNER_GAP = 12;
@@ -500,13 +511,15 @@ export default function HomeScreen() {
       {/* Static Refined Luxury Header Section */}
       <LinearGradient
         colors={["#FFF4F6", "#FFFFFF"]}
-        className="px-5 pb-4 border-b border-rose-100 shadow-sm"
-        style={{ paddingTop: Math.max(insets.top + 8, 34) }}
+        className="px-4 pb-3 border-b border-rose-100/80 shadow-xs"
+        style={{ paddingTop: Math.max(insets.top + 6, 28) }}
       >
+        {/* Top Row: Brand & Action Icons */}
         <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center flex-1 mr-3">
-            {/* Brand Diamond Logo */}
-            <View className="w-11 h-11 rounded-2xl bg-white border border-rose-100 p-1.5 shadow-sm items-center justify-center mr-3">
+          {/* Left: Brand Identity (Logo + Name + Greeting) */}
+          <View className="flex-row items-center flex-1 mr-3 min-w-0">
+            {/* Diamond Brand Logo */}
+            <View className="w-10 h-10 rounded-2xl bg-white border border-rose-100 p-1.5 shadow-xs items-center justify-center mr-2.5 shrink-0">
               <Image
                 source={require("../../../assets/images/logo.png")}
                 className="w-full h-full"
@@ -514,101 +527,104 @@ export default function HomeScreen() {
               />
             </View>
 
-            {/* Left Column: Greeting, Name, Tagline */}
-            <View className="flex-1">
-              {/* Eyebrow Greeting & Role Badge */}
+            {/* Store Name & Greeting */}
+            <View className="flex-1 min-w-0 justify-center">
               <View className="flex-row items-center">
-                <Text className="text-label-sm font-medium text-slate-500">
-                  {STRINGS.home.greeting}
+                <Text
+                  className="text-base font-extrabold text-slate-900 tracking-tight font-serif shrink-0"
+                  numberOfLines={1}
+                >
+                  {STRINGS.common.appName}
                 </Text>
                 {user?.role === "super_admin" && (
-                  <View className="ml-2 bg-rose-600 px-2 py-0.5 rounded-full shadow-sm">
-                    <Text className="text-overline font-bold text-white uppercase tracking-wider">
+                  <View className="ml-1.5 bg-rose-600 px-2 py-0.5 rounded-full shadow-xs shrink-0">
+                    <Text className="text-[9px] font-bold text-white uppercase tracking-wider">
                       {STRINGS.home.roles.superAdmin}
                     </Text>
                   </View>
                 )}
                 {user?.role === "admin" && (
-                  <View className="ml-2 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200">
-                    <Text className="text-overline font-bold text-rose-700 uppercase tracking-wider">
+                  <View className="ml-1.5 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200 shrink-0">
+                    <Text className="text-[9px] font-bold text-rose-700 uppercase tracking-wider">
                       {STRINGS.home.roles.admin}
                     </Text>
                   </View>
                 )}
               </View>
 
-              {/* User Name as Primary Title */}
               <Text
-                className="text-headline-md font-bold text-slate-900 tracking-tight mt-0.5"
+                className="text-[11px] text-slate-500 font-medium mt-0.5"
                 numberOfLines={1}
               >
-                {getDisplayName()}
-              </Text>
-
-              {/* Tagline */}
-              <View className="flex-row items-center mt-1">
-                <AppIcon name="sparkles" size={13} color="#e11d48" style={{ marginRight: 5 }} />
-                <Text className="text-label-md font-semibold text-rose-600 tracking-wide">
-                  {STRINGS.home.tagline}
+                {STRINGS.home.greeting}{" "}
+                <Text className="font-semibold text-rose-600">
+                  {getDisplayName()}
                 </Text>
-              </View>
+              </Text>
             </View>
           </View>
 
-          {/* Right Column: Action Buttons */}
-          <View className="flex-row items-center">
-            {/* Dedicated Search Option Button */}
+          {/* Right: Action Buttons (Search, Bag, Profile) */}
+          <View className="flex-row items-center gap-2 shrink-0">
+            {/* Search Icon Button */}
             <TouchableOpacity
               onPress={() => router.push("/search" as any)}
-              className="w-11 h-11 rounded-full bg-white shadow-sm border border-rose-100 items-center justify-center mr-2.5 relative"
+              className="w-10 h-10 rounded-full bg-white shadow-xs border border-rose-100 items-center justify-center"
               activeOpacity={0.7}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel={STRINGS.common.search}
             >
-              <AppIcon name="search" size={20} color="#e11d48" />
+              <AppIcon name="search" size={19} color="#e11d48" />
             </TouchableOpacity>
 
             {/* Orders Bag Button */}
             <TouchableOpacity
               onPress={() => router.push("/orders" as any)}
-              className="w-11 h-11 rounded-full bg-white shadow-sm border border-rose-100 items-center justify-center mr-2.5 relative"
+              className="w-10 h-10 rounded-full bg-white shadow-xs border border-rose-100 items-center justify-center relative"
               activeOpacity={0.7}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel={STRINGS.home.actions.viewOrders}
             >
-              <AppIcon name="bag" size={20} color="#e11d48" />
-              {(purchasedProductIds || []).length > 0 && (
-                <View className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 items-center justify-center border-2 border-white shadow-sm">
-                  <Text className="text-overline font-extrabold text-white">
-                    {purchasedProductIds.length > 9 ? "9+" : purchasedProductIds.length}
+              <AppIcon name="bag" size={19} color="#e11d48" />
+              {validPurchasedCount > 0 && (
+                <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 items-center justify-center border-2 border-white shadow-xs">
+                  <Text className="text-[10px] font-extrabold text-white">
+                    {validPurchasedCount > 9 ? "9+" : validPurchasedCount}
                   </Text>
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* Profile Avatar */}
+            {/* Profile Avatar Button */}
             <TouchableOpacity
               onPress={() => router.push("/(tabs)/profile")}
               activeOpacity={0.7}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel={STRINGS.home.actions.viewProfile}
-              className="relative"
+              className="w-10 h-10 rounded-full border-2 border-rose-200 shadow-xs overflow-hidden bg-rose-50 items-center justify-center"
             >
-              {user?.avatar_url ? (
+              {isValidAvatar ? (
                 <Image
-                  source={{ uri: user.avatar_url }}
-                  className="w-11 h-11 rounded-full border-2 border-rose-200 shadow-sm"
+                  source={{ uri: user!.avatar_url!.trim() }}
+                  className="w-full h-full object-cover"
+                  onError={() => setAvatarError(true)}
                 />
               ) : (
-                <View className="w-11 h-11 rounded-full border-2 border-rose-200 bg-rose-50 shadow-sm items-center justify-center">
-                  <AppIcon name="profile" size={20} color="#e11d48" />
-                </View>
+                <AppIcon name="profile" size={19} color="#e11d48" />
               )}
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Bottom Tagline Banner: Clean & Seamless */}
+        <View className="flex-row items-center mt-2">
+          <AppIcon name="sparkles" size={12} color="#e11d48" style={{ marginRight: 6 }} />
+          <Text className="text-[11px] font-semibold text-rose-600 tracking-wide flex-1" numberOfLines={1}>
+            {STRINGS.home.tagline}
+          </Text>
         </View>
       </LinearGradient>
 
