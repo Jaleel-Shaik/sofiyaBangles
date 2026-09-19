@@ -44,7 +44,7 @@ async function generateOtp() {
     
     const secret = decryptSecret(encryptedSecret);
     const code = await generate({ secret });
-    console.log(`Current OTP Code for ${email}: ${code}`);
+    process.stdout.write(`OTP: ${code}\n`);
   } catch (error) {
     console.error('Error generating OTP:', error);
   }

@@ -30,6 +30,8 @@ import {
 import { type AdminOrder, type Product } from "@/src/lib/api";
 import toast from "react-hot-toast";
 import { api } from "@/src/lib/api";
+import { ConfirmDialog, Modal, Button, Input } from "@/src/components/ui";
+import { STRINGS } from "@/src/constants/strings";
 
 export default function OrdersManagementPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -39,6 +41,11 @@ export default function OrdersManagementPage() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Accessible Complete and Refund Dialog States
+  const [confirmCompleteId, setConfirmCompleteId] = useState<string | null>(null);
+  const [refundOrderId, setRefundOrderId] = useState<string | null>(null);
+  const [refundReason, setRefundReason] = useState("");
 
   // New WhatsApp Sale Modal State
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
@@ -260,18 +267,14 @@ export default function OrdersManagementPage() {
     }
   };
 
-  const handleCompleteOrder = async (orderId: string) => {
-    if (
-      !confirm(
-        "Mark this order as COMPLETED? This allocates the 70/30 commission into the revenue ledger."
-      )
-    ) {
-      return;
-    }
+  const handleCompleteOrderConfirm = async () => {
+    if (!confirmCompleteId) return;
+    const orderId = confirmCompleteId;
     setActionLoading(true);
     try {
       await api.superAdmin.completeOrder(orderId);
       toast.success("Order completed and 70/30 commission allocated!");
+      setConfirmCompleteId(null);
       await fetchOrders();
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status: "completed" } : null));
@@ -283,13 +286,19 @@ export default function OrdersManagementPage() {
     }
   };
 
-  const handleRefundOrder = async (orderId: string) => {
-    const reason = prompt("Please enter the cancellation/refund reason:");
-    if (!reason) return;
+  const handleRefundOrderConfirm = async () => {
+    if (!refundOrderId) return;
+    if (!refundReason.trim()) {
+      toast.error("Please enter a refund reason");
+      return;
+    }
+    const orderId = refundOrderId;
     setActionLoading(true);
     try {
-      await api.superAdmin.refundOrder(orderId, reason);
+      await api.superAdmin.refundOrder(orderId, refundReason.trim());
       toast.success("Order refunded and ledger reversed.");
+      setRefundOrderId(null);
+      setRefundReason("");
       await fetchOrders();
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status: "refunded" } : null));
@@ -960,15 +969,18 @@ export default function OrdersManagementPage() {
               <div className="flex gap-2">
                 <button
                   disabled={actionLoading || selectedOrder.status === "completed"}
-                  onClick={() => handleCompleteOrder(selectedOrder.id)}
-                  className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50 shadow-sm"
+                  onClick={() => setConfirmCompleteId(selectedOrder.id)}
+                  className="flex-1 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50 shadow-sm"
                 >
                   Complete Order (70/30 Split)
                 </button>
                 <button
                   disabled={actionLoading || selectedOrder.status === "refunded"}
-                  onClick={() => handleRefundOrder(selectedOrder.id)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors disabled:opacity-50"
+                  onClick={() => {
+                    setRefundOrderId(selectedOrder.id);
+                    setRefundReason("");
+                  }}
+                  className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors disabled:opacity-50"
                 >
                   Cancel / Refund
                 </button>
@@ -976,7 +988,7 @@ export default function OrdersManagementPage() {
 
               <button
                 onClick={() => handlePrintInvoice(selectedOrder)}
-                className="w-full py-2.5 rounded-xl text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 min-h-[44px] rounded-xl text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5"
               >
                 <Printer className="w-4 h-4" /> Print Customer Invoice
               </button>
@@ -984,6 +996,62 @@ export default function OrdersManagementPage() {
           </div>
         </div>
       )}
+
+      {/* Accessible Complete Order Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmCompleteId)}
+        onClose={() => setConfirmCompleteId(null)}
+        onConfirm={handleCompleteOrderConfirm}
+        title={STRINGS.orders.completeConfirmTitle}
+        message={STRINGS.orders.completeConfirmMessage}
+        confirmLabel="Complete Order"
+        cancelLabel={STRINGS.common.cancel}
+        variant="primary"
+        isLoading={actionLoading}
+      />
+
+      {/* Accessible Refund/Cancel Order Modal */}
+      <Modal
+        isOpen={Boolean(refundOrderId)}
+        onClose={() => {
+          setRefundOrderId(null);
+          setRefundReason("");
+        }}
+        title="Cancel & Refund Order"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Cancelling this order will mark it as refunded and reverse any associated revenue commissions in the ledger.
+          </p>
+          <Input
+            label="Refund / Cancellation Reason"
+            value={refundReason}
+            onChange={(e) => setRefundReason(e.target.value)}
+            placeholder="e.g. Customer cancelled via WhatsApp, Incorrect size selected"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => {
+                setRefundOrderId(null);
+                setRefundReason("");
+              }}
+            >
+              {STRINGS.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              size="md"
+              onClick={handleRefundOrderConfirm}
+              isLoading={actionLoading}
+            >
+              Confirm Refund
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

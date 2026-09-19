@@ -141,6 +141,34 @@ export const sellProduct = async (id: string, quantity = 1) => {
   }
 };
 
+export const lookupProductByCode = async (code: string) => {
+  try {
+    const res = await apiClient.get(API_ENDPOINTS.PRODUCTS.LOOKUP_CODE(code));
+    return res.data.data;
+  } catch (error: unknown) {
+    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Product not found');
+    throw new Error(message);
+  }
+};
+
+export const sellProductByCode = async (
+  code: string,
+  quantity = 1,
+  extra?: { customer_name?: string; customer_phone?: string; notes?: string }
+) => {
+  try {
+    const res = await apiClient.post(API_ENDPOINTS.PRODUCTS.SELL_BY_CODE, {
+      code,
+      quantity,
+      ...extra,
+    });
+    return res.data.data;
+  } catch (error: unknown) {
+    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to sell product');
+    throw new Error(message);
+  }
+};
+
 export const deleteProduct = async (id: string) => {
   try {
     const res = await apiClient.delete(API_ENDPOINTS.PRODUCTS.BY_ID(id));

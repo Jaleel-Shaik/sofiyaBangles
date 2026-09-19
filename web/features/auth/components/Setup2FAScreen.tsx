@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import { type Verify2FAResponse } from "@/src/lib/api";
@@ -41,6 +42,38 @@ export default function Setup2FAScreen() {
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [acknowledgedBackup, setAcknowledgedBackup] = useState(false);
   const savedAuthResultRef = useRef<Verify2FAResponse | null>(null);
+
+  // RFC 6238 Epoch-Synchronized TOTP 30-second Countdown Timer
+  const [totpCountdown, setTotpCountdown] = useState<number>(() => {
+    const epochSeconds = Math.floor(Date.now() / 1000);
+    const rem = 30 - (epochSeconds % 30);
+    return rem === 0 ? 30 : rem;
+  });
+
+  useEffect(() => {
+    if (currentStep !== "verify") return;
+
+    const syncTimer = () => {
+      const epochSeconds = Math.floor(Date.now() / 1000);
+      const rem = 30 - (epochSeconds % 30);
+      setTotpCountdown(rem === 0 ? 30 : rem);
+    };
+
+    syncTimer();
+    const interval = setInterval(syncTimer, 500);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncTimer();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [currentStep]);
 
   // QR expiry timer (10 min)
   useEffect(() => {
@@ -180,6 +213,10 @@ export default function Setup2FAScreen() {
       {/* Left Panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#FFF0F3] via-[#FFD6DE] to-[#FFB3C2] relative overflow-hidden items-center justify-center">
         <div className="relative z-10 text-center px-12">
+          <div className="flex items-center justify-center gap-2.5 mb-8 bg-white/60 backdrop-blur-sm py-2 px-5 rounded-full mx-auto w-fit border border-white/60 shadow-sm">
+            <Image src="/logo.png" alt="Sofiya Bangles" width={24} height={24} className="object-contain" />
+            <span className="text-sm font-bold text-[#7A0D3C] tracking-wide">Sofiya Bangles</span>
+          </div>
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -231,6 +268,12 @@ export default function Setup2FAScreen() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
+          {/* Mobile brand header */}
+          <div className="lg:hidden flex items-center justify-center gap-2 mb-6">
+            <Image src="/logo.png" alt="Sofiya Bangles" width={28} height={28} className="object-contain" />
+            <span className="text-base font-bold text-[#171717]">Sofiya Bangles</span>
+          </div>
+
           {/* Step indicator - 3-step flow */}
           <div className="flex items-center justify-center gap-2 mb-8">
             <div
@@ -451,6 +494,23 @@ export default function Setup2FAScreen() {
                     />
                   </motion.div>
                 ))}
+              </div>
+
+              <div className="mb-6 text-center">
+                {totpCountdown <= 5 ? (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    Code rotating in {totpCountdown}s...
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#737373] flex items-center justify-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#E8436E]/60" />
+                    Code refreshes in{" "}
+                    <span className="text-[#E8436E] font-semibold">
+                      {totpCountdown}s
+                    </span>
+                  </p>
+                )}
               </div>
 
               {error && (

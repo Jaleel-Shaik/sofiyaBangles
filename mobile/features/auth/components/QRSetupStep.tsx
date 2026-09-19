@@ -6,15 +6,17 @@ import {
   TouchableOpacity,
   Animated,
   Platform,
+  ActivityIndicator,
   useWindowDimensions,
+  AppState,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import Button from "@/src/components/Button";
 import { StepProgress } from "./StepProgress";
 import { OTPDigitInput } from "./OTPDigitInput";
+import { STRINGS } from "@/src/constants/strings";
 
 export interface QRSetupProps {
   qrCodeUrl: string;
@@ -50,6 +52,35 @@ export const QRSetupStep: React.FC<QRSetupProps> = ({
   const insets = useSafeAreaInsets();
   const isSmallScreen = screenHeight < 600;
 
+  // RFC 6238 Epoch-Synchronized TOTP 30-second Countdown Timer
+  const [totpTimer, setTotpTimer] = useState<number>(() => {
+    const epochSeconds = Math.floor(Date.now() / 1000);
+    const rem = 30 - (epochSeconds % 30);
+    return rem === 0 ? 30 : rem;
+  });
+
+  useEffect(() => {
+    const syncTotp = () => {
+      const epochSeconds = Math.floor(Date.now() / 1000);
+      const rem = 30 - (epochSeconds % 30);
+      setTotpTimer(rem === 0 ? 30 : rem);
+    };
+
+    syncTotp();
+    const interval = setInterval(syncTotp, 500);
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        syncTotp();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, []);
+
   useEffect(() => {
     if (!qrExpired && qrCodeUrl) {
       const pulse = Animated.loop(
@@ -75,25 +106,22 @@ export const QRSetupStep: React.FC<QRSetupProps> = ({
     ? manualSecret.match(/.{1,4}/g)?.join(" ")
     : "";
 
-  const otpResetKeyRef = useRef(0);
   const prevSetupOtpCode = useRef(setupOtpCode);
-
   useEffect(() => {
     if (prevSetupOtpCode.current && !setupOtpCode) {
-      otpResetKeyRef.current += 1;
-      setOtpResetKey(otpResetKeyRef.current);
+      setOtpResetKey((prev) => prev + 1);
     }
     prevSetupOtpCode.current = setupOtpCode;
   }, [setupOtpCode]);
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#FFF0F3" }}>
+    <View className="flex-1 bg-[#FAFAFA]">
       <KeyboardAwareScrollView
         contentContainerStyle={{
           flexGrow: 1,
-          paddingHorizontal: 24,
-          paddingTop: isSmallScreen ? 8 : 20,
-          paddingBottom: insets.bottom + 16,
+          paddingHorizontal: 20,
+          paddingTop: isSmallScreen ? 12 : 20,
+          paddingBottom: Math.max(insets.bottom + 16, 24),
         }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -102,138 +130,109 @@ export const QRSetupStep: React.FC<QRSetupProps> = ({
       >
         <StepProgress current={0} total={2} />
 
-        {/* Header */}
-        <View className="items-center mb-5">
-          <View
-            className={`${isSmallScreen ? "w-20 h-20" : "w-24 h-24"} bg-white rounded-2xl items-center justify-center shadow-md mb-3`}
-            style={{
-              shadowColor: "#FF1F4B",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 12,
-              elevation: 8,
-              transform: [{ rotate: "-3deg" }],
-            }}
+        {/* Top Header Row */}
+        <View className="flex-row items-center justify-between mb-3">
+          <TouchableOpacity
+            onPress={onCancel}
+            className="w-10 h-10 bg-white rounded-full items-center justify-center border border-slate-200/80 shadow-xs active:bg-slate-50"
           >
-            <View
-              className={`${isSmallScreen ? "w-16 h-16" : "w-20 h-20"} bg-gradient-to-br from-[#FF1F4B]/10 to-[#FF1F4B]/5 rounded-2xl items-center justify-center`}
-              style={{ transform: [{ rotate: "3deg" }] }}
-            >
-              <Ionicons
-                name="key-outline"
-                size={isSmallScreen ? 26 : 32}
-                color="#FF1F4B"
-              />
+            <Ionicons name="close" size={20} color="#0f172a" />
+          </TouchableOpacity>
+
+          <View className="flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200/60">
+            <View className="w-2 h-2 rounded-full bg-primary" />
+            <Text className="text-[11px] font-bold text-primary uppercase tracking-wider">
+              {STRINGS.auth.qrSetup.badge}
+            </Text>
+          </View>
+
+          <View className="w-10" />
+        </View>
+
+        {/* Header Hero */}
+        <View className="items-center mb-5">
+          <View className="w-20 h-20 bg-white rounded-3xl items-center justify-center border border-slate-100 shadow-sm mb-3">
+            <View className="w-14 h-14 bg-rose-50 rounded-2xl items-center justify-center">
+              <Ionicons name="key-outline" size={28} color="#e11d48" />
             </View>
           </View>
-          <Text
-            className={`${isSmallScreen ? "text-xl" : "text-2xl"} font-extrabold text-slate-800 text-center mb-1`}
-            style={{ letterSpacing: -0.5 }}
-          >
-            Set up 2FA
+          <Text className="text-2xl font-black text-slate-900 text-center tracking-tight">
+            {STRINGS.auth.qrSetup.title}
           </Text>
-          <Text className="text-slate-500 text-sm text-center leading-5 px-2">
-            Link your account to Google Authenticator
+          <Text className="text-xs text-slate-500 text-center mt-1 px-4 leading-relaxed max-w-[300px]">
+            {STRINGS.auth.qrSetup.subtitle}
           </Text>
         </View>
 
         {/* QR Code Card */}
-        <View
-          className="bg-white rounded-3xl items-center shadow-sm mb-3 border border-rose-100"
-          style={{
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.06,
-            shadowRadius: 12,
-            elevation: 4,
-          }}
-        >
+        <View className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm mb-4 items-center">
           {qrExpired ? (
-            <View
-              className={`${isSmallScreen ? "py-6" : "py-10"} items-center justify-center`}
-            >
-              <View className="w-14 h-14 bg-slate-50 rounded-full items-center justify-center mb-2">
-                <Ionicons name="time-outline" size={28} color="#94a3b8" />
+            <View className="py-8 items-center justify-center">
+              <View className="w-14 h-14 bg-rose-50 rounded-2xl items-center justify-center mb-3">
+                <Ionicons name="time-outline" size={28} color="#e11d48" />
               </View>
-              <Text className="text-slate-400 font-bold text-sm">
-                Code Expired
+              <Text className="text-slate-900 font-bold text-base">
+                {STRINGS.auth.qrSetup.expiredTitle}
               </Text>
-              <Text className="text-slate-400 text-xs text-center mt-1 px-6 leading-4">
-                Regenerate below to get a new QR code and secret key
+              <Text className="text-slate-500 text-xs text-center mt-1 px-4 leading-relaxed">
+                {STRINGS.auth.qrSetup.expiredSubtitle}
               </Text>
+              <TouchableOpacity
+                onPress={onRegenerate}
+                className="mt-4 px-4 py-2.5 bg-rose-50 rounded-xl flex-row items-center gap-2 border border-rose-200"
+              >
+                <Ionicons name="refresh-outline" size={16} color="#e11d48" />
+                <Text className="text-primary font-bold text-xs">
+                  {STRINGS.auth.qrSetup.regenerate}
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : qrCodeUrl ? (
-            <View
-              className={`${isSmallScreen ? "pt-4 pb-3 px-5" : "pt-6 pb-4 px-6"} items-center`}
-            >
-              <Animated.View style={{ opacity: pulseAnim }}>
+            <View className="items-center w-full">
+              <Animated.View style={{ opacity: pulseAnim }} className="p-3 bg-white rounded-2xl border border-slate-100 shadow-xs">
                 <Image
                   source={{ uri: qrCodeUrl }}
-                  className={`${isSmallScreen ? "w-36 h-36" : "w-48 h-48"}`}
+                  className={isSmallScreen ? "w-40 h-40" : "w-48 h-48"}
                   resizeMode="contain"
                 />
               </Animated.View>
-              {!qrExpired && (
-                <View className="flex-row items-center mt-3 gap-1.5 bg-rose-50 px-3 py-1 rounded-full border border-rose-200">
-                  <Ionicons name="timer-outline" size={12} color="#e11d48" />
-                  <Text className="text-rose-500 text-xs font-bold">
+
+              <View className="flex-row items-center mt-3 gap-1.5 bg-slate-50 px-3.5 py-1.5 rounded-full border border-slate-100">
+                <Ionicons name="timer-outline" size={13} color="#e11d48" />
+                <Text className="text-slate-500 text-xs font-medium">
+                  Expires in{" "}
+                  <Text className="font-bold text-primary font-mono">
                     {Math.floor(countdown / 60)}:
                     {(countdown % 60).toString().padStart(2, "0")}
                   </Text>
-                </View>
-              )}
-              <View className="flex-row items-center mt-3 gap-2 bg-amber-50 rounded-xl px-3 py-2 border border-amber-200/60 w-full">
-                <Ionicons name="scan-outline" size={14} color="#d97706" />
-                <Text className="text-amber-700 text-xs flex-1 leading-4">
-                  Open Google Authenticator →{" "}
-                  <Text className="font-bold">+</Text> → scan code
                 </Text>
               </View>
 
-              {/* WARNING FOR ROTATED CODE */}
-              <View className="flex-row items-start mt-2 gap-2 bg-blue-50 rounded-xl px-3 py-2.5 border border-blue-200/60 w-full">
-                <Ionicons
-                  name="information-circle-outline"
-                  size={16}
-                  color="#2563eb"
-                  style={{ marginTop: 1 }}
-                />
-                <View className="flex-1">
-                  <Text className="text-blue-800 text-xs font-bold mb-0.5">
-                    New Setup Generated
-                  </Text>
-                  <Text className="text-blue-700 text-[10px] leading-3.5">
-                    Please remove any old entries for this account from Google Authenticator to avoid confusion. Only the newly scanned entry will work.
-                  </Text>
-                </View>
+              <View className="flex-row items-center mt-3 gap-2 bg-amber-50 rounded-2xl px-3.5 py-2.5 border border-amber-200/60 w-full">
+                <Ionicons name="scan-outline" size={16} color="#d97706" />
+                <Text className="text-amber-800 text-xs flex-1 leading-relaxed">
+                  Open Google Authenticator → tap <Text className="font-bold">+</Text> → scan this code
+                </Text>
               </View>
             </View>
           ) : (
-            <View className="py-10 items-center justify-center">
-              <Ionicons name="qr-code" size={48} color="#f1f5f9" />
+            <View className="py-12 items-center justify-center">
+              <ActivityIndicator size="large" color="#e11d48" />
             </View>
           )}
         </View>
 
-        {/* Secret Key */}
-        <View
-          className="bg-white rounded-2xl shadow-sm mb-3 border border-rose-100 overflow-hidden"
-          style={{
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.04,
-            shadowRadius: 4,
-            elevation: 2,
-          }}
-        >
+        {/* Secret Key Accordion */}
+        <View className="bg-white rounded-2xl shadow-xs mb-4 border border-slate-100 overflow-hidden">
           <TouchableOpacity
             onPress={() => setShowKey(!showKey)}
-            className="flex-row items-center justify-between px-4 py-3 active:opacity-70"
+            activeOpacity={0.7}
+            className="flex-row items-center justify-between px-4 py-3"
           >
             <View className="flex-row items-center gap-2">
               <Ionicons name="key-outline" size={16} color="#e11d48" />
-              <Text className="text-slate-700 font-bold text-sm">
-                Secret Key
+              <Text className="text-slate-800 font-bold text-xs">
+                {STRINGS.auth.qrSetup.secretKeyLabel}
               </Text>
             </View>
             <Ionicons
@@ -242,13 +241,14 @@ export const QRSetupStep: React.FC<QRSetupProps> = ({
               color="#94a3b8"
             />
           </TouchableOpacity>
+
           {showKey && manualSecret && (
             <View className="px-4 pb-3">
               <View className="flex-row items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-                <View className="flex-1 px-3 py-3">
+                <View className="flex-1 px-3 py-2.5">
                   <Text
                     selectable
-                    className="text-sm font-mono text-slate-800 tracking-wider leading-5"
+                    className="text-xs font-mono font-bold text-slate-800 tracking-wider"
                   >
                     {groupedKey}
                   </Text>
@@ -268,16 +268,16 @@ export const QRSetupStep: React.FC<QRSetupProps> = ({
                       setTimeout(() => setCopied(false), 2000);
                     } catch {}
                   }}
-                  className={`px-3 py-3 ${copied ? "bg-emerald-50" : "bg-rose-50"} active:opacity-70`}
+                  className={`px-3 py-2.5 ${copied ? "bg-emerald-50" : "bg-rose-50"} active:opacity-70`}
                 >
                   <View className="flex-row items-center gap-1">
                     <Ionicons
                       name={copied ? "checkmark-circle" : "copy-outline"}
-                      size={16}
+                      size={14}
                       color={copied ? "#16a34a" : "#e11d48"}
                     />
                     <Text
-                      className={`text-xs font-bold ${copied ? "text-emerald-600" : "text-rose-600"}`}
+                      className={`text-xs font-bold ${copied ? "text-emerald-600" : "text-primary"}`}
                     >
                       {copied ? "Copied" : "Copy"}
                     </Text>
@@ -288,96 +288,93 @@ export const QRSetupStep: React.FC<QRSetupProps> = ({
           )}
         </View>
 
-        {/* Regenerate button (only when expired) */}
-        {qrExpired && (
-          <Button
-            title="Regenerate New Code"
-            onPress={onRegenerate}
-            loading={loading}
-            variant="outline"
-            className="mb-3 rounded-2xl"
-            icon={<Ionicons name="refresh-outline" size={18} color="#e11d48" />}
-            iconPosition="left"
-            size="small"
-          />
-        )}
+        {/* Step 2: Verification Input Card */}
+        <View className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm mb-4">
+          <Text className="text-sm font-bold text-slate-900 text-center mb-1">
+            {STRINGS.auth.qrSetup.enterCodeTitle}
+          </Text>
+          <Text className="text-xs text-slate-500 text-center mb-4">
+            {STRINGS.auth.qrSetup.enterCodeSubtitle}
+          </Text>
 
-        {/* OTP Section */}
-        <View className="mt-1 mb-2">
-          <View className="flex-row items-center mb-3 gap-3">
-            <View className="flex-1 h-px bg-rose-200" />
-            <Text className="text-rose-400 text-xs font-bold uppercase tracking-widest">
-              Step 2: Verify Code
-            </Text>
-            <View className="flex-1 h-px bg-rose-200" />
-          </View>
-
-          <View
-            className="bg-white rounded-3xl px-5 pt-4 pb-5 shadow-sm mb-2"
-            style={{
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.06,
-              shadowRadius: 12,
-              elevation: 4,
+          <OTPDigitInput
+            key={`setup-otp-${otpResetKey}`}
+            value={setupOtpCode}
+            onChange={setSetupOtpCode}
+            onComplete={onVerify}
+            error={qrSetupError}
+            setError={(msg) => {
+              if (!msg) setQrSetupError("");
             }}
+            disabled={loading}
+          />
+
+          {/* Synchronized 30s TOTP Countdown Pill */}
+          <View
+            className={`flex-row items-center justify-center gap-1.5 py-1.5 px-3.5 rounded-full self-center mt-4 ${
+              totpTimer <= 5
+                ? "bg-amber-50 border border-amber-200"
+                : "bg-slate-50 border border-slate-100"
+            }`}
           >
-            <OTPDigitInput
-              key={`setup-otp-${otpResetKey}`}
-              initialDigits={["", "", "", "", "", ""]}
-              onDigitsChange={(d) => setSetupOtpCode(d.join("").slice(0, 6))}
-              onComplete={onVerify}
-              error={qrSetupError}
-              setError={(msg) => {
-                if (!msg) setQrSetupError("");
-              }}
-              disabled={loading}
+            <Ionicons
+              name={totpTimer <= 5 ? "warning-outline" : "time-outline"}
+              size={13}
+              color={totpTimer <= 5 ? "#d97706" : "#e11d48"}
             />
-            {qrSetupError ? (
-              <View className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mt-3 flex-row items-start gap-2">
-                <Ionicons
-                  name="alert-circle"
-                  size={14}
-                  color="#dc2626"
-                  style={{ marginTop: 2 }}
-                />
-                <Text className="text-red-600 text-xs flex-1 leading-5">
-                  {qrSetupError}
-                </Text>
-              </View>
-            ) : (
-              <Text className="text-slate-400 text-xs text-center mt-2">
-                Enter the 6-digit code shown in the app
-              </Text>
-            )}
+            <Text
+              className={`text-xs font-medium ${
+                totpTimer <= 5 ? "text-amber-700 font-semibold" : "text-slate-500"
+              }`}
+            >
+              {totpTimer <= 5
+                ? STRINGS.auth.qrSetup.rotatingSoon(totpTimer)
+                : STRINGS.auth.qrSetup.refreshesIn(totpTimer)}
+            </Text>
           </View>
+
+          {qrSetupError ? (
+            <View className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5 mt-3 flex-row items-center gap-2">
+              <Ionicons name="alert-circle" size={16} color="#dc2626" />
+              <Text className="text-red-600 text-xs flex-1 leading-5 font-medium">
+                {qrSetupError}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        {/* Verify Button */}
-        <Button
-          title="Enable & Verify"
+        {/* Verify Action Button */}
+        <TouchableOpacity
           onPress={onVerify}
-          loading={loading}
-          icon={<Ionicons name="shield-checkmark" size={20} color="#fff" />}
-          iconPosition="left"
-          disabled={loading}
-          className="shadow-lg bg-[#FF1F4B] rounded-2xl h-14"
-          style={{
-            shadowColor: "#FF1F4B",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 8,
-          }}
-        />
+          disabled={loading || setupOtpCode.length !== 6}
+          activeOpacity={0.9}
+          className={`h-14 rounded-2xl flex-row items-center justify-center shadow-sm ${
+            loading || setupOtpCode.length !== 6 ? "bg-slate-200" : "bg-primary"
+          }`}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="shield-checkmark" size={18} color="white" />
+              <Text className="text-white font-bold text-base">
+                {STRINGS.auth.qrSetup.verifyAndActivate}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
+        {/* Cancel Action */}
         <TouchableOpacity
           onPress={onCancel}
-          className="mt-4 mb-6 items-center py-2 active:opacity-60"
+          activeOpacity={0.7}
+          className="mt-3 py-2.5 items-center"
         >
-          <Text className="text-slate-400 font-semibold text-sm">Cancel</Text>
+          <Text className="text-slate-400 font-semibold text-xs">
+            {STRINGS.auth.qrSetup.cancel}
+          </Text>
         </TouchableOpacity>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
+    </View>
   );
 };

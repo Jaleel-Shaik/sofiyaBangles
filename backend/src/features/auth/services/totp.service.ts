@@ -208,10 +208,9 @@ export const initiateLoginService = async (
 };
 
 /**
- * Resolves the login challenge by challengeId or legacy JWT token payload.
+ * Resolves the login challenge by challengeId.
  */
-const resolveLoginChallenge = async (bodyChallengeId: string | undefined, decodedToken: any) => {
-  const challengeId = bodyChallengeId || decodedToken?.challengeId;
+const resolveLoginChallenge = async (challengeId: string | undefined) => {
   if (!challengeId) {
     throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
   }
@@ -251,19 +250,23 @@ export const verify2FAOtpService = async (
   bodyEmail?: string,
   useBackupCode?: boolean
 ) => {
-  let decoded: any = null;
-  if (otpPendingToken) {
-    try {
-      decoded = jwt.verify(otpPendingToken, env.JWT_SECRET);
-    } catch {
-      // If bodyChallengeId is provided, we can continue without valid JWT
-      if (!bodyChallengeId) {
-        throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
-      }
-    }
+  if (!otpPendingToken) {
+    throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
   }
 
-  const challenge = await resolveLoginChallenge(bodyChallengeId, decoded);
+  let decoded: any;
+  try {
+    decoded = jwt.verify(otpPendingToken, env.JWT_SECRET);
+  } catch {
+    throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
+  }
+
+  if (bodyChallengeId && decoded.challengeId && bodyChallengeId !== decoded.challengeId) {
+    throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
+  }
+
+  const challengeId = decoded.challengeId || bodyChallengeId;
+  const challenge = await resolveLoginChallenge(challengeId);
   const rawUserId = challenge.user_id || challenge.userId;
   if (!rawUserId) {
     throw new Error("EXPIRED_OR_INVALID_PENDING_TOKEN");
@@ -343,6 +346,7 @@ export const verify2FAOtpService = async (
   };
 
   const isBackupRecovery = Boolean(useBackupCode);
+  let matchedSecretEncrypted: string | null = null;
 
   if (isBackupRecovery) {
     // --- Backup Code Recovery Flow ---
@@ -396,21 +400,37 @@ export const verify2FAOtpService = async (
       throw new Error("OTP_ALREADY_USED");
     }
 
-    // Determine which secret to decrypt (pending temporary secret during setup vs permanent secret)
-    const isFirstTimeSetup = challenge.isTotpSetupRequired ||
-      (!profile.twoFactorEnabled && !profile.is_2fa_enabled);
+    // Collect all candidate encrypted secrets for this profile (pending secret, permanent secret, legacy field)
+    const candidateSecrets: string[] = [];
+    if (profile.pendingTwoFactorSecretEncrypted) {
+      candidateSecrets.push(profile.pendingTwoFactorSecretEncrypted);
+    }
+    if (profile.twoFactorSecretEncrypted && !candidateSecrets.includes(profile.twoFactorSecretEncrypted)) {
+      candidateSecrets.push(profile.twoFactorSecretEncrypted);
+    }
+    if (profile.two_fa_secret && !candidateSecrets.includes(profile.two_fa_secret)) {
+      candidateSecrets.push(profile.two_fa_secret);
+    }
 
-    const encryptedSecret = isFirstTimeSetup
-      ? profile.pendingTwoFactorSecretEncrypted || profile.twoFactorSecretEncrypted || profile.two_fa_secret
-      : profile.twoFactorSecretEncrypted || profile.two_fa_secret;
-
-    if (!encryptedSecret) {
+    if (candidateSecrets.length === 0) {
       throw new Error("2FA_SECRET_NOT_FOUND");
     }
 
-    const plainSecret = decryptSecret(encryptedSecret);
-    // Verify TOTP with ±30 second clock tolerance
-    const isValid = verifyTotpCode(plainSecret, cleanOtp, 30);
+    let isValid = false;
+    matchedSecretEncrypted = null;
+
+    for (const secEnc of candidateSecrets) {
+      try {
+        const plain = decryptSecret(secEnc);
+        if (verifyTotpCode(plain, cleanOtp, 60)) {
+          isValid = true;
+          matchedSecretEncrypted = secEnc;
+          break;
+        }
+      } catch {
+        // Continue to next candidate
+      }
+    }
 
     if (!isValid) {
       await recordFailedAttempt(false);
@@ -431,12 +451,14 @@ export const verify2FAOtpService = async (
 
   let generatedBackupCodes: string[] | undefined = undefined;
 
-  // If first-time setup: activate 2FA and generate 10 backup codes
+  // If first-time setup or pending secret verified: activate 2FA and generate 10 backup codes
   const isFirstTimeSetup = challenge.isTotpSetupRequired ||
-    (!profile.twoFactorEnabled && !profile.is_2fa_enabled);
+    (!profile.twoFactorEnabled && !profile.is_2fa_enabled) ||
+    Boolean(matchedSecretEncrypted && matchedSecretEncrypted === profile.pendingTwoFactorSecretEncrypted);
 
   if (isFirstTimeSetup) {
-    const activeEncryptedSecret = profile.pendingTwoFactorSecretEncrypted ||
+    const activeEncryptedSecret = matchedSecretEncrypted ||
+      profile.pendingTwoFactorSecretEncrypted ||
       profile.twoFactorSecretEncrypted ||
       profile.two_fa_secret ||
       "";

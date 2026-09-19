@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "../utils/secureStore";
 import { Platform } from "react-native";
 
 const STORAGE_KEY = "api_base_url_override";

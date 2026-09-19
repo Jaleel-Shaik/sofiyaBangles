@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Shield, Sparkles } from "lucide-react";
@@ -53,9 +54,16 @@ export default function LoginScreen() {
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ duration: 0.8, type: "spring" }}
-            className="w-24 h-24 bg-white/80 backdrop-blur rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl"
+            className="w-28 h-28 bg-white/90 backdrop-blur rounded-3xl p-3 flex items-center justify-center mx-auto mb-8 shadow-2xl border border-white/60"
           >
-            <Shield className="w-12 h-12 text-[#E8436E]" />
+            <Image
+              src="/logo.png"
+              alt="Sofiya Bangles"
+              width={96}
+              height={96}
+              className="w-full h-full object-contain drop-shadow-sm"
+              priority
+            />
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -95,8 +103,15 @@ export default function LoginScreen() {
         >
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#FFF0F3] to-[#FFD6DE] rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Shield className="w-8 h-8 text-[#E8436E]" />
+            <div className="w-20 h-20 bg-white rounded-2xl p-2.5 flex items-center justify-center mx-auto mb-4 shadow-lg border border-rose-100">
+              <Image
+                src="/logo.png"
+                alt="Sofiya Bangles"
+                width={64}
+                height={64}
+                className="w-full h-full object-contain"
+                priority
+              />
             </div>
             <h1 className="text-2xl font-bold text-[#171717]">
               Sofiya Bangles

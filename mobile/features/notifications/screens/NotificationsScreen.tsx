@@ -1,9 +1,10 @@
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useNotificationStore, AppNotification } from '@/src/store/notificationStore';
+import { AppIcon } from '@/src/constants/icons';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function NotificationsScreen() {
   const [isEditMode, setIsEditMode] = useState(false);
@@ -12,12 +13,13 @@ export default function NotificationsScreen() {
   const router = useRouter();
 
   const { notifications, initialized, markAsRead, deleteNotifications } = useNotificationStore();
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
   const handleDelete = async (idsToDelete: string[]) => {
     Alert.alert('Delete Notifications', 'Are you sure you want to delete the selected notifications?', [
-      { text: 'Cancel', style: 'cancel' },
+      { text: STRINGS.common.cancel, style: 'cancel' },
       { 
-        text: 'Delete', 
+        text: STRINGS.common.delete, 
         style: 'destructive',
         onPress: async () => {
           await deleteNotifications(idsToDelete);
@@ -38,12 +40,10 @@ export default function NotificationsScreen() {
     if (isEditMode) {
       toggleSelection(notif.id);
     } else {
-      // Mark as read in global store
       if (!notif.isRead) {
         await markAsRead(notif.id);
       }
       
-      // Navigate to product
       if (notif.productId) {
         router.push({ pathname: '/products/[id]', params: { id: notif.productId } } as any);
       }
@@ -51,75 +51,96 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#FAFAFA]">
-      <View className="px-6 pb-6 bg-[#FFF0F3] rounded-b-3xl shadow-sm" style={{ paddingTop: Math.max(insets.top + 16, 40) }}>
+    <View className="flex-1 bg-background">
+      <View className="px-6 pb-5 bg-[#FFF0F3] rounded-b-3xl shadow-sm border-b border-rose-100" style={{ paddingTop: Math.max(insets.top + 16, 40) }}>
         <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-3xl font-extrabold text-[#FF1F4B]">Notifications 🔔</Text>
-          <TouchableOpacity onPress={() => {
-            if (isEditMode) {
-              setIsEditMode(false);
-              setSelectedIds([]);
-            } else {
-              setIsEditMode(true);
-            }
-          }}>
-            <Text className="text-[#FF1F4B] font-bold text-sm">{isEditMode ? 'Cancel' : 'Select'}</Text>
-          </TouchableOpacity>
+          <Text className="text-headline-lg font-extrabold text-primary">Notifications 🔔</Text>
+          {safeNotifications.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                if (isEditMode) {
+                  setIsEditMode(false);
+                  setSelectedIds([]);
+                } else {
+                  setIsEditMode(true);
+                }
+              }}
+              className="min-h-[44px] min-w-[44px] items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={isEditMode ? STRINGS.common.cancel : 'Select notifications'}
+            >
+              <Text className="text-primary font-bold text-label-md">{isEditMode ? STRINGS.common.cancel : 'Select'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        <Text className="text-slate-500 text-sm">Stay updated on your orders & offers</Text>
+        <Text className="text-text-secondary text-body-sm">Stay updated on your orders & offers</Text>
       </View>
 
-      <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 px-5 pt-4" showsVerticalScrollIndicator={false}>
         {!initialized ? (
           <View className="py-20 items-center justify-center">
-            <ActivityIndicator size="large" color="#FF1F4B" />
+            <ActivityIndicator size="large" color="#e11d48" />
+          </View>
+        ) : safeNotifications.length === 0 ? (
+          <View className="py-24 items-center justify-center px-6">
+            <View className="w-16 h-16 rounded-full bg-rose-50 border border-rose-100 items-center justify-center mb-4">
+              <AppIcon name="notificationsOutline" size={30} color="#e11d48" />
+            </View>
+            <Text className="text-title-md font-bold text-text-primary mb-1">No Notifications Yet</Text>
+            <Text className="text-text-secondary text-body-sm text-center px-6">
+              We'll let you know when new arrivals, bridal collections, or special offers drop!
+            </Text>
           </View>
         ) : (
-          notifications.map((notif) => {
+          safeNotifications.map((notif) => {
             const isSelected = selectedIds.includes(notif.id);
             return (
               <TouchableOpacity 
                 key={notif.id} 
                 onPress={() => handleNotificationPress(notif)}
-                className={`bg-white p-4 rounded-2xl mb-4 shadow-sm flex-row items-center ${isSelected ? 'bg-rose-50' : ''}`}
+                activeOpacity={0.8}
+                className={`bg-white p-4 rounded-2xl mb-3 shadow-xs flex-row items-center ${isSelected ? 'bg-rose-50' : ''}`}
                 style={{ 
                   borderWidth: 1, 
-                  borderColor: isSelected ? '#FF1F4B' : '#e2e8f0',
+                  borderColor: isSelected ? '#e11d48' : '#f1f5f9',
                   borderLeftWidth: notif.isRead && !isSelected ? 1 : 3,
-                  borderLeftColor: isSelected ? '#FF1F4B' : (notif.isRead ? '#e2e8f0' : '#FF1F4B')
+                  borderLeftColor: isSelected ? '#e11d48' : (notif.isRead ? '#f1f5f9' : '#e11d48')
                 }}
               >
                 {isEditMode && (
                   <View className="mr-3">
-                    <Ionicons 
-                      name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
-                      size={24} 
-                      color={isSelected ? "#FF1F4B" : "#cbd5e1"} 
+                    <AppIcon 
+                      name={isSelected ? "checkCircle" : "cubeOutline"} 
+                      size={22} 
+                      color={isSelected ? "#e11d48" : "#cbd5e1"} 
                     />
                   </View>
                 )}
-                <View className="w-12 h-12 rounded-full bg-[#FF1F4B] items-center justify-center mr-4">
-                <Ionicons name={notif.icon as any} size={20} color="white" />
-              </View>
-              
-              <View className="flex-1">
-                <View className="flex-row justify-between items-start mb-1">
-                  <Text className="text-base font-bold text-slate-800">{notif.title}</Text>
-                  {!notif.isRead && <View className="w-2 h-2 rounded-full bg-[#FF1F4B] mt-1" />}
+                <View className="w-11 h-11 rounded-full bg-primary items-center justify-center mr-3.5 shadow-xs">
+                  <AppIcon name={(notif.icon as any) || "notifications"} size={20} color="white" />
                 </View>
-                <Text className="text-slate-500 text-sm leading-5 mb-1">{notif.desc}</Text>
-                <Text className="text-slate-400 text-xs font-medium">{notif.time}</Text>
-              </View>
               
-              {!isEditMode && (
-                <TouchableOpacity 
-                  className="p-2 ml-1"
-                  onPress={() => handleDelete([notif.id])}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#cbd5e1" />
-                </TouchableOpacity>
-              )}
-            </TouchableOpacity>
+                <View className="flex-1">
+                  <View className="flex-row justify-between items-start mb-1">
+                    <Text className="text-label-lg font-bold text-text-primary">{notif.title}</Text>
+                    {!notif.isRead && <View className="w-2 h-2 rounded-full bg-primary mt-1" />}
+                  </View>
+                  <Text className="text-text-secondary text-body-sm leading-5 mb-1">{notif.desc}</Text>
+                  <Text className="text-text-hint text-caption font-medium">{notif.time}</Text>
+                </View>
+              
+                {!isEditMode && (
+                  <TouchableOpacity 
+                    className="w-11 h-11 items-center justify-center -mr-2"
+                    onPress={() => handleDelete([notif.id])}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={STRINGS.common.delete}
+                  >
+                    <AppIcon name="close" size={18} color="#94a3b8" />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
             );
           })
         )}
@@ -129,11 +150,13 @@ export default function NotificationsScreen() {
       {isEditMode && selectedIds.length > 0 && (
         <View className="absolute bottom-20 left-6 right-6 z-20">
           <TouchableOpacity 
-            className="bg-[#FF1F4B] py-4 rounded-full items-center shadow-lg flex-row justify-center gap-2"
+            className="bg-primary py-4 rounded-full items-center shadow-lg flex-row justify-center min-h-[48px]"
             onPress={() => handleDelete(selectedIds)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
           >
-            <Ionicons name="trash-outline" size={20} color="white" />
-            <Text className="text-white font-bold text-lg">Delete Selected ({selectedIds.length})</Text>
+            <AppIcon name="closeCircleFilled" size={20} color="white" />
+            <Text className="text-white font-bold text-label-lg ml-2">Delete Selected ({selectedIds.length})</Text>
           </TouchableOpacity>
         </View>
       )}

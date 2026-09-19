@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { AppIcon } from "@/src/constants/icons";
+import { STRINGS } from "@/src/constants/strings";
 
 interface ProductVariantSelectorProps {
   product: any;
@@ -31,26 +32,31 @@ export function ProductVariantSelector({
 }: ProductVariantSelectorProps) {
   const router = useRouter();
 
-  if (!product.has_variants && !product.accepts_custom_size) return null;
+  if (!product?.has_variants && !product?.accepts_custom_size) return null;
+
+  const safeVariants = Array.isArray(product?.variants) ? product.variants : [];
+  const safePreferences = Array.isArray(preferences) ? preferences : [];
+  const safeCustomProfiles = Array.isArray(customProfiles) ? customProfiles : [];
 
   return (
     <View className="mb-5 pt-4 border-t border-divider">
       <View className="flex-row justify-between items-center mb-3">
         <Text className="text-base font-bold text-text-primary">
-          {productModelTypeName ? `${productModelTypeName} Sizes` : "Select Size"}
+          {productModelTypeName ? STRINGS.productDetail.modelSizesTitle(productModelTypeName) : STRINGS.productDetail.selectSizeTitle}
         </Text>
       </View>
 
-      {product.has_variants && product.variants && (
+      {product?.has_variants && safeVariants.length > 0 && (
         <View className="flex-row flex-wrap mb-4">
-          {product.variants.map((variant: any) => {
+          {safeVariants.map((variant: any) => {
             const isPerfectFit =
-              product.category_id &&
-              preferences.some(
+              product?.category_id &&
+              safePreferences.some(
                 (p) =>
+                  p &&
                   p.category_id === product.category_id &&
                   !p.is_custom &&
-                  p.standard_size === variant.size,
+                  p.standard_size === variant?.size,
               );
             const isSelected = !useCustomSize && selectedVariantId === variant.id;
             const isDisabled = variant.quantity <= 0;
@@ -73,7 +79,7 @@ export function ProductVariantSelector({
               >
                 {isPerfectFit && (
                   <View className="absolute top-0 right-0 bg-primary px-1 py-0.5 rounded-bl-lg">
-                    <Ionicons name="star" size={8} color="white" />
+                    <AppIcon name="star" size={8} color="white" />
                   </View>
                 )}
                 <Text
@@ -102,10 +108,10 @@ export function ProductVariantSelector({
             </View>
             <View className="flex-1">
               <Text className="font-bold text-text-primary text-base">
-                Custom Made to Order
+                {STRINGS.productDetail.customMadeToOrder}
               </Text>
               <Text className="text-text-secondary text-xs mt-0.5">
-                We'll craft this perfectly to your measurements.
+                {STRINGS.productDetail.customMadeToOrderSubtitle}
               </Text>
             </View>
             {product.custom_size_price && (
@@ -119,18 +125,18 @@ export function ProductVariantSelector({
 
           {useCustomSize && (
             <View className="p-4">
-              {customProfiles.length > 0 ? (
+              {safeCustomProfiles.length > 0 ? (
                 <View className="space-y-4">
                   <Text className="text-xs text-text-hint font-bold uppercase tracking-widest">
-                    Select Custom Size Profile
+                    {STRINGS.productDetail.selectProfileTitle}
                   </Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {customProfiles.map((p: any) => {
-                      const isSelected = (selectedCustomProfileId || customProfiles[0]?.id) === p.id;
+                    {safeCustomProfiles.map((p: any) => {
+                      const isSelected = (selectedCustomProfileId || safeCustomProfiles[0]?.id) === p?.id;
                       return (
                         <TouchableOpacity
-                          key={p.id}
-                          onPress={() => setSelectedCustomProfileId(p.id)}
+                          key={p?.id || 'profile-default'}
+                          onPress={() => setSelectedCustomProfileId(p?.id)}
                           className={`mr-3 px-4 py-3 rounded-2xl border-2 ${
                             isSelected
                               ? "border-primary bg-primary/10"
@@ -138,8 +144,8 @@ export function ProductVariantSelector({
                           }`}
                         >
                           <View className="flex-row items-center">
-                            <Ionicons
-                              name="person-outline"
+                            <AppIcon
+                              name="personOutline"
                               size={14}
                               color={isSelected ? "#e11d48" : "#64748B"}
                             />
@@ -148,7 +154,7 @@ export function ProductVariantSelector({
                                 isSelected ? "text-primary" : "text-text-primary"
                               }`}
                             >
-                              {p.profile_name || "Custom Profile"}
+                              {p?.profile_name || STRINGS.productDetail.defaultProfileName}
                             </Text>
                           </View>
                         </TouchableOpacity>
@@ -161,14 +167,14 @@ export function ProductVariantSelector({
                     <View className="bg-slate-50 p-4 rounded-2xl border border-divider mt-2">
                       <View className="flex-row items-center justify-between mb-2 pb-2 border-b border-divider/60">
                         <Text className="text-xs font-bold text-text-primary">
-                          Measurements for {activeCustomProfile.profile_name || "Custom Fit"}
+                          {STRINGS.productDetail.customFitTitle(activeCustomProfile.profile_name || STRINGS.productDetail.defaultProfileName)}
                         </Text>
                         <TouchableOpacity onPress={() => router.push("/(tabs)/size-preferences" as any)}>
-                          <Text className="text-xs font-bold text-primary">Edit</Text>
+                          <Text className="text-xs font-bold text-primary">{STRINGS.common.edit}</Text>
                         </TouchableOpacity>
                       </View>
                       <View className="space-y-1.5">
-                        {Object.entries(activeCustomProfile.custom_measurements as Record<string, string>).map(([key, val]) => (
+                        {Object.entries((activeCustomProfile.custom_measurements || {}) as Record<string, string>).map(([key, val]) => (
                           <View key={key} className="flex-row justify-between items-center">
                             <Text className="text-xs text-text-secondary capitalize">{key.replace(/_/g, ' ')}</Text>
                             <Text className="text-xs font-bold text-text-primary">{val}</Text>
@@ -180,16 +186,16 @@ export function ProductVariantSelector({
                 </View>
               ) : (
                 <View className="items-center bg-primary/5 p-4 rounded-2xl border border-dashed border-primary/30">
-                  <Ionicons name="cut-outline" size={24} color="#e11d48" />
+                  <AppIcon name="cutOutline" size={24} color="#e11d48" />
                   <Text className="text-text-secondary text-center text-sm font-medium my-3">
-                    No custom measurements saved for this category.
+                    {STRINGS.productDetail.noCustomMeasurements}
                   </Text>
                   <TouchableOpacity
                     onPress={() => router.push("/(tabs)/size-preferences" as any)}
                     className="bg-primary px-5 py-2.5 rounded-full"
                   >
                     <Text className="text-white font-bold text-xs">
-                      Add Measurements Now
+                      {STRINGS.productDetail.addMeasurementsNow}
                     </Text>
                   </TouchableOpacity>
                 </View>

@@ -1,1 +1,0 @@
-Updated image mapping in frontend 

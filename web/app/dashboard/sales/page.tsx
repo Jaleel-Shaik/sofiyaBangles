@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ShoppingBag, Search, Download, Filter, Eye } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/src/lib/api";
+import { STRINGS } from "@/src/constants/strings";
 
 export default function SalesPage() {
   const [sales, setSales] = useState<any[]>([]);
@@ -42,10 +43,10 @@ export default function SalesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ShoppingBag className="w-6 h-6 text-rose-600" /> Sales & Orders Management
+            <ShoppingBag className="w-6 h-6 text-rose-600" /> {STRINGS.salesManagement.title}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Complete list of all store sales with real-time 70/30 commission allocation breakdown.
+            {STRINGS.salesManagement.subtitle}
           </p>
         </div>
 
@@ -53,9 +54,9 @@ export default function SalesPage() {
           href={api.superAdmin.exportSalesCsvUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors"
+          className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold transition-colors"
         >
-          <Download className="w-4 h-4" /> Export CSV
+          <Download className="w-4 h-4" /> {STRINGS.salesManagement.exportCsv}
         </a>
       </div>
 
@@ -65,28 +66,28 @@ export default function SalesPage() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by order number or customer..."
+            placeholder={STRINGS.salesManagement.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-rose-500"
+            className="w-full pl-9 pr-4 py-2.5 min-h-[44px] text-xs border border-slate-200 rounded-xl focus:outline-none focus:border-rose-500"
           />
         </form>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold">
-            <Filter className="w-4 h-4 text-slate-400" /> Status:
+            <Filter className="w-4 h-4 text-slate-400" /> {STRINGS.salesManagement.statusLabel}
           </div>
           <select
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:outline-none focus:border-rose-500 font-medium"
+            className="text-xs border border-slate-200 rounded-xl px-3 py-2.5 min-h-[44px] bg-white text-slate-700 focus:outline-none focus:border-rose-500 font-medium"
           >
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="completed">Completed</option>
-            <option value="returned">Returned / Refunded</option>
+            <option value="">{STRINGS.salesManagement.allStatuses}</option>
+            <option value="pending">{STRINGS.salesManagement.statusPending}</option>
+            <option value="processing">{STRINGS.salesManagement.statusProcessing}</option>
+            <option value="confirmed">{STRINGS.salesManagement.statusConfirmed}</option>
+            <option value="completed">{STRINGS.salesManagement.statusCompleted}</option>
+            <option value="returned">{STRINGS.salesManagement.statusReturned}</option>
           </select>
         </div>
       </div>
@@ -94,23 +95,23 @@ export default function SalesPage() {
       {/* Sales Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-slate-400 text-sm">Loading sales data...</div>
+          <div className="p-8 text-center text-slate-400 text-sm">{STRINGS.salesManagement.loading}</div>
         ) : sales.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm font-medium">No sales records found.</div>
+          <div className="p-12 text-center text-slate-400 text-sm font-medium">{STRINGS.salesManagement.empty}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold">
                 <tr>
-                  <th className="p-4">Order Number</th>
-                  <th className="p-4">Date</th>
-                  <th className="p-4">Customer</th>
+                  <th className="p-4">{STRINGS.salesManagement.tableOrderNumber}</th>
+                  <th className="p-4">{STRINGS.salesManagement.tableDate}</th>
+                  <th className="p-4">{STRINGS.salesManagement.tableCustomer}</th>
                   <th className="p-4">Items Count</th>
-                  <th className="p-4">Total Amount</th>
-                  <th className="p-4 text-emerald-600">Admin Share (70%)</th>
-                  <th className="p-4 text-rose-600">SuperAdmin Share (30%)</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Actions</th>
+                  <th className="p-4">{STRINGS.salesManagement.tableTotal}</th>
+                  <th className="p-4 text-emerald-600">{STRINGS.salesManagement.tableAdminShare}</th>
+                  <th className="p-4 text-rose-600">{STRINGS.salesManagement.tableSuperAdminShare}</th>
+                  <th className="p-4">{STRINGS.salesManagement.tableStatus}</th>
+                  <th className="p-4 text-right">{STRINGS.salesManagement.tableAction}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -136,9 +137,9 @@ export default function SalesPage() {
                     <td className="p-4 text-right">
                       <Link
                         href={`/dashboard/sales/${s.id}`}
-                        className="inline-flex items-center gap-1 text-[#E8436E] hover:text-[#CC3366] font-bold"
+                        className="inline-flex items-center gap-1 text-[#E8436E] hover:text-[#CC3366] font-bold px-2 py-1 min-h-[36px] rounded-lg hover:bg-rose-50"
                       >
-                        <Eye className="w-3.5 h-3.5" /> Detail
+                        <Eye className="w-3.5 h-3.5" /> {STRINGS.salesManagement.actionDetails}
                       </Link>
                     </td>
                   </tr>
@@ -155,14 +156,14 @@ export default function SalesPage() {
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 font-semibold"
+              className="px-3 py-2 min-h-[44px] border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 font-semibold"
             >
               Previous
             </button>
             <button
               disabled={page * 15 >= total}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 font-semibold"
+              className="px-3 py-2 min-h-[44px] border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 font-semibold"
             >
               Next
             </button>

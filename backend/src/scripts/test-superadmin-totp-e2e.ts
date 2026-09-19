@@ -3,6 +3,7 @@ import { initiateLoginService, verify2FAOtpService } from "../features/auth/serv
 import { decryptSecret } from "../shared/utils/crypto.utils";
 import { generateTotpCode } from "../shared/utils/totp.utils";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 
 async function runTests() {
@@ -30,7 +31,7 @@ async function runTests() {
     }
     const originalAdminData = adminSnap.data();
     const TEST_EMAIL = process.env.SUPER_ADMIN_SEED_EMAIL || originalAdminData?.email || "test-superadmin@sofiya.internal";
-    const TEST_PASSWORD = process.env.SUPER_ADMIN_SEED_PASSWORD || "TestSuperAdmin@123!Secure";
+    const TEST_PASSWORD = process.env.SUPER_ADMIN_SEED_PASSWORD || (crypto.randomBytes(16).toString("hex") + "!Aa1");
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(TEST_PASSWORD, salt);

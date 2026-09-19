@@ -1,11 +1,12 @@
 import { Tabs, Redirect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import { useFavoriteStore } from "@/src/store/favoriteStore";
 import { useNotificationStore } from "@/src/store/notificationStore";
 import { useAuthStore } from "@/src/store/authStore";
+import { AppIcon } from '@/src/constants/icons';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -22,7 +23,9 @@ export default function TabLayout() {
     }
   }, [favInit, notifInit, fetchFavorites, fetchNotifications]);
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
+  }
 
   if (!token) return <Redirect href="/login" />;
 
@@ -57,37 +60,37 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: STRINGS.tabs.home,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={26} color={color} />
+            <AppIcon name={focused ? "home" : "homeOutline"} size={26} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="categories"
         options={{
-          title: 'Categories',
+          title: STRINGS.tabs.collections,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "grid" : "grid-outline"} size={26} color={color} />
+            <AppIcon name={focused ? "grid" : "gridOutline"} size={26} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="favorites"
         options={{
-          title: 'Favorites',
+          title: STRINGS.tabs.favorites,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "heart" : "heart-outline"} size={26} color={color} />
+            <AppIcon name={focused ? "heart" : "heartOutline"} size={26} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="notifications"
         options={{
-          title: 'Notifications',
+          title: STRINGS.tabs.notifications,
           tabBarIcon: ({ color, focused }) => (
             <View>
-              <Ionicons name={focused ? "notifications" : "notifications-outline"} size={26} color={color} />
+              <AppIcon name={focused ? "notifications" : "notificationsOutline"} size={26} color={color} />
               {unreadCount > 0 && (
                 <View className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
               )}
@@ -95,12 +98,12 @@ export default function TabLayout() {
           ),
         }}
       />
-    <Tabs.Screen
+      <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: STRINGS.tabs.profile,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={26} color={color} />
+            <AppIcon name={focused ? "profile" : "profileOutline"} size={26} color={color} />
           ),
         }}
       />

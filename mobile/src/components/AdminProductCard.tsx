@@ -47,7 +47,7 @@ export default function AdminProductCard({ product, categoryName, modelTypeName,
           )}
           {product.has_variants && product.variants && product.variants.length > 0 && (
             <Text className="text-xs text-text-secondary font-medium mt-1">
-              Sizes: <Text className="text-text-primary">{product.variants.map(v => v.size).join(', ')}</Text>
+              Sizes: <Text className="text-text-primary">{(product.variants || []).map(v => v?.size).filter(Boolean).join(', ')}</Text>
             </Text>
           )}
           {product.accepts_custom_size && (

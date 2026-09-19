@@ -1,17 +1,17 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   TextInput,
-  Animated,
+  ActivityIndicator,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
-import Button from "@/src/components/Button";
 import { OTPDigitInput } from "./OTPDigitInput";
+import { STRINGS } from "@/src/constants/strings";
 
 export interface OTPVerifyProps {
   otpCode: string;
@@ -48,299 +48,213 @@ export const OTPStepVerify: React.FC<OTPVerifyProps> = ({
   isLocked,
   lockoutMessage,
 }) => {
-  const initialDigits = otpCode.padEnd(6, "").split("").slice(0, 6);
   const { height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isSmallScreen = screenHeight < 600;
-  const [progressDots] = useState(() => {
-    const opacity1 = new Animated.Value(1);
-    const opacity2 = new Animated.Value(0.3);
-    const opacity3 = new Animated.Value(0.3);
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity1, {
-          toValue: 0.3,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity2, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity2, {
-          toValue: 0.3,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity3, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity3, {
-          toValue: 0.3,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity1, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-    return [opacity1, opacity2, opacity3];
-  });
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#FFF0F3" }}>
+    <View className="flex-1 bg-[#FAFAFA]">
       <KeyboardAwareScrollView
         contentContainerStyle={{
           flexGrow: 1,
-          paddingHorizontal: 24,
-          paddingTop: isSmallScreen ? 12 : 32,
-          paddingBottom: insets.bottom + 16,
+          paddingHorizontal: 20,
+          paddingTop: isSmallScreen ? 12 : 24,
+          paddingBottom: Math.max(insets.bottom + 16, 24),
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         extraScrollHeight={isSmallScreen ? 40 : 80}
         enableOnAndroid
       >
-        <TouchableOpacity
-          onPress={onBack}
-          className="w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm mb-4"
-          style={{
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 3,
-            elevation: 2,
-          }}
-        >
-          <Ionicons name="chevron-back" size={22} color="#e11d48" />
-        </TouchableOpacity>
+        {/* Top Navigation Row */}
+        <View className="flex-row items-center justify-between mb-4">
+          <TouchableOpacity
+            onPress={onBack}
+            className="w-10 h-10 bg-white rounded-full items-center justify-center border border-slate-200/80 shadow-xs active:bg-slate-50"
+            accessibilityRole="button"
+            accessibilityLabel={STRINGS.common.back}
+          >
+            <Ionicons name="arrow-back" size={20} color="#0f172a" />
+          </TouchableOpacity>
 
-        <View className={isSmallScreen ? "pb-2" : "pb-4"}>
-          {/* Icon */}
-          <View className="items-center mb-5">
-            <View
-              className={`${isSmallScreen ? "w-18 h-18" : "w-24 h-24"} bg-white rounded-[24px] items-center justify-center shadow-lg mb-4`}
-              style={{
-                shadowColor: "#FF1F4B",
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.16,
-                shadowRadius: 16,
-                elevation: 10,
-              }}
-            >
-              <View
-                className={`${isSmallScreen ? "w-14 h-14" : "w-20 h-20"} bg-gradient-to-br from-[#FF1F4B]/15 to-[#FF1F4B]/5 rounded-[20px] items-center justify-center`}
-              >
-                <Ionicons
-                  name={useBackupCode ? "key" : "shield-checkmark"}
-                  size={isSmallScreen ? 28 : 36}
-                  color="#FF1F4B"
-                />
-              </View>
+          <View className="flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200/60">
+            <View className="w-2 h-2 rounded-full bg-primary" />
+            <Text className="text-[11px] font-bold text-primary uppercase tracking-wider">
+              {STRINGS.auth.otpVerify.badge}
+            </Text>
+          </View>
+
+          {/* Spacer to balance back button */}
+          <View className="w-10" />
+        </View>
+
+        {/* Hero Security Icon & Header */}
+        <View className="items-center mb-6">
+          <View className="w-20 h-20 bg-white rounded-3xl items-center justify-center border border-slate-100 shadow-sm mb-3.5">
+            <View className="w-14 h-14 bg-rose-50 rounded-2xl items-center justify-center">
+              <Ionicons
+                name={useBackupCode ? "key" : "shield-checkmark"}
+                size={30}
+                color="#e11d48"
+              />
             </View>
           </View>
 
-          <Text
-            className={`${isSmallScreen ? "text-xl" : "text-2xl"} font-extrabold text-slate-800 text-center mb-2`}
-            style={{ letterSpacing: -0.5 }}
-          >
-            {useBackupCode ? "Recovery Code Sign In" : "Welcome back"}
-          </Text>
-          <Text className="text-slate-500 text-sm text-center mb-5 leading-5 px-4">
+          <Text className="text-2xl font-black text-slate-900 text-center tracking-tight">
             {useBackupCode
-              ? "Enter one of your single-use backup recovery codes."
-              : "Enter the 6-digit verification code from your authenticator app."}
+              ? STRINGS.auth.otpVerify.recoveryTitle
+              : STRINGS.auth.otpVerify.title}
           </Text>
+          <Text className="text-xs text-slate-500 text-center mt-1.5 px-4 leading-5 max-w-[300px]">
+            {useBackupCode
+              ? STRINGS.auth.otpVerify.recoverySubtitle
+              : STRINGS.auth.otpVerify.subtitle}
+          </Text>
+        </View>
 
-          {/* Lockout Banner */}
-          {isLocked && (
-            <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4 flex-row items-start gap-2.5">
-              <Ionicons name="lock-closed" size={18} color="#dc2626" style={{ marginTop: 2 }} />
-              <View className="flex-1">
-                <Text className="text-red-900 font-bold text-xs mb-1">
-                  Account Temporarily Locked
-                </Text>
-                <Text className="text-red-700 text-xs leading-relaxed">
-                  {lockoutMessage || "Too many failed attempts. Your account has been locked for 15 minutes."}
-                </Text>
-              </View>
+        {/* Lockout Alert Banner */}
+        {isLocked && (
+          <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4 flex-row items-start gap-3">
+            <Ionicons name="lock-closed" size={20} color="#dc2626" style={{ marginTop: 1 }} />
+            <View className="flex-1">
+              <Text className="text-red-900 font-bold text-xs mb-0.5">
+                {STRINGS.auth.otpVerify.accountLocked}
+              </Text>
+              <Text className="text-red-700 text-xs leading-relaxed">
+                {lockoutMessage || STRINGS.auth.otpVerify.defaultLockout}
+              </Text>
             </View>
-          )}
+          </View>
+        )}
 
-          {/* OTP Input or Backup Input */}
+        {/* Main Input Card */}
+        <View className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm mb-4">
           {!useBackupCode ? (
             <>
+              <Text className="text-[11px] font-bold text-slate-400 tracking-[0.2em] uppercase text-center mb-4">
+                {STRINGS.auth.otpVerify.codeLabel}
+              </Text>
+
+              <OTPDigitInput
+                value={otpCode}
+                onChange={setOtpCode}
+                onComplete={onVerify}
+                error={otpError}
+                setError={setOtpError}
+                disabled={loading || isLocked}
+              />
+
+              {/* Refresh Countdown Pill */}
               <View
-                className="bg-white rounded-[24px] px-5 pt-5 pb-5 shadow-sm mb-3"
-                style={{
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.06,
-                  shadowRadius: 12,
-                  elevation: 4,
-                }}
+                className={`flex-row items-center justify-center gap-1.5 py-1.5 px-3.5 rounded-full self-center mt-4 ${
+                  otpTimer <= 5
+                    ? "bg-amber-50 border border-amber-200"
+                    : "bg-slate-50 border border-slate-100"
+                }`}
               >
-                <View className="items-center mb-3">
-                  <Text className="text-[11px] font-bold text-slate-400 tracking-[0.24em] uppercase">
-                    Authentication Code
-                  </Text>
-                </View>
-                <OTPDigitInput
-                  initialDigits={initialDigits}
-                  onDigitsChange={(d) => setOtpCode(d.join("").slice(0, 6))}
-                  onComplete={onVerify}
-                  error={otpError}
-                  setError={setOtpError}
-                  disabled={loading || isLocked}
+                <Ionicons
+                  name={otpTimer <= 5 ? "warning-outline" : "time-outline"}
+                  size={13}
+                  color={otpTimer <= 5 ? "#d97706" : "#e11d48"}
                 />
-                {otpError ? null : (
-                  <View className="flex-row items-center justify-center mt-3 gap-1.5">
-                    {progressDots.map((anim, i) => (
-                      <Animated.View
-                        key={i}
-                        style={{ opacity: anim }}
-                        className="w-1.5 h-1.5 rounded-full bg-rose-300"
-                      />
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {otpError ? (
-                <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3 flex-row items-start gap-2.5">
-                  <Ionicons
-                    name="alert-circle"
-                    size={16}
-                    color="#dc2626"
-                    style={{ marginTop: 1 }}
-                  />
-                  <Text className="text-red-600 text-xs flex-1 leading-5">
-                    {otpError}
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Timer */}
-              <View className="flex-row items-center justify-center mb-4 gap-2 rounded-full bg-rose-50 px-3 py-2 self-center">
-                <View className="w-6 h-6 bg-white rounded-full items-center justify-center shadow-sm">
-                  <Ionicons name="time-outline" size={13} color="#e11d48" />
-                </View>
-                <Text className="text-rose-500 text-xs font-semibold">
-                  Code refreshes in{" "}
-                  <Text className="font-extrabold">{otpTimer}s</Text>
+                <Text
+                  className={`text-xs font-medium ${
+                    otpTimer <= 5 ? "text-amber-700 font-semibold" : "text-slate-500"
+                  }`}
+                >
+                  {otpTimer <= 5
+                    ? STRINGS.auth.otpVerify.rotatingSoon(otpTimer)
+                    : STRINGS.auth.otpVerify.refreshesIn(otpTimer)}
                 </Text>
               </View>
-
-              {/* Verify Button */}
-              <Button
-                title="Verify & Sign In"
-                onPress={onVerify}
-                loading={loading}
-                icon={<Ionicons name="shield-checkmark" size={20} color="#fff" />}
-                iconPosition="left"
-                disabled={loading || isLocked || otpCode.length !== 6}
-                className="shadow-lg bg-[#FF1F4B] rounded-[18px] h-14"
-                style={{
-                  shadowColor: "#FF1F4B",
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.28,
-                  shadowRadius: 10,
-                  elevation: 8,
-                }}
-              />
             </>
           ) : (
             <>
-              {/* Backup Code Input */}
-              <View
-                className="bg-white rounded-[24px] px-5 pt-5 pb-5 shadow-sm mb-3"
-                style={{
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.06,
-                  shadowRadius: 12,
-                  elevation: 4,
-                }}
-              >
-                <View className="items-center mb-3">
-                  <Text className="text-[11px] font-bold text-slate-400 tracking-[0.24em] uppercase">
-                    Backup Recovery Code
-                  </Text>
-                </View>
-                <TextInput
-                  value={backupCode}
-                  onChangeText={(val) => {
-                    setBackupCode(val);
-                    setOtpError("");
-                  }}
-                  placeholder="e.g. ABCD-1234"
-                  placeholderTextColor="#94a3b8"
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  editable={!loading && !isLocked}
-                  className="bg-slate-50 border border-rose-200 rounded-2xl px-4 py-3.5 text-center text-lg font-mono font-bold text-slate-800 tracking-widest uppercase"
-                />
-                <Text className="text-slate-400 text-[11px] text-center mt-2">
-                  Case-insensitive. Dashes are optional.
-                </Text>
-              </View>
+              <Text className="text-[11px] font-bold text-slate-400 tracking-[0.2em] uppercase text-center mb-3">
+                {STRINGS.auth.otpVerify.recoveryCodeLabel}
+              </Text>
 
-              {otpError ? (
-                <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3 flex-row items-start gap-2.5">
-                  <Ionicons
-                    name="alert-circle"
-                    size={16}
-                    color="#dc2626"
-                    style={{ marginTop: 1 }}
-                  />
-                  <Text className="text-red-600 text-xs flex-1 leading-5">
-                    {otpError}
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Verify Backup Code Button */}
-              <Button
-                title="Verify Recovery Code"
-                onPress={onVerifyBackup}
-                loading={loading}
-                icon={<Ionicons name="key" size={20} color="#fff" />}
-                iconPosition="left"
-                disabled={loading || isLocked || !backupCode.trim()}
-                className="shadow-lg bg-[#FF1F4B] rounded-[18px] h-14"
-                style={{
-                  shadowColor: "#FF1F4B",
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.28,
-                  shadowRadius: 10,
-                  elevation: 8,
+              <TextInput
+                value={backupCode}
+                onChangeText={(val) => {
+                  setBackupCode(val);
+                  setOtpError("");
                 }}
+                placeholder={STRINGS.auth.otpVerify.recoveryPlaceholder}
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!loading && !isLocked}
+                className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-center text-lg font-mono font-bold text-slate-900 tracking-widest uppercase"
               />
+              <Text className="text-slate-400 text-[11px] text-center mt-2">
+                {STRINGS.auth.otpVerify.recoveryHint}
+              </Text>
             </>
           )}
-
-          {/* Toggle Between Modes */}
-          <TouchableOpacity
-            onPress={() => {
-              setUseBackupCode(!useBackupCode);
-              setOtpError("");
-            }}
-            className="mt-5 items-center py-2 active:opacity-70"
-          >
-            <Text className="text-xs font-bold text-[#FF1F4B]">
-              {useBackupCode
-                ? "← Use Google Authenticator instead"
-                : "Lost your device? Use Backup Recovery Code →"}
-            </Text>
-          </TouchableOpacity>
         </View>
+
+        {/* Error Notification */}
+        {otpError ? (
+          <View className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4 flex-row items-center gap-2.5">
+            <Ionicons name="alert-circle" size={18} color="#dc2626" />
+            <Text className="text-red-600 text-xs flex-1 leading-5 font-medium">
+              {otpError}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Primary Verify Action Button */}
+        <TouchableOpacity
+          onPress={useBackupCode ? onVerifyBackup : onVerify}
+          disabled={
+            loading ||
+            isLocked ||
+            (useBackupCode ? !backupCode.trim() : otpCode.length !== 6)
+          }
+          activeOpacity={0.9}
+          className={`h-14 rounded-2xl flex-row items-center justify-center shadow-sm ${
+            loading ||
+            isLocked ||
+            (useBackupCode ? !backupCode.trim() : otpCode.length !== 6)
+              ? "bg-slate-200"
+              : "bg-primary"
+          }`}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <View className="flex-row items-center gap-2">
+              <Ionicons
+                name={useBackupCode ? "key" : "shield-checkmark"}
+                size={18}
+                color="white"
+              />
+              <Text className="text-white font-bold text-base">
+                {useBackupCode
+                  ? STRINGS.auth.otpVerify.verifyRecoveryBtn
+                  : STRINGS.auth.otpVerify.verifyBtn}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Switch Verification Mode Link */}
+        <TouchableOpacity
+          onPress={() => {
+            setUseBackupCode(!useBackupCode);
+            setOtpError("");
+          }}
+          activeOpacity={0.7}
+          className="mt-4 py-3 items-center"
+        >
+          <Text className="text-xs font-bold text-primary">
+            {useBackupCode
+              ? `← ${STRINGS.auth.otpVerify.useAuthenticator}`
+              : `${STRINGS.auth.otpVerify.useRecovery} →`}
+          </Text>
+        </TouchableOpacity>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
+    </View>
   );
 };

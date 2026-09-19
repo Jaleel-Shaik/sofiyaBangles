@@ -78,18 +78,33 @@ export const verifyOtp = asyncHandler(async (req: AuthRequest, res: Response) =>
 });
 
 export const verify2FAController = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { otp_pending_token, totp_code, backup_code, challenge_id, email } = req.body;
+  const {
+    otp_pending_token,
+    totp_code,
+    otp_code,
+    otp,
+    backup_code,
+    challenge_id,
+    challengeId,
+    email,
+    use_backup_code,
+    useBackupCode,
+  } = req.body;
   const deviceInfo = extractDeviceInfo(req);
   const platform = resolvePlatform(req.headers["x-client-type"] as string | undefined);
 
+  const finalCode = (totp_code || otp_code || otp || backup_code || "").toString().trim();
+  const activeChallengeId = challenge_id || challengeId;
+  const isBackup = Boolean(use_backup_code || useBackupCode || backup_code);
+
   const result = await verify2FAOtpService(
     otp_pending_token,
-    totp_code || backup_code,
+    finalCode,
     deviceInfo,
     platform,
-    challenge_id,
+    activeChallengeId,
     email,
-    !!backup_code
+    isBackup
   );
 
   return sendSuccess(res, result, (result as any).message || "2FA verification successful.");

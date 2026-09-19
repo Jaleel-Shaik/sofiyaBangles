@@ -14,6 +14,8 @@ import { ProductCategorySelect } from "./form/ProductCategorySelect";
 import { ProductVariants } from "./form/ProductVariants";
 import { FormState, VariantState } from "./form/types";
 import { api } from "@/src/lib/api";
+import { Button } from "@/src/components/ui";
+import { STRINGS } from "@/src/constants/strings";
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -209,12 +211,20 @@ export default function EditProductPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/products" className="p-2 rounded-xl hover:bg-[#F5F5F5]">
+        <Link
+          href="/dashboard/products"
+          aria-label={STRINGS.common.back}
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs"
+        >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-[#171717]">Edit Product</h1>
-          <p className="text-[#737373] text-sm">Update product details and inventory</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            {STRINGS.products.editProduct}
+          </h1>
+          <p className="text-xs font-semibold text-slate-400 mt-0.5">
+            Update product details, sizing models, and catalog inventory
+          </p>
         </div>
       </div>
 
@@ -268,11 +278,19 @@ export default function EditProductPage() {
         />
 
         <div className="flex justify-end gap-3 pt-2">
-          <Link href="/dashboard/products" className="px-6 py-3 text-sm font-semibold text-[#525252] border border-[#E5E5E5] rounded-xl hover:bg-[#F5F5F5] transition-colors cursor-pointer">Cancel</Link>
-          <button type="submit" disabled={saving} className="gradient-primary text-white font-bold py-3 px-8 rounded-xl flex items-center gap-2 shadow-lg shadow-[#E8436E]/20 transition-transform active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {saving ? "Updating Product..." : "Save Changes"}
-          </button>
+          <Link href="/dashboard/products">
+            <Button variant="outline" size="md">
+              {STRINGS.common.cancel}
+            </Button>
+          </Link>
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            isLoading={saving}
+          >
+            {saving ? "Updating Product..." : STRINGS.common.save}
+          </Button>
         </div>
       </motion.form>
     </div>

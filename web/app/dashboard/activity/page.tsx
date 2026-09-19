@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import Link from "next/link";
 import { api } from "@/src/lib/api";
+import { STRINGS } from "@/src/constants/strings";
 import {
   Package,
   PlusCircle,
@@ -55,15 +56,17 @@ export default function AdminProductActivityPage() {
         <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Shield className="w-6 h-6" />
         </div>
-        <h2 className="text-lg font-bold text-slate-900 mb-2">SuperAdmin Access Required</h2>
+        <h2 className="text-lg font-bold text-slate-900 mb-2">
+          {STRINGS.superAdminAuth.accessRequiredTitle}
+        </h2>
         <p className="text-xs text-slate-500 mb-6">
-          Monitoring admin operations and catalog audit trails is restricted to Super-Administrators.
+          {STRINGS.superAdminAuth.accessRequiredDesc}
         </p>
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 bg-[#E8436E] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#CC3366] transition-colors"
+          className="inline-flex items-center gap-2 bg-[#E8436E] text-white px-5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold hover:bg-[#CC3366] transition-colors"
         >
-          Return to Store Dashboard
+          {STRINGS.superAdminAuth.returnToDashboard}
         </Link>
       </div>
     );
@@ -196,15 +199,15 @@ export default function AdminProductActivityPage() {
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Package className="w-6 h-6 text-[#E8436E]" /> Product Operations Log
+            <Package className="w-6 h-6 text-[#E8436E]" /> {STRINGS.activity.title}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Complete audit record of products added, edited, deleted, and inventory stock changes performed by store administrators.
+            {STRINGS.activity.subtitle}
           </p>
         </div>
 
         <span className="text-xs font-semibold px-3.5 py-1.5 rounded-xl bg-rose-50 text-[#E8436E] border border-rose-100 self-start sm:self-auto">
-          {total} Product Actions Logged
+          {total} Actions Logged
         </span>
       </div>
 
@@ -214,78 +217,77 @@ export default function AdminProductActivityPage() {
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto">
           <button
             onClick={() => setActiveTab("ALL")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+            className={`px-3 py-2 min-h-[36px] rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === "ALL"
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            All Product Actions
+            {STRINGS.activity.allTab}
           </button>
           <button
             onClick={() => setActiveTab("CREATED")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-2 min-h-[36px] rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === "CREATED"
                 ? "bg-white text-emerald-700 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <PlusCircle className="w-3.5 h-3.5 text-emerald-600" /> Added
+            <PlusCircle className="w-3.5 h-3.5 text-emerald-600" /> {STRINGS.activity.createdTab}
           </button>
           <button
             onClick={() => setActiveTab("UPDATED")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-2 min-h-[36px] rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === "UPDATED"
                 ? "bg-white text-blue-700 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <Edit className="w-3.5 h-3.5 text-blue-600" /> Edited
+            <Edit className="w-3.5 h-3.5 text-blue-600" /> {STRINGS.activity.updatedTab}
           </button>
           <button
             onClick={() => setActiveTab("DELETED")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-2 min-h-[36px] rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === "DELETED"
                 ? "bg-white text-rose-700 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <Trash2 className="w-3.5 h-3.5 text-rose-600" /> Deleted
+            <Trash2 className="w-3.5 h-3.5 text-rose-600" /> {STRINGS.activity.deletedTab}
           </button>
           <button
             onClick={() => setActiveTab("STOCK")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            className={`px-3 py-2 min-h-[36px] rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === "STOCK"
                 ? "bg-white text-purple-700 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <Layers className="w-3.5 h-3.5 text-purple-600" /> Stock Changes
+            <Layers className="w-3.5 h-3.5 text-purple-600" /> {STRINGS.activity.stockTab}
           </button>
         </div>
 
         {/* Search */}
         <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
           <input
             type="text"
-            placeholder="Search admin, product name..."
+            placeholder={STRINGS.activity.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#E8436E]"
+            className="w-full pl-9 pr-3 py-2 min-h-[44px] rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#E8436E]"
           />
         </div>
       </div>
 
-      {/* Product Operations Table */}
+      {/* Audit Log Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-400 text-xs">
-            Loading product operational audit stream...
-          </div>
+          <div className="p-12 text-center text-slate-400 text-xs">{STRINGS.common.loading}</div>
         ) : filteredItems.length === 0 ? (
           <div className="p-12 text-center text-slate-400 text-xs font-medium">
-            No product operations recorded yet.
+            <p className="font-bold text-sm text-slate-700 mb-1">{STRINGS.activity.emptyTitle}</p>
+            <p>{STRINGS.activity.emptyDesc}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/src/lib/api";
+import { STRINGS } from "@/src/constants/strings";
 
 export default function ProductSalesRevenuePage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -69,15 +70,17 @@ export default function ProductSalesRevenuePage() {
         <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Shield className="w-6 h-6" />
         </div>
-        <h2 className="text-lg font-bold text-slate-900 mb-2">SuperAdmin Access Required</h2>
+        <h2 className="text-lg font-bold text-slate-900 mb-2">
+          {STRINGS.superAdminAuth.accessRequiredTitle}
+        </h2>
         <p className="text-xs text-slate-500 mb-6">
-          Accessing the 70/30 Profit Split & Commission Ledger is restricted to Super-Administrators.
+          {STRINGS.superAdminAuth.accessRequiredDesc}
         </p>
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 bg-[#E8436E] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#CC3366] transition-colors"
+          className="inline-flex items-center gap-2 bg-[#E8436E] text-white px-5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold hover:bg-[#CC3366] transition-colors"
         >
-          Return to Store Dashboard
+          {STRINGS.superAdminAuth.returnToDashboard}
         </Link>
       </div>
     );
@@ -107,28 +110,28 @@ export default function ProductSalesRevenuePage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-[#E8436E]" /> Product Sales & Commission Ledger
+            <TrendingUp className="w-6 h-6 text-[#E8436E]" /> {STRINGS.revenue.title}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Detailed record of which products sold at what rate, and the exact {commissionSettings.admin_percentage}% Admin vs {commissionSettings.super_admin_percentage}% Super-Admin profit allocation.
+            {STRINGS.revenue.subtitle(commissionSettings.admin_percentage, commissionSettings.super_admin_percentage)}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/settings/commission"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <Settings className="w-4 h-4 text-slate-500" /> Adjust Split Ratio
+            <Settings className="w-4 h-4 text-slate-500" /> {STRINGS.revenue.adjustRatio}
           </Link>
 
           <a
             href={api.superAdmin.exportRevenueCsvUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-[#E8436E] hover:bg-[#CC3366] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-all"
+            className="inline-flex items-center gap-2 bg-[#E8436E] hover:bg-[#CC3366] text-white px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold shadow-sm transition-all"
           >
-            <Download className="w-4 h-4" /> Export CSV
+            <Download className="w-4 h-4" /> {STRINGS.revenue.exportCsv}
           </a>
         </div>
       </div>
@@ -137,27 +140,27 @@ export default function ProductSalesRevenuePage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Gross Sales */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <p className="text-xs font-semibold text-slate-500">Gross Products Sold</p>
+          <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.grossVolume}</p>
           <p className="text-2xl font-bold text-slate-900">₹{totalGross.toLocaleString()}</p>
-          <p className="text-[11px] text-slate-400">Total sale volume from orders</p>
+          <p className="text-[11px] text-slate-400">{STRINGS.revenue.grossVolumeDesc}</p>
         </div>
 
         {/* Admin Share */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Admin Share Payout</p>
+            <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.adminSharePayout}</p>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
               {commissionSettings.admin_percentage}%
             </span>
           </div>
           <p className="text-2xl font-bold text-emerald-600">₹{totalAdminShare.toLocaleString()}</p>
-          <p className="text-[11px] text-slate-400">Allocated to product sellers</p>
+          <p className="text-[11px] text-slate-400">{STRINGS.revenue.adminSharePayoutDesc}</p>
         </div>
 
         {/* SuperAdmin Share */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Super-Admin Platform Share</p>
+            <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.superAdminShare}</p>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-[#E8436E]">
               {commissionSettings.super_admin_percentage}%
             </span>
@@ -165,16 +168,16 @@ export default function ProductSalesRevenuePage() {
           <p className="text-2xl font-bold text-[#E8436E]">
             ₹{totalSuperAdminShare.toLocaleString()}
           </p>
-          <p className="text-[11px] text-slate-400">Platform operational commission</p>
+          <p className="text-[11px] text-slate-400">{STRINGS.revenue.superAdminShareDesc}</p>
         </div>
 
         {/* Split Rule */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <p className="text-xs font-semibold text-slate-500">Commission Rule</p>
+          <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.commissionRule}</p>
           <p className="text-2xl font-bold text-slate-900">
             {commissionSettings.admin_percentage} / {commissionSettings.super_admin_percentage}
           </p>
-          <p className="text-[11px] text-slate-400">Admin 70% • SuperAdmin 30%</p>
+          <p className="text-[11px] text-slate-400">{STRINGS.revenue.commissionRuleDesc}</p>
         </div>
       </div>
 
@@ -182,13 +185,13 @@ export default function ProductSalesRevenuePage() {
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         {/* Search */}
         <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
           <input
             type="text"
-            placeholder="Search product name, order ID..."
+            placeholder={STRINGS.revenue.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#E8436E]"
+            className="w-full pl-9 pr-3 py-2 min-h-[44px] rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#E8436E]"
           />
         </div>
 
@@ -203,9 +206,9 @@ export default function ProductSalesRevenuePage() {
               setTransactionType(e.target.value);
               setPage(1);
             }}
-            className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:outline-none focus:border-[#E8436E] font-medium"
+            className="text-xs border border-slate-200 rounded-xl px-3 py-2 min-h-[44px] bg-white text-slate-700 focus:outline-none focus:border-[#E8436E] font-medium"
           >
-            <option value="">All Transactions</option>
+            <option value="">{STRINGS.revenue.allTransactions}</option>
             <option value="SALE">SALE</option>
             <option value="REFUND">REFUND</option>
           </select>
@@ -216,10 +219,11 @@ export default function ProductSalesRevenuePage() {
       {/* Product Sales Ledger Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-400 text-xs">Loading product sales ledger...</div>
+          <div className="p-12 text-center text-slate-400 text-xs">{STRINGS.common.loading}</div>
         ) : filteredItems.length === 0 ? (
           <div className="p-12 text-center text-slate-400 text-xs font-medium">
-            No sales records found.
+            <p className="font-bold text-sm text-slate-700 mb-1">{STRINGS.revenue.emptyTitle}</p>
+            <p>{STRINGS.revenue.emptyDesc}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

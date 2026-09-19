@@ -10,6 +10,7 @@ import TextInputField from '@/src/components/TextInputField';
 import Button from '@/src/components/Button';
 
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
+import { STRINGS } from '@/src/constants/strings';
 
 import { getProductById } from '@/src/api/products';
 
@@ -66,12 +67,12 @@ export default function EditProductScreen() {
             
             setImageUrls(productData.images || (productData.image_url ? [productData.image_url] : []));
             
-            if (productData.variants && productData.variants.length > 0) {
+            if (Array.isArray(productData.variants) && productData.variants.length > 0) {
               setVariants(productData.variants.map((v: any, idx: number) => ({
-                id: v.id || `v-${idx}-${v.size}`,
-                size: v.size,
-                price: v.price.toString(),
-                quantity: v.quantity.toString()
+                id: v?.id || `v-${idx}-${v?.size}`,
+                size: v?.size || '',
+                price: (v?.price ?? '').toString(),
+                quantity: (v?.quantity ?? '').toString()
               })));
             }
             
@@ -119,10 +120,10 @@ export default function EditProductScreen() {
     if (!currentCategory) return;
     
     // Only populate variants from category if variants state is currently empty (meaning it's not loaded from product)
-    if (variants.length === 0) {
+    if ((variants || []).length === 0) {
       if (currentCategory.size_type === 'standard' || currentCategory.size_type === 'both') {
         setHasVariants(true);
-        if (currentCategory.standard_sizes) {
+        if (Array.isArray(currentCategory.standard_sizes) && currentCategory.standard_sizes.length > 0) {
           setVariants(currentCategory.standard_sizes.map(sz => ({
             id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             size: sz,
@@ -178,7 +179,7 @@ export default function EditProductScreen() {
     if (!price) newErrors.price = 'Price is required';
     else if (parseFloat(price) <= 0) newErrors.price = 'Price must be a positive number';
     if (!selectedModelType) newErrors.model_type_id = 'Model Type is required';
-    if (!selectedCategory) newErrors.category = 'Category is required';
+    if (!selectedCategory) newErrors.category = STRINGS.admin.products.pleaseSelectCollection;
     if (imageUrls.length === 0) newErrors.images = 'At least one image is required';
 
     if (Object.keys(newErrors).length > 0) {
@@ -398,7 +399,7 @@ export default function EditProductScreen() {
             <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
               <Ionicons name="grid" size={16} color="#e11d48" />
             </View>
-            <Text className="text-lg font-bold text-text-primary">Categorization</Text>
+            <Text className="text-lg font-bold text-text-primary">{STRINGS.admin.products.categorization}</Text>
           </View>
           <View className="flex-row items-center justify-between mb-3 px-1">
             <Text className="text-sm font-bold text-text-secondary">Model Type *</Text>
@@ -420,13 +421,13 @@ export default function EditProductScreen() {
         {selectedModelType ? (
           <>
             <View className="flex-row items-center mb-2 ml-1">
-              <Text className="text-sm font-bold text-text-secondary mr-2">Select Category *</Text>
+              <Text className="text-sm font-bold text-text-secondary mr-2">{STRINGS.admin.products.selectCollection}</Text>
               {errors.category && <Text className="text-xs font-bold text-red-500">{errors.category}</Text>}
             </View>
             <View className="mb-4">
-              {filteredCategories.length > 0 ? (
-                filteredCategories.map((cat) => {
-                  const mt = modelTypes.find(m => m.id === cat.model_type_id);
+              {(filteredCategories || []).length > 0 ? (
+                (filteredCategories || []).map((cat) => {
+                  const mt = (modelTypes || []).find(m => m.id === cat.model_type_id);
                   const isSelected = selectedCategory === cat.id;
                   
                   return (
@@ -484,7 +485,7 @@ export default function EditProductScreen() {
                   );
                 })
               ) : (
-                <Text className="text-text-secondary italic ml-1">No categories found for this model type.</Text>
+                <Text className="text-text-secondary italic ml-1">{STRINGS.admin.products.noCollectionsFound}</Text>
               )}
             </View>
           </>
@@ -506,7 +507,7 @@ export default function EditProductScreen() {
               onPress={() => {
                 const nextVal = !hasVariants;
                 setHasVariants(nextVal);
-                if (nextVal && variants.length === 0 && currentCategory?.standard_sizes) {
+                if (nextVal && (variants || []).length === 0 && Array.isArray(currentCategory?.standard_sizes) && currentCategory.standard_sizes.length > 0) {
                   setVariants(currentCategory.standard_sizes.map(sz => ({
                     id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     size: sz,
@@ -564,12 +565,12 @@ export default function EditProductScreen() {
                 </TouchableOpacity>
               </View>
 
-              {variants.length === 0 ? (
+              {(variants || []).length === 0 ? (
                 <View className="p-5 border border-dashed border-divider rounded-2xl items-center">
                   <Text className="text-xs text-text-hint text-center">No sizes added yet. Use the field above to add sizes, or toggle Sizes OFF.</Text>
                 </View>
               ) : (
-                variants.map((v) => (
+                (variants || []).map((v) => (
                   <View key={v.id} className="flex-row items-center bg-surface p-3 rounded-2xl border border-divider mb-3">
                     <View className="bg-primary/10 border border-primary/20 px-3.5 py-2.5 rounded-xl mr-3 items-center justify-center min-w-[50px]">
                       <Text className="font-bold text-primary text-base">{v.size}</Text>
@@ -663,7 +664,7 @@ export default function EditProductScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {modelTypes.map((mt) => {
+              {(modelTypes || []).map((mt) => {
                 const isSelected = selectedModelType === mt.id;
                 return (
                   <TouchableOpacity

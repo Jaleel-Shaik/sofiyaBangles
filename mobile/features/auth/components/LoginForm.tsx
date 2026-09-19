@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
+import { View, Text, TouchableOpacity, useWindowDimensions, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import TextInputField from "@/src/components/TextInputField";
@@ -69,18 +69,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     >
       <View className="items-center mb-8 mt-8">
         <View
-          className="w-20 h-20 bg-white rounded-full items-center justify-center shadow-lg mb-4"
+          className="w-24 h-24 bg-white rounded-3xl items-center justify-center shadow-lg mb-4 p-2.5 border border-rose-100"
           style={{
-            shadowColor: "#FF1F4B",
+            shadowColor: "#e11d48",
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
             elevation: 8,
           }}
         >
-          <Ionicons name="shield-checkmark" size={36} color="#FF1F4B" />
+          <Image
+            source={require("../../../assets/images/logo.png")}
+            className="w-full h-full"
+            resizeMode="contain"
+          />
         </View>
-        <Text className="text-3xl font-extrabold text-[#FF1F4B] font-serif mb-1">
+        <Text className="text-3xl font-extrabold text-primary font-serif mb-1">
           Sofiya Bangles
         </Text>
         <Text className="text-slate-500 text-sm font-medium">
@@ -136,17 +140,17 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   onPress={() => setRole("user")}
                   className={`flex-1 py-3 px-4 rounded-xl border-2 flex-row items-center justify-center gap-2 ${
                     role === "user"
-                      ? "bg-rose-50 border-[#FF1F4B]"
+                      ? "bg-rose-50 border-primary"
                       : "bg-white border-slate-200"
                   }`}
                 >
                   <Ionicons
                     name="person-outline"
                     size={18}
-                    color={role === "user" ? "#FF1F4B" : "#94a3b8"}
+                    color={role === "user" ? "#e11d48" : "#94a3b8"}
                   />
                   <Text
-                    className={`font-semibold text-sm ${role === "user" ? "text-[#FF1F4B]" : "text-slate-500"}`}
+                    className={`font-semibold text-sm ${role === "user" ? "text-primary" : "text-slate-500"}`}
                   >
                     User
                   </Text>
@@ -155,17 +159,17 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   onPress={() => setRole("admin")}
                   className={`flex-1 py-3 px-4 rounded-xl border-2 flex-row items-center justify-center gap-2 ${
                     role === "admin"
-                      ? "bg-rose-50 border-[#FF1F4B]"
+                      ? "bg-rose-50 border-primary"
                       : "bg-white border-slate-200"
                   }`}
                 >
                   <Ionicons
                     name="shield-checkmark-outline"
                     size={18}
-                    color={role === "admin" ? "#FF1F4B" : "#94a3b8"}
+                    color={role === "admin" ? "#e11d48" : "#94a3b8"}
                   />
                   <Text
-                    className={`font-semibold text-sm ${role === "admin" ? "text-[#FF1F4B]" : "text-slate-500"}`}
+                    className={`font-semibold text-sm ${role === "admin" ? "text-primary" : "text-slate-500"}`}
                   >
                     Admin
                   </Text>
@@ -211,9 +215,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           title={authStep === "register" ? "Create Account" : "Sign In"}
           onPress={authStep === "register" ? onRegister : onLogin}
           loading={loading}
-          className="shadow-md bg-[#FF1F4B] rounded-xl"
+          className="shadow-md bg-primary rounded-xl"
           style={{
-            shadowColor: "#FF1F4B",
+            shadowColor: "#e11d48",
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.3,
             shadowRadius: 8,
@@ -232,7 +236,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             {authStep === "login"
               ? "Don't have an account? "
               : "Already have an account? "}
-            <Text className="text-[#FF1F4B] font-bold">
+            <Text className="text-primary font-bold">
               {authStep === "login" ? "Register" : "Login"}
             </Text>
           </Text>

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateReviewStats, deleteProductModel, restoreProductModel } from './product.model';
-import { createProductService } from '../services/product.service';
+import { createProductService, lookupProductByCodeOrIdService, sellProductService } from '../services/product.service';
 import { createProductSchema } from '../validations/product.validation';
 import { db } from '../../../shared/config/firebase';
+import { getProductByCodeOrIdDb } from '../../../db/product.db';
 
 test('Product Model Setup and Lifecycle', async (t) => {
   await t.test('calculateReviewStats averages ratings and preserves review count', () => {
@@ -121,6 +122,92 @@ test('Product Model Setup and Lifecycle', async (t) => {
     assert.equal(parsed.variants[0].size, '2.4');
     assert.equal(parsed.accepts_custom_size, true, 'accepts_custom_size should be parsed as boolean');
     assert.equal(parsed.custom_size_price, 249.99, 'custom_size_price should be parsed as number');
+  });
+
+  await t.test('Product Special ID lookup and sale by code decrements stock count', async () => {
+    // Check Firestore connectivity
+    try {
+      await db.collection("model_types").limit(1).get();
+    } catch (err: any) {
+      console.warn("⚠️ Skipping live Firestore test: unauthenticated.");
+      return;
+    }
+
+    const testMtId = 'test-mt-code-' + Date.now();
+    const testCatId = 'test-cat-code-' + Date.now();
+    const testProdId = 'test-prd-code-' + Date.now();
+    const specialCode = `TST-${Date.now().toString().slice(-4)}`;
+
+    await db.collection("model_types").doc(testMtId).set({
+      id: testMtId,
+      name: "Silk Bangles",
+      is_active: true,
+      created_at: new Date().toISOString()
+    });
+
+    await db.collection("categories").doc(testCatId).set({
+      id: testCatId,
+      category_name: "Silk Thread Regular",
+      model_type_id: testMtId,
+      is_active: true,
+      created_at: new Date().toISOString()
+    });
+
+    await db.collection("products").doc(testProdId).set({
+      id: testProdId,
+      unique_code: specialCode,
+      product_name: "Test Special Bangles",
+      description: "Testing code sell",
+      price: 499,
+      quantity: 15,
+      category_id: testCatId,
+      model_type_id: testMtId,
+      is_active: true,
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+
+    try {
+      // 1. Test lookup by unique_code (both uppercase and lowercase)
+      const foundByCode = await getProductByCodeOrIdDb(specialCode);
+      assert.ok(foundByCode, 'Product must be found by unique_code');
+      assert.equal(foundByCode.id, testProdId);
+      assert.equal(foundByCode.unique_code, specialCode);
+
+      const foundByLowerCode = await getProductByCodeOrIdDb(specialCode.toLowerCase());
+      assert.ok(foundByLowerCode, 'Product must be found even if entered in lowercase');
+      assert.equal(foundByLowerCode.id, testProdId);
+
+      // 2. Test lookupProductByCodeOrIdService
+      const serviceLookup = await lookupProductByCodeOrIdService(specialCode);
+      assert.ok(serviceLookup, 'lookupProductByCodeOrIdService must return product');
+      assert.equal(serviceLookup.product_name, "Test Special Bangles");
+      assert.equal(serviceLookup.category_name, "Silk Thread Regular");
+      assert.equal(serviceLookup.model_type_name, "Silk Bangles");
+
+      // 3. Test sellProductService using the special code
+      const soldProduct = await sellProductService(specialCode, 3, 'test-admin-actor');
+      assert.ok(soldProduct, 'Sold product must be returned');
+      assert.equal(soldProduct.quantity, 12, 'Stock quantity must decrement from 15 to 12');
+
+      // Verify Firestore state
+      const docCheck = await db.collection("products").doc(testProdId).get();
+      assert.equal(docCheck.data()?.quantity, 12, 'Persisted Firestore quantity must be 12');
+
+      // 4. Test insufficient stock throws error
+      await assert.rejects(
+        async () => {
+          await sellProductService(specialCode, 20, 'test-admin-actor');
+        },
+        { message: 'INSUFFICIENT_STOCK' }
+      );
+    } finally {
+      // Cleanup
+      await db.collection("products").doc(testProdId).delete();
+      await db.collection("categories").doc(testCatId).delete();
+      await db.collection("model_types").doc(testMtId).delete();
+    }
   });
 });
 

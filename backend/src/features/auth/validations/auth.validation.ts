@@ -29,19 +29,23 @@ export const loginSchema = z.object({
 });
 
 export const verify2faSchema = z.object({
-  otp_pending_token: z.string().optional(),
+  otp_pending_token: z.string().min(1, "OTP pending token is required"),
   challenge_id: z.string().optional(),
   challengeId: z.string().optional(),
   email: z.string().optional(),
   otp_code: z.string().optional(),
   otp: z.string().optional(),
+  totp_code: z.string().optional(),
+  backup_code: z.string().optional(),
   useBackupCode: z.boolean().optional(),
   use_backup_code: z.boolean().optional(),
 }).refine(
-  (data) => Boolean(data.otp_pending_token || data.challenge_id || data.challengeId),
-  { message: "Either challengeId, challenge_id, or otp_pending_token is required" }
-).refine(
-  (data) => Boolean((data.otp && data.otp.trim().length > 0) || (data.otp_code && data.otp_code.trim().length > 0)),
+  (data) => Boolean(
+    (data.otp && data.otp.trim().length > 0) ||
+    (data.otp_code && data.otp_code.trim().length > 0) ||
+    (data.totp_code && data.totp_code.trim().length > 0) ||
+    (data.backup_code && data.backup_code.trim().length > 0)
+  ),
   { message: "OTP or backup recovery code is required" }
 );
 

@@ -2,14 +2,16 @@ import React from 'react';
 import { Text, TextProps } from 'react-native';
 
 export type TypographyVariant = 
-  | 'display-lg' | 'display-md' | 'display-sm'
+  | 'display-xl' | 'display-lg' | 'display-md'
+  | 'headline-xl' | 'headline-lg' | 'headline-md' | 'headline-sm'
   | 'title-lg' | 'title-md' | 'title-sm'
   | 'body-lg' | 'body-md' | 'body-sm'
-  | 'label-lg' | 'label-md' | 'label-sm';
+  | 'label-lg' | 'label-md' | 'label-sm'
+  | 'caption' | 'overline';
 
 export type TypographyColor = 
   | 'primary' | 'secondary' | 'hint' 
-  | 'brand-primary' | 'brand-secondary' 
+  | 'brand-primary' | 'brand-secondary' | 'price'
   | 'success' | 'warning' | 'error' | 'white';
 
 interface TypographyProps extends TextProps {
@@ -31,20 +33,31 @@ export function Typography({
   ...props
 }: TypographyProps) {
   
-  // Base classes mapping to tailwind.config.js
+  // Base classes mapping strictly to tailwind.config.js
   const variantClasses: Record<TypographyVariant, string> = {
-    'display-lg': 'text-display-lg font-serif font-extrabold',
-    'display-md': 'text-display-md font-serif font-extrabold',
-    'display-sm': 'text-display-sm font-serif font-extrabold',
+    'display-xl': 'text-display-xl font-extrabold',
+    'display-lg': 'text-display-lg font-extrabold',
+    'display-md': 'text-display-md font-bold',
+    
+    'headline-xl': 'text-headline-xl font-bold',
+    'headline-lg': 'text-headline-lg font-bold',
+    'headline-md': 'text-headline-md font-bold',
+    'headline-sm': 'text-headline-sm font-semibold',
+
     'title-lg': 'text-title-lg font-bold',
     'title-md': 'text-title-md font-semibold',
     'title-sm': 'text-title-sm font-semibold',
+
     'body-lg': 'text-body-lg',
     'body-md': 'text-body-md',
     'body-sm': 'text-body-sm',
-    'label-lg': 'text-label-lg uppercase tracking-wider',
-    'label-md': 'text-label-md uppercase tracking-wider',
-    'label-sm': 'text-label-sm uppercase tracking-wider',
+
+    'label-lg': 'text-label-lg font-semibold',
+    'label-md': 'text-label-md font-semibold',
+    'label-sm': 'text-label-sm font-semibold',
+
+    'caption': 'text-caption',
+    'overline': 'text-overline font-bold uppercase tracking-wider',
   };
 
   const colorClasses: Record<TypographyColor, string> = {
@@ -53,6 +66,7 @@ export function Typography({
     'hint': 'text-text-hint',
     'brand-primary': 'text-primary',
     'brand-secondary': 'text-secondary',
+    'price': 'text-[#C25B3E]',
     'success': 'text-success',
     'warning': 'text-warning',
     'error': 'text-error',

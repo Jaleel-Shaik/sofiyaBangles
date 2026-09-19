@@ -29,9 +29,9 @@ export const useSizeStore = create<SizeState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const prefs = await api.sizes.getSizePreferences(user.id);
-      set({ preferences: prefs, loading: false });
+      set({ preferences: Array.isArray(prefs) ? prefs : [], loading: false });
     } catch (err: any) {
-      set({ error: err.message, loading: false });
+      set({ error: err.message, preferences: [], loading: false });
     }
   },
 
@@ -42,7 +42,7 @@ export const useSizeStore = create<SizeState>((set, get) => ({
     try {
       const newPref = await api.sizes.createSizePreference(user.id, data);
       set(state => ({
-        preferences: [...state.preferences, newPref]
+        preferences: [...(Array.isArray(state.preferences) ? state.preferences : []), newPref]
       }));
     } catch (err: any) {
       throw err;
@@ -53,7 +53,7 @@ export const useSizeStore = create<SizeState>((set, get) => ({
     try {
       await api.sizes.updateSizePreference(id, data);
       set(state => ({
-        preferences: state.preferences.map(p => 
+        preferences: (Array.isArray(state.preferences) ? state.preferences : []).map(p => 
           p.id === id ? { ...p, ...data, updated_at: new Date().toISOString() } : p
         )
       }));
@@ -66,7 +66,7 @@ export const useSizeStore = create<SizeState>((set, get) => ({
     try {
       await api.sizes.deleteSizePreference(id);
       set(state => ({
-        preferences: state.preferences.filter(p => p.id !== id)
+        preferences: (Array.isArray(state.preferences) ? state.preferences : []).filter(p => p.id !== id)
       }));
     } catch (err: any) {
       throw err;
@@ -75,7 +75,8 @@ export const useSizeStore = create<SizeState>((set, get) => ({
 
   setCategoryPreference: async (categoryId, data) => {
     const state = get();
-    const existing = state.preferences.find(p => p.category_id === categoryId);
+    const safePrefs = Array.isArray(state.preferences) ? state.preferences : [];
+    const existing = safePrefs.find(p => p && p.category_id === categoryId);
     
     if (existing) {
       await state.editPreference(existing.id, data);

@@ -6,6 +6,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCategories, Category } from '@/src/api/categories';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function CategoryProducts() {
   const { id } = useLocalSearchParams();
@@ -68,8 +69,8 @@ export default function CategoryProducts() {
           <Ionicons name="arrow-back" size={22} color="#e11d48" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-primary font-medium text-xs uppercase tracking-wider">Products</Text>
-          <Text className="text-xl font-bold text-text-primary" numberOfLines={1}>{category?.category_name || 'Category not found'}</Text>
+          <Text className="text-primary font-medium text-xs uppercase tracking-wider">{STRINGS.admin.tabs.products}</Text>
+          <Text className="text-xl font-bold text-text-primary" numberOfLines={1}>{category?.category_name || STRINGS.admin.collections.collectionNotFound}</Text>
         </View>
       </View>
 

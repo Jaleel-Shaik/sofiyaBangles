@@ -1,10 +1,9 @@
 import type { Favorite } from '@/src/api/favorites';
 import type { Product } from '@/src/api/products';
 import { api } from "@/src/api";
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 
 import { getCategories, Category } from '@/src/api/categories';
 import { useFavoriteStore } from '@/src/store/favoriteStore';
@@ -13,6 +12,8 @@ import Header from '@/src/components/Header';
 import FilterPill from '@/src/components/FilterPill';
 import FavoriteItemCard from '@/src/components/FavoriteItemCard';
 import { openWhatsAppEnquiry } from '@/src/utils/whatsapp';
+import { AppIcon } from '@/src/constants/icons';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function FavoritesScreen() {
   const { token } = useAuthStore();
@@ -29,20 +30,20 @@ export default function FavoritesScreen() {
       if (!token) {
         setFavorites([]);
         const catData = await getCategories();
-        setCategories(catData);
+        setCategories(Array.isArray(catData) ? catData : []);
       } else {
         const [favResult, catResult] = await Promise.allSettled([
           api.favorites.getFavorites(),
           getCategories()
         ]);
         if (favResult.status === 'fulfilled') {
-          setFavorites(favResult.value);
+          setFavorites(Array.isArray(favResult.value) ? favResult.value : []);
         } else {
           console.warn("Failed to fetch favorites:", favResult.reason);
           setFavorites([]);
         }
         if (catResult.status === 'fulfilled') {
-          setCategories(catResult.value);
+          setCategories(Array.isArray(catResult.value) ? catResult.value : []);
         } else {
           console.warn("Failed to fetch categories:", catResult.reason);
           setCategories([]);
@@ -50,6 +51,8 @@ export default function FavoritesScreen() {
       }
     } catch (err) {
       console.error("Favorites screen fetch error:", err);
+      setFavorites([]);
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -62,12 +65,8 @@ export default function FavoritesScreen() {
   );
 
   const handleRemove = async (productId: string) => {
-    try {
-      await toggleFavorite(productId);
-      setFavorites(favorites.filter(f => f.product_id !== productId));
-    } catch (error) {
-      console.error(error);
-    }
+    await toggleFavorite(productId);
+    setFavorites(prev => (Array.isArray(prev) ? prev : []).filter(f => f && f.product_id !== productId));
   };
 
   const openWhatsApp = async (product?: Product) => {
@@ -82,12 +81,14 @@ export default function FavoritesScreen() {
     });
   };
 
-  const favCategoryIds = new Set(favorites.map(f => f.product?.category_id).filter(Boolean));
-  const availableCategories = categories.filter(c => favCategoryIds.has(c.id));
+  const safeFavorites = Array.isArray(favorites) ? favorites : [];
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const favCategoryIds = new Set(safeFavorites.map(f => f?.product?.category_id).filter(Boolean));
+  const availableCategories = safeCategories.filter(c => c && favCategoryIds.has(c.id));
 
   const filteredFavorites = activeFilter === 'All'
-    ? favorites
-    : favorites.filter(f => f.product?.category_id === activeFilter);
+    ? safeFavorites
+    : safeFavorites.filter(f => f?.product?.category_id === activeFilter);
 
   if (loading) {
     return (
@@ -99,7 +100,7 @@ export default function FavoritesScreen() {
 
   return (
     <View className="flex-1 bg-[#FAFAFA]">
-      <Header title="My Favorites" showBack={false} />
+      <Header title={STRINGS.favorites.title} showBack={false} />
 
       {/* Category Pills */}
       {availableCategories.length > 0 && (
@@ -111,7 +112,7 @@ export default function FavoritesScreen() {
             className="flex-row"
           >
             <FilterPill
-              label="All"
+              label={STRINGS.common.all}
               isActive={activeFilter === 'All'}
               onPress={() => setActiveFilter('All')}
             />
@@ -135,11 +136,11 @@ export default function FavoritesScreen() {
         {filteredFavorites.length === 0 ? (
           <View className="items-center justify-center py-20">
             <View className="w-20 h-20 rounded-full bg-primary/10 items-center justify-center mb-4">
-              <Ionicons name="heart-outline" size={32} color="#e11d48" />
+              <AppIcon name="heartOutline" size={32} color="#e11d48" />
             </View>
-            <Text className="text-lg font-bold text-text-primary mb-1">No favorites yet</Text>
+            <Text className="text-lg font-bold text-text-primary mb-1">{STRINGS.favorites.emptyTitle}</Text>
             <Text className="text-text-secondary text-sm text-center px-8">
-              Tap the heart icon on any bangle to save it here
+              {STRINGS.favorites.emptyDescription}
             </Text>
           </View>
         ) : (

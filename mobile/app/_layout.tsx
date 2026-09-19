@@ -6,7 +6,7 @@ import {
 } from "expo-router";
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, ActivityIndicator, StyleSheet, Image } from "react-native";
 import { useAuthStore } from "@/src/store/authStore";
 import { getDashboardHref } from "@/src/utils/navigation";
 import { startAppStateListener, stopAppStateListener } from "@/src/api/client";
@@ -22,7 +22,11 @@ function NavigatingSplash() {
   return (
     <View style={styles.splash}>
       <View style={styles.iconBox}>
-        <Text style={styles.iconText}>✦</Text>
+        <Image
+          source={require("../assets/images/logo.png")}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
       </View>
       <Text style={styles.brand}>Sofiya Bangles</Text>
       <Text style={styles.subtitle}>Taking you to the dashboard...</Text>
@@ -55,7 +59,9 @@ export default function RootLayout() {
     // super_admin is not allowed on mobile — force logout immediately
     if (user.role === "super_admin") {
       useAuthStore.getState().forceLogout();
-      router.replace("/login");
+      if (segments?.[0] !== "login") {
+        router.replace("/login");
+      }
       return;
     }
 
@@ -76,13 +82,8 @@ export default function RootLayout() {
     }
   }, [segments, isNavigating]);
 
-  // Show branded splash while navigating to dashboard after login/OTP
-  if (isNavigating) {
-    return <NavigatingSplash />;
-  }
-
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
@@ -92,11 +93,18 @@ export default function RootLayout() {
         <Stack.Screen name="new-arrivals/index" />
         <Stack.Screen name="products/[id]" />
         <Stack.Screen name="category/[id]" />
+        <Stack.Screen name="search" />
+        <Stack.Screen name="orders" />
         <Stack.Screen name="server-settings" />
         <Stack.Screen name="error-center" />
       </Stack>
+      {isNavigating && (
+        <View style={StyleSheet.absoluteFill}>
+          <NavigatingSplash />
+        </View>
+      )}
       <NetworkErrorModal />
-    </>
+    </View>
   );
 }
 
@@ -109,23 +117,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   iconBox: {
-    width: 80,
-    height: 80,
+    width: 88,
+    height: 88,
     borderRadius: 24,
-    backgroundColor: "#E8436E",
+    backgroundColor: "#ffffff",
+    padding: 10,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#FFE4E6",
     shadowColor: "#E8436E",
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.2,
     shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
-  iconText: {
-    color: "#fff",
-    fontSize: 36,
-    fontWeight: "700",
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   brand: {
     fontSize: 24,

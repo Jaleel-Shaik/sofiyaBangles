@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { api, type Product, type AnalyticsOverview, type Category, type ModelType } from "@/src/lib/api";
 import Link from "next/link";
+import { STRINGS } from "@/src/constants/strings";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -95,27 +96,27 @@ export default function DashboardPage() {
       >
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Welcome, {user?.full_name || "Admin"}
+            {STRINGS.adminDashboard.welcome(user?.full_name || "Admin")}
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            Real-time bangles catalog management, inventory tracking & WhatsApp order fulfillment.
+            {STRINGS.adminDashboard.subtitle}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <Link
             href="/dashboard/products/new"
-            className="flex items-center gap-1.5 bg-[#E8436E] hover:bg-[#CC3366] text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+            className="flex items-center gap-1.5 bg-[#E8436E] hover:bg-[#CC3366] text-white px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all shadow-sm"
           >
             <PlusCircle className="w-4 h-4" />
-            Add New Bangles
+            {STRINGS.adminDashboard.addNewBangles}
           </Link>
           <Link
             href="/dashboard/orders?action=new-sale"
-            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all shadow-sm"
           >
             <ShoppingCart className="w-4 h-4 text-emerald-400" />
-            + WhatsApp Sale
+            {STRINGS.adminDashboard.whatsAppSale}
           </Link>
         </div>
       </motion.div>
@@ -123,7 +124,9 @@ export default function DashboardPage() {
       {/* Overview Stats */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <h2 className="text-lg font-bold text-[#171717]">Catalog & Sales Overview</h2>
+          <h2 className="text-lg font-bold text-[#171717]">
+            {STRINGS.adminDashboard.catalogOverview}
+          </h2>
           <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedModelType}
@@ -131,9 +134,9 @@ export default function DashboardPage() {
                 setSelectedModelType(e.target.value);
                 setSelectedCategory("");
               }}
-              className="text-xs font-semibold px-3 py-2 rounded-xl border border-[#E5E5E5] bg-white text-[#171717] focus:outline-none focus:border-[#E8436E] cursor-pointer shadow-sm"
+              className="text-xs font-semibold px-3 py-2 min-h-[44px] rounded-xl border border-[#E5E5E5] bg-white text-[#171717] focus:outline-none focus:border-[#E8436E] cursor-pointer shadow-sm"
             >
-              <option value="">All Model Types</option>
+              <option value="">{STRINGS.adminDashboard.allModelTypes}</option>
               {modelTypes.map((mt) => (
                 <option key={mt.id} value={mt.id}>{mt.name}</option>
               ))}
@@ -142,9 +145,9 @@ export default function DashboardPage() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="text-xs font-semibold px-3 py-2 rounded-xl border border-[#E5E5E5] bg-white text-[#171717] focus:outline-none focus:border-[#E8436E] cursor-pointer shadow-sm"
+              className="text-xs font-semibold px-3 py-2 min-h-[44px] rounded-xl border border-[#E5E5E5] bg-white text-[#171717] focus:outline-none focus:border-[#E8436E] cursor-pointer shadow-sm"
             >
-              <option value="">All Categories</option>
+              <option value="">{STRINGS.adminDashboard.allCategories}</option>
               {filteredCategories.map((cat) => (
                 <option key={cat.id} value={cat.id}>{cat.category_name}</option>
               ))}
@@ -391,12 +394,14 @@ export default function DashboardPage() {
       {/* Recent Products */}
       <div className="pb-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-[#171717]">Recent Products</h2>
+          <h2 className="text-lg font-bold text-[#171717]">
+            {STRINGS.adminDashboard.recentProductsTitle}
+          </h2>
           <Link
             href="/dashboard/products"
             className="text-sm text-[#E8436E] hover:text-[#CC3366] font-medium transition-colors flex items-center gap-1.5"
           >
-            View All
+            {STRINGS.adminDashboard.viewAll}
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
@@ -416,13 +421,15 @@ export default function DashboardPage() {
         ) : recentProducts.length === 0 ? (
           <div className="bg-white rounded-2xl border border-[#E5E5E5] p-10 text-center shadow-sm">
             <Package className="w-14 h-14 text-[#D4D4D4] mx-auto mb-4" />
-            <p className="text-[#A3A3A3] font-medium text-base">No products found</p>
+            <p className="text-[#A3A3A3] font-medium text-base">
+              {STRINGS.adminDashboard.noRecentProducts}
+            </p>
             <Link
               href="/dashboard/products/new"
-              className="inline-flex items-center gap-1.5 mt-4 text-sm text-[#E8436E] hover:text-[#CC3366] font-medium transition-colors bg-rose-50 px-5 py-2.5 rounded-xl"
+              className="inline-flex items-center gap-1.5 mt-4 text-sm text-[#E8436E] hover:text-[#CC3366] font-medium transition-colors bg-rose-50 px-5 py-2.5 rounded-xl min-h-[44px]"
             >
               <PlusCircle className="w-4 h-4" />
-              Add your first product
+              {STRINGS.products.addFirstProduct}
             </Link>
           </div>
         ) : (

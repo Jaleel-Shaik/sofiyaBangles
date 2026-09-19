@@ -109,11 +109,11 @@ export default function SplashScreen() {
                 elevation: 10,
               }}
             >
-              <View className="w-full h-full rounded-full border-4 border-rose-300 overflow-hidden relative">
+              <View className="w-full h-full rounded-full bg-white border-4 border-rose-200 overflow-hidden p-3 items-center justify-center relative">
                 <Image
-                  source={{ uri: "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca5" }}
+                  source={require("../../../assets/images/logo.png")}
                   className="w-full h-full"
-                  resizeMode="cover"
+                  resizeMode="contain"
                 />
               </View>
               <View className="absolute -top-1 -right-1 bg-white rounded-full p-2 border border-rose-200 shadow-sm">
@@ -121,12 +121,15 @@ export default function SplashScreen() {
               </View>
             </View>
 
-            <Text className="text-4xl font-extrabold text-rose-600 mb-2 font-serif tracking-wide">
+            <Text className="text-4xl font-extrabold text-rose-600 mb-3 font-serif tracking-wide text-center">
               Sofiya Bangles
             </Text>
-            <Text className="text-sm text-rose-400 font-medium mb-8 text-center px-4 leading-5">
-              Discover Elegance, Wear Beauty
-            </Text>
+            <View className="flex-row items-center bg-white/85 px-4 py-1.5 rounded-full border border-rose-200/90 shadow-sm mb-8">
+              <Ionicons name="sparkles" size={13} color="#e11d48" style={{ marginRight: 6 }} />
+              <Text className="text-xs font-bold text-rose-600 tracking-wider text-center uppercase">
+                Find best suited things for you
+              </Text>
+            </View>
 
             <View className="flex-row items-center">
               <View className="w-12 h-px bg-rose-200" />

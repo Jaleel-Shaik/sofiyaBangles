@@ -3,7 +3,6 @@ import { api } from "@/src/api";
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
 export interface AppNotification {
   id: string;
   title: string;
@@ -48,12 +47,13 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
       const storedRead = await AsyncStorage.getItem('read_notifications');
       const parsedRead: string[] = storedRead ? JSON.parse(storedRead) : [];
 
-      const { products } = await api.products.getNewArrivals(7, 1, 20);
+      const newArrivalsRes = await api.products.getNewArrivals(7, 1, 20);
+      const incomingProducts = Array.isArray(newArrivalsRes?.products) ? newArrivalsRes.products : [];
       
-      const dynamicNotifs: AppNotification[] = products.map((p: Product) => ({
+      const dynamicNotifs: AppNotification[] = incomingProducts.map((p: Product) => ({
         id: p.id,
         title: 'New Product Added! ✨',
-        desc: `${p.product_name} has just been added to our collection for ₹${p.price}. Tap to view!`,
+        desc: `${p.product_name || 'Item'} has just been added to our collection for ₹${p.price || 0}. Tap to view!`,
         time: getRelativeTime(p.created_at),
         icon: 'sparkles-outline',
         isRead: parsedRead.includes(p.id),
@@ -72,23 +72,25 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
       ];
 
       const allNotifs = [...dynamicNotifs, ...staticNotifs];
-      const filteredNotifs = allNotifs.filter(n => !parsedDeleted.includes(n.id));
+      const filteredNotifs = allNotifs.filter(n => n && !parsedDeleted.includes(n.id));
 
       const unreadCount = filteredNotifs.filter(n => !n.isRead).length;
 
       set({ notifications: filteredNotifs, initialized: true, unreadCount });
     } catch (error) {
       console.error('Failed to fetch notifications for store', error);
+      set({ notifications: [], initialized: true, unreadCount: 0 });
     }
   },
 
   markAsRead: async (id: string) => {
     const { notifications } = get();
-    const notif = notifications.find(n => n.id === id);
+    const safeNotifs = Array.isArray(notifications) ? notifications : [];
+    const notif = safeNotifs.find(n => n && n.id === id);
     if (!notif || notif.isRead) return;
 
     // Optimistic UI update
-    const updatedNotifs = notifications.map(n => 
+    const updatedNotifs = safeNotifs.map(n => 
       n.id === id ? { ...n, isRead: true } : n
     );
     const unreadCount = updatedNotifs.filter(n => !n.isRead).length;
@@ -108,7 +110,8 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
 
   deleteNotifications: async (ids: string[]) => {
     const { notifications } = get();
-    const updatedNotifs = notifications.filter(n => !ids.includes(n.id));
+    const safeNotifs = Array.isArray(notifications) ? notifications : [];
+    const updatedNotifs = safeNotifs.filter(n => n && !ids.includes(n.id));
     const unreadCount = updatedNotifs.filter(n => !n.isRead).length;
     set({ notifications: updatedNotifs, unreadCount });
 

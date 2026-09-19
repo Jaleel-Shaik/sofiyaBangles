@@ -45,7 +45,7 @@ async function resetPassword() {
       password_hash
     });
     
-    console.log(`Successfully reset admin password for ${email} to: ${password}`);
+    console.log(`Successfully reset admin password for ${email}.`);
   } catch (error) {
     console.error('Error resetting password:', error);
   }

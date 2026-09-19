@@ -3,6 +3,7 @@ import {
   generateNextProductSequenceDb,
   insertProductWithRelationsDb,
   getProductByIdDb,
+  getProductByCodeOrIdDb,
   getActiveProductsDb,
   getAllAdminProductsDb,
   updateProductWithRelationsDb,
@@ -100,7 +101,7 @@ export const createProductService = async (
     allImageUrls.push(...uploadedUrls);
   }
 
-  let generatedCode = input.unique_code;
+  let generatedCode = input.unique_code ? input.unique_code.trim().toUpperCase() : undefined;
   if (!generatedCode) {
     generatedCode = await generateNextProductSequenceDb(input.model_type_id, mtDoc.name || "PRD");
   }
@@ -218,6 +219,7 @@ export const getProductsService = async (options: {
     allProducts = allProducts.filter(
       (p) =>
         (p.product_name && p.product_name.toLowerCase().includes(lowerSearch)) ||
+        (p.unique_code && p.unique_code.toLowerCase().includes(lowerSearch)) ||
         (p.description && p.description.toLowerCase().includes(lowerSearch))
     );
   }
@@ -227,10 +229,12 @@ export const getProductsService = async (options: {
   const paginatedProducts = allProducts.slice(offset, offset + limit);
 
   const categories = await getCategoriesDb();
-  const categoryMap = new Map(categories.map((c) => [c.id, c.category_name]));
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const categoryMap = new Map(safeCategories.map((c) => [c.id, c.category_name]));
 
+  const safePaginated = Array.isArray(paginatedProducts) ? paginatedProducts : [];
   const productsWithDetails = await Promise.all(
-    paginatedProducts.map(async (p) => {
+    safePaginated.map(async (p) => {
       const category_name = p.category_id ? categoryMap.get(p.category_id) : undefined;
       const is_favorited = options.userId ? await isFavoritedDb(options.userId, p.id) : false;
       const variants = await getVariantsByProductDb(p.id);
@@ -505,14 +509,59 @@ export const updateStockService = async (
 };
 
 /**
- * Service: Deduct inventory upon sale.
+ * Service: Lookup a product by its special code or ID with full details.
+ */
+export const lookupProductByCodeOrIdService = async (codeOrId: string, userId?: string): Promise<Product> => {
+  const product = await getProductByCodeOrIdDb(codeOrId);
+  if (!product) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+
+  let category_name = undefined;
+  let model_type_name = undefined;
+  let model_type_id = product.model_type_id;
+
+  const [categories, mtDoc] = await Promise.all([
+    getCategoriesDb(),
+    product.model_type_id ? getModelTypeByIdDb(product.model_type_id) : null,
+  ]);
+
+  const cat = categories.find((c) => c.id === product.category_id);
+  if (cat) {
+    category_name = cat.category_name;
+    if (!model_type_id) {
+      model_type_id = cat.model_type_id;
+    }
+  }
+  if (mtDoc) {
+    model_type_name = mtDoc.name;
+  }
+
+  const is_favorited = userId ? await isFavoritedDb(userId, product.id) : false;
+  const variants = await getVariantsByProductDb(product.id);
+  const images = await getImagesByProductDb(product.id);
+
+  return {
+    ...product,
+    category_name,
+    model_type_name,
+    model_type_id: model_type_id || "",
+    is_favorited,
+    variants,
+    images,
+  };
+};
+
+/**
+ * Service: Deduct inventory upon sale using code or ID.
  */
 export const sellProductService = async (
-  id: string,
+  codeOrId: string,
   quantity: number,
   actorId: string,
+  extra?: { customer_name?: string; customer_phone?: string; notes?: string }
 ) => {
-  const existing = await getProductByIdDb(id);
+  const existing = await getProductByCodeOrIdDb(codeOrId);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
@@ -520,15 +569,27 @@ export const sellProductService = async (
     throw new Error("INSUFFICIENT_STOCK");
   }
   const newQuantity = existing.quantity - quantity;
-  const product = await updateProductDocDb(id, { quantity: newQuantity });
+  const product = await updateProductDocDb(existing.id, { quantity: newQuantity });
+
+  const oldData: Record<string, unknown> = { quantity: existing.quantity };
+  if (existing.unique_code) oldData.unique_code = existing.unique_code;
+
+  const newData: Record<string, unknown> = {
+    quantity: newQuantity,
+    sold_quantity: quantity,
+  };
+  if (existing.unique_code) newData.unique_code = existing.unique_code;
+  if (extra?.customer_name) newData.customer_name = extra.customer_name;
+  if (extra?.customer_phone) newData.customer_phone = extra.customer_phone;
+  if (extra?.notes) newData.notes = extra.notes;
 
   await insertAuditLogDb({
     actor_id: actorId,
     action: "PRODUCT_SOLD",
     table_name: "products",
-    record_id: id,
-    old_data: { quantity: existing.quantity },
-    new_data: { quantity: newQuantity },
+    record_id: existing.id,
+    old_data: oldData,
+    new_data: newData,
   });
 
   return product;
@@ -650,7 +711,7 @@ export const deleteProductsByCategoryService = async (
  */
 export const searchProductsService = async (query: string, limit?: number, userId?: string) => {
   const res = await getProductsService({ page: 1, limit: limit || 20, search: query, userId });
-  return res.products;
+  return Array.isArray(res?.products) ? res.products : [];
 };
 
 /**

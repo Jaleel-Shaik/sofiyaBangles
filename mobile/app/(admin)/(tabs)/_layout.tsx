@@ -3,12 +3,15 @@ import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@/src/store/authStore";
+import { STRINGS } from "@/src/constants/strings";
 
 export default function AdminTabsLayout() {
   const insets = useSafeAreaInsets();
   const { token, user, isLoading } = useAuthStore();
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
+  }
 
   if (!token) return <Redirect href="/login" />;
 
@@ -46,7 +49,7 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: "Dashboard",
+          title: STRINGS.admin.tabs.dashboard,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? "grid" : "grid-outline"}
@@ -59,7 +62,7 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="products"
         options={{
-          title: "Products",
+          title: STRINGS.admin.tabs.products,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? "pricetag" : "pricetag-outline"}
@@ -98,7 +101,7 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="categories"
         options={{
-          title: "Categories",
+          title: STRINGS.admin.tabs.collections,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? "folder" : "folder-outline"}
@@ -111,7 +114,7 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
+          title: STRINGS.admin.tabs.settings,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? "settings" : "settings-outline"}

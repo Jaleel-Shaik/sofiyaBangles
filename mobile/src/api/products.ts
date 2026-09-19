@@ -44,6 +44,24 @@ export interface Product {
   updated_at?: string;
 }
 
+const sanitizeProduct = (p: any): Product => ({
+  ...p,
+  id: String(p?.id || ''),
+  unique_code: p?.unique_code || '',
+  product_name: p?.product_name || 'Bangle',
+  description: p?.description || '',
+  price: typeof p?.price === 'number' ? p.price : Number(p?.price) || 0,
+  image_url: p?.image_url || '',
+  images: Array.isArray(p?.images) ? p.images : (p?.image_url ? [p.image_url] : []),
+  category_id: p?.category_id || '',
+  quantity: typeof p?.quantity === 'number' ? p.quantity : Number(p?.quantity) || 0,
+  is_active: p?.is_active !== false,
+  has_variants: Boolean(p?.has_variants),
+  variants: Array.isArray(p?.variants) ? p.variants : [],
+  accepts_custom_size: Boolean(p?.accepts_custom_size),
+  model_type_id: p?.model_type_id || '',
+});
+
 export const getProducts = async (
   page = 1,
   limit = 10,
@@ -52,13 +70,19 @@ export const getProducts = async (
 ): Promise<{ products: Product[]; total: number }> => {
   try {
     let url = `${API_ENDPOINTS.PRODUCTS.BASE}?page=${page}&limit=${limit}`;
-    if (categoryId) url += `&category_id=${categoryId}`;
+    if (categoryId) url += `&category_id=${encodeURIComponent(categoryId)}`;
     if (search && search.trim()) url += `&search=${encodeURIComponent(search.trim())}`;
 
     const res = await apiClient.get(url);
-    const payload: Product[] = Array.isArray(res.data?.data) ? res.data.data : [];
-    const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;
-    return { products: payload, total };
+    const rawData = res.data?.data ?? res.data?.products ?? (Array.isArray(res.data) ? res.data : []);
+    const payload: any[] = Array.isArray(rawData) ? rawData : [];
+    const products: Product[] = payload
+      .filter((p) => Boolean(p && typeof p === 'object'))
+      .map(sanitizeProduct);
+    const total = typeof res.data?.pagination?.total === 'number'
+      ? res.data.pagination.total
+      : (typeof res.data?.total === 'number' ? res.data.total : products.length);
+    return { products, total };
   } catch (error) {
     console.error('Error fetching products', error);
     return { products: [], total: 0 };
@@ -77,15 +101,19 @@ export const getRecommendedProducts = async (
     }
 
     const res = await apiClient.get(url);
-    const payload: Product[] = Array.isArray(res.data?.data) ? res.data.data : [];
-    const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;
+    const rawData = res.data?.data ?? (Array.isArray(res.data) ? res.data : []);
+    const payload: any[] = Array.isArray(rawData) ? rawData : [];
+    const products: Product[] = payload
+      .filter((p) => Boolean(p && typeof p === 'object'))
+      .map(sanitizeProduct);
+    const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : products.length;
 
-    // Resilient fallback: If recommendations endpoint returns 0 (e.g. cold start with no interaction history), fallback to getProducts
-    if (payload.length === 0 && !search) {
+    // Resilient fallback: If recommendations endpoint returns 0, fallback to getProducts
+    if (products.length === 0 && !search) {
       return getProducts(page, limit);
     }
 
-    return { products: payload, total };
+    return { products, total };
   } catch (error) {
     console.warn('Falling back to standard products for recommendations:', error);
     return getProducts(page, limit, undefined, search);
@@ -95,7 +123,8 @@ export const getRecommendedProducts = async (
 export const getProductById = async (id: string): Promise<Product | null> => {
   try {
     const res = await apiClient.get(API_ENDPOINTS.PRODUCTS.BY_ID(id));
-    return (res.data?.data || null) as Product | null;
+    const raw = res.data?.data ?? (res.data && typeof res.data === 'object' && !Array.isArray(res.data) ? res.data : null);
+    return raw ? sanitizeProduct(raw) : null;
   } catch (error) {
     console.error(`Error fetching product ${id}`, error);
     return null;
@@ -105,7 +134,9 @@ export const getProductById = async (id: string): Promise<Product | null> => {
 export const getFeaturedProducts = async (): Promise<Product[]> => {
   try {
     const res = await apiClient.get(`${API_ENDPOINTS.PRODUCTS.BASE}?featured=true`);
-    return (res.data?.data || []) as Product[];
+    const rawData = res.data?.data ?? (Array.isArray(res.data) ? res.data : []);
+    const payload: any[] = Array.isArray(rawData) ? rawData : [];
+    return payload.filter((p) => Boolean(p && typeof p === 'object')).map(sanitizeProduct);
   } catch (error) {
     console.error('Error fetching featured products', error);
     return [];
@@ -120,14 +151,18 @@ export const getNewArrivals = async (
   try {
     const url = `${API_ENDPOINTS.PRODUCTS.NEW_ARRIVALS}?daysAgo=${daysAgo}&page=${page}&limit=${limit}`;
     const res = await apiClient.get(url);
-    const payload: Product[] = Array.isArray(res.data?.data) ? res.data.data : [];
-    const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : payload.length;
+    const rawData = res.data?.data ?? (Array.isArray(res.data) ? res.data : []);
+    const payload: any[] = Array.isArray(rawData) ? rawData : [];
+    const products: Product[] = payload
+      .filter((p) => Boolean(p && typeof p === 'object'))
+      .map(sanitizeProduct);
+    const total = typeof res.data?.pagination?.total === 'number' ? res.data.pagination.total : products.length;
 
-    if (payload.length === 0) {
+    if (products.length === 0) {
       return getProducts(page, limit);
     }
 
-    return { products: payload, total };
+    return { products, total };
   } catch (error) {
     console.warn('Falling back to standard products for new arrivals:', error);
     return getProducts(page, limit);
@@ -136,8 +171,10 @@ export const getNewArrivals = async (
 
 export const getProductsByCategory = async (categoryId: string): Promise<Product[]> => {
   try {
-    const res = await apiClient.get(`${API_ENDPOINTS.PRODUCTS.BASE}?category_id=${categoryId}`);
-    return (res.data?.data || []) as Product[];
+    const res = await apiClient.get(`${API_ENDPOINTS.PRODUCTS.BASE}?category_id=${encodeURIComponent(categoryId)}`);
+    const rawData = res.data?.data ?? (Array.isArray(res.data) ? res.data : []);
+    const payload: any[] = Array.isArray(rawData) ? rawData : [];
+    return payload.filter((p) => Boolean(p && typeof p === 'object')).map(sanitizeProduct);
   } catch (error) {
     console.error(`Error fetching products for category ${categoryId}`, error);
     return [];

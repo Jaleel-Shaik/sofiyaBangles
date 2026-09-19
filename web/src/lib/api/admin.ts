@@ -83,6 +83,10 @@ export const adminApi = {
     apiClient.delete(API_ENDPOINTS.PRODUCTS.BY_ID(id)).then(r => r.data),
   sellProduct: (id: string, quantity = 1) =>
     apiClient.patch(API_ENDPOINTS.PRODUCTS.SELL(id), { quantity }).then(r => r.data.data),
+  lookupProductByCode: (code: string) =>
+    apiClient.get(API_ENDPOINTS.PRODUCTS.LOOKUP_CODE(code)).then(r => r.data.data as Product),
+  sellProductByCode: (code: string, quantity = 1, extra?: { customer_name?: string; customer_phone?: string; notes?: string }) =>
+    apiClient.post(API_ENDPOINTS.PRODUCTS.SELL_BY_CODE, { code, quantity, ...extra }).then(r => r.data.data as Product),
 
   // Categories
   getCategories: async (modelTypeId?: string) => {

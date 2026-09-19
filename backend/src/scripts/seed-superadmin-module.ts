@@ -1,5 +1,6 @@
 import { db } from "../shared/config/firebase";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { createRevenueAllocationModel, createRefundReversalModel } from "../features/order/models/revenueLedger.model";
 import { createAuditLogModel } from "../shared/models/audit.model";
@@ -52,7 +53,8 @@ export async function seedSuperAdminModule(credentials?: { email?: string; passw
 
   // 2. Seed Admin User in 'admins' collection
   const adminId = "admin_seeded_01";
-  const adminHash = await bcrypt.hash("AdminPass@123", 12);
+  const seedAdminPassword = process.env.ADMIN_SEED_PASSWORD || crypto.randomBytes(16).toString("hex");
+  const adminHash = await bcrypt.hash(seedAdminPassword, 12);
   await db.collection("admins").doc(adminId).set({
     id: adminId,
     full_name: "General Admin Manager",

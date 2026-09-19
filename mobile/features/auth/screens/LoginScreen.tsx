@@ -2,8 +2,8 @@ import { api } from "@/src/api";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Alert, AppState } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import { useRouter, useRootNavigationState } from "expo-router";
+import * as SecureStore from "@/src/utils/secureStore";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -25,6 +25,8 @@ import {
 export default function LoginScreen() {
   const { login, set2faPending, clear2faPending, token, user, forceLogout } =
     useAuthStore();
+  const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
 
   const [authStep, setAuthStep] = useState("login");
   const [email, setEmail] = useState("");
@@ -112,11 +114,11 @@ export default function LoginScreen() {
 
   // Deferred navigation
   useEffect(() => {
-    if (pendingRedirect && navigationReady) {
+    if (pendingRedirect && rootNavigationState?.key) {
       router.replace(pendingRedirect as any);
       setPendingRedirect(null);
     }
-  }, [pendingRedirect, navigationReady]);
+  }, [pendingRedirect, rootNavigationState?.key, router]);
 
   // Navigate by role after successful login
   const navigateAfterLogin = useCallback(() => {
@@ -128,16 +130,20 @@ export default function LoginScreen() {
     }
     const href = getDashboardHref(u, t);
     if (href !== "/login") {
-      setPendingRedirect(href as string);
+      if (rootNavigationState?.key) {
+        router.replace(href as any);
+      } else {
+        setPendingRedirect(href as string);
+      }
     }
-  }, []);
+  }, [router, rootNavigationState?.key]);
 
   // Watch for login state changes to navigate
   useEffect(() => {
-    if (token && user && authStep !== "login" && authStep !== "register") {
+    if (token && user && authStep !== "login" && authStep !== "register" && rootNavigationState?.key) {
       navigateAfterLogin();
     }
-  }, [token, user, authStep, navigateAfterLogin]);
+  }, [token, user, authStep, rootNavigationState?.key, navigateAfterLogin]);
 
   // Check if a super_admin token was restored from storage
   useEffect(() => {
@@ -197,17 +203,32 @@ export default function LoginScreen() {
     };
   }, [authStep, qrCodeUrl]);
 
-  // 30-second OTP refresh timer
+  // RFC 6238 Epoch-Synchronized TOTP 30-second Countdown Timer
+  // Synchronized to UTC seconds so it ticks in exact lockstep with Google Authenticator
   useEffect(() => {
     if (authStep !== "otp_verify") return;
-    setOtpTimer(30);
-    const otpTimerInterval = setInterval(() => {
-      setOtpTimer((prev) => {
-        if (prev <= 1) return 30; // Reset to 30 when it hits 0
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(otpTimerInterval);
+
+    const syncTimer = () => {
+      const epochSeconds = Math.floor(Date.now() / 1000);
+      const remainder = epochSeconds % 30;
+      const remaining = 30 - remainder;
+      setOtpTimer(remaining === 0 ? 30 : remaining);
+    };
+
+    syncTimer();
+    const otpTimerInterval = setInterval(syncTimer, 500);
+
+    // Sync immediately when returning from background (e.g., after viewing Google Authenticator)
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        syncTimer();
+      }
+    });
+
+    return () => {
+      clearInterval(otpTimerInterval);
+      subscription.remove();
+    };
   }, [authStep]);
 
   const handleVerify2FA = async () => {
@@ -727,7 +748,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#FFF0F3]">
+    <SafeAreaView className="flex-1 bg-[#FAFAFA]">
       {authStep === "otp_verify" ? (
         <OTPStepVerify
           otpCode={otpCode}

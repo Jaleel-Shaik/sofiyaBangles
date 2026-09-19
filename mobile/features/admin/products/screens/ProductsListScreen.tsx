@@ -7,6 +7,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getAdminProducts, deleteProduct } from '@/src/api/admin';
+import { STRINGS } from '@/src/constants/strings';
 
 export default function ProductsListScreen() {
   const router = useRouter();
@@ -26,10 +27,10 @@ export default function ProductsListScreen() {
         api.categories.getCategories(),
       ]);
       if (prodRes.status === 'fulfilled') {
-        setProducts(prodRes.value.products || []);
+        setProducts(Array.isArray(prodRes.value?.products) ? prodRes.value.products : []);
       }
       if (catsRes.status === 'fulfilled') {
-        setCategories(catsRes.value || []);
+        setCategories(Array.isArray(catsRes.value) ? catsRes.value : []);
       }
     } catch (error) {
       console.error('Failed to load products', error);
@@ -44,8 +45,13 @@ export default function ProductsListScreen() {
   );
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const matchesSearch = p.product_name.toLowerCase().includes(search.toLowerCase());
+    const lower = search.toLowerCase().trim();
+    const safeProducts = Array.isArray(products) ? products : [];
+    return safeProducts.filter(p => {
+      if (!p) return false;
+      const pName = (p.product_name || '').toLowerCase();
+      const pCode = (p.unique_code || '').toLowerCase();
+      const matchesSearch = !lower || pName.includes(lower) || pCode.includes(lower);
       const matchesCategory = !selectedCategory || p.category_id === selectedCategory;
       return matchesSearch && matchesCategory;
     });
@@ -95,15 +101,22 @@ export default function ProductsListScreen() {
               <Text className="text-2xl font-bold text-text-primary">Products</Text>
             </View>
           </View>
-          <TouchableOpacity
-            className="bg-primary px-5 py-3 rounded-full shadow-sm shadow-primary/30"
-            onPress={() => router.push('/(admin)/(tabs)/add' as any)}
-          >
-            <View className="flex-row items-center">
-              <Ionicons name="add" size={20} color="white" />
-              <Text className="text-white font-bold text-sm ml-1.5">Add</Text>
-            </View>
-          </TouchableOpacity>
+          <View className="flex-row items-center gap-2">
+            <TouchableOpacity
+              className="bg-slate-900 px-3.5 py-2.5 rounded-full shadow-sm flex-row items-center"
+              onPress={() => router.push('/(admin)/quick-sell')}
+            >
+              <Ionicons name="flash" size={16} color="#fbbf24" />
+              <Text className="text-white font-bold text-xs ml-1">Sell</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-primary px-4 py-2.5 rounded-full shadow-sm shadow-primary/30 flex-row items-center"
+              onPress={() => router.push('/(admin)/(tabs)/add')}
+            >
+              <Ionicons name="add" size={18} color="white" />
+              <Text className="text-white font-bold text-xs ml-1">Add</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <Text className="text-text-hint text-xs font-medium ml-[52px]">{totalProducts} total products</Text>
       </View>
@@ -114,7 +127,7 @@ export default function ProductsListScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search products..."
+            placeholder="Search by name or code (e.g. SIL-101)..."
             placeholderTextColor="#94a3b8"
             className="flex-1 px-2.5 text-text-primary text-base"
           />
@@ -126,22 +139,22 @@ export default function ProductsListScreen() {
         </View>
       </View>
 
-      {/* Category Filter - Horizontal Scroll */}
+      {/* Collection Filter - Horizontal Scroll */}
       <View className="pb-2" style={{ maxHeight: 44 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-5" contentContainerStyle={{ alignItems: 'center' }}>
           <TouchableOpacity
             onPress={() => setSelectedCategory('')}
             className={`px-4 py-2 rounded-full mr-2 ${!selectedCategory ? 'bg-primary' : 'bg-surface border border-divider'}`}
           >
-            <Text className={`text-xs font-bold ${!selectedCategory ? 'text-white' : 'text-text-secondary'}`}>All</Text>
+            <Text className={`text-xs font-bold ${!selectedCategory ? 'text-white' : 'text-text-secondary'}`}>{STRINGS.admin.products.filterAll}</Text>
           </TouchableOpacity>
-          {categories.map(cat => (
+          {(categories || []).map((cat, idx) => (
             <TouchableOpacity
-              key={cat.id}
-              onPress={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-full mr-2 ${selectedCategory === cat.id ? 'bg-primary' : 'bg-surface border border-divider'}`}
+              key={cat?.id || `admin-prod-cat-${idx}`}
+              onPress={() => setSelectedCategory(cat?.id || '')}
+              className={`px-4 py-2 rounded-full mr-2 ${selectedCategory === cat?.id ? 'bg-primary' : 'bg-surface border border-divider'}`}
             >
-              <Text className={`text-xs font-bold ${selectedCategory === cat.id ? 'text-white' : 'text-text-secondary'}`}>{cat.category_name}</Text>
+              <Text className={`text-xs font-bold ${selectedCategory === cat?.id ? 'text-white' : 'text-text-secondary'}`}>{cat?.category_name || cat?.name || STRINGS.admin.collections.title}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -199,7 +212,7 @@ export default function ProductsListScreen() {
               <TouchableOpacity
                 className="flex-1 bg-surface rounded-2xl mb-3 border border-divider overflow-hidden shadow-sm"
                 activeOpacity={0.95}
-                onPress={() => router.push({ pathname: '/(admin)/(tabs)/product-detail/[id]', params: { id: item.id } } as any)}
+                onPress={() => router.push({ pathname: '/(admin)/(tabs)/product-detail/[id]', params: { id: item.id } })}
               >
                 <View className="aspect-[4/3] bg-[#FAFAFA] overflow-hidden relative">
                   <Image
@@ -228,8 +241,20 @@ export default function ProductsListScreen() {
                   </View>
                   <View className="flex-row items-center gap-2 mt-2.5 pt-2.5 border-t border-divider">
                     <TouchableOpacity
-                      onPress={() => router.push({ pathname: '/(admin)/(tabs)/edit-product/[id]', params: { id: item.id } } as any)}
+                      onPress={() => router.push({
+                        pathname: '/(admin)/quick-sell',
+                        params: { code: item.unique_code || item.id, id: item.id },
+                      })}
+                      className="flex-row items-center justify-center py-2 px-3 bg-slate-900 rounded-xl"
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="flash" size={13} color="#fbbf24" />
+                      <Text className="text-white font-bold text-xs ml-1">Sell</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => router.push({ pathname: '/(admin)/(tabs)/edit-product/[id]', params: { id: item.id } })}
                       className="flex-1 flex-row items-center justify-center py-2 bg-primary/10 rounded-xl"
+                      activeOpacity={0.8}
                     >
                       <Ionicons name="pencil" size={14} color="#e11d48" />
                       <Text className="text-primary font-bold text-xs ml-1">Edit</Text>
@@ -237,6 +262,7 @@ export default function ProductsListScreen() {
                     <TouchableOpacity
                       onPress={() => handleDelete(item)}
                       className="flex-row items-center justify-center py-2 px-3 bg-error/10 rounded-xl"
+                      activeOpacity={0.8}
                     >
                       <Ionicons name="trash-outline" size={14} color="#ef4444" />
                     </TouchableOpacity>

@@ -10,6 +10,7 @@ import TextInputField from '@/src/components/TextInputField';
 import Button from '@/src/components/Button';
 
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
+import { STRINGS } from '@/src/constants/strings';
 
 
 export default function AddProductScreen() {
@@ -86,7 +87,7 @@ export default function AddProductScreen() {
     if (currentCategory) {
       if (currentCategory.size_type === 'standard' || currentCategory.size_type === 'both') {
         setHasVariants(true);
-        if (currentCategory.standard_sizes && currentCategory.standard_sizes.length > 0) {
+        if (Array.isArray(currentCategory.standard_sizes) && currentCategory.standard_sizes.length > 0) {
           setVariants(currentCategory.standard_sizes.map(sz => ({
             id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             size: sz,
@@ -140,7 +141,7 @@ export default function AddProductScreen() {
     if (!price) newErrors.price = 'Price is required';
     else if (parseFloat(price) <= 0) newErrors.price = 'Price must be a positive number';
     if (!selectedModelType) newErrors.model_type_id = 'Model Type is required';
-    if (!selectedCategory) newErrors.category = 'Category is required';
+    if (!selectedCategory) newErrors.category = STRINGS.admin.products.pleaseSelectCollection;
     if (imageUrls.length === 0) newErrors.images = 'At least one image is required';
 
     if (hasVariants && variants.length === 0) {
@@ -318,6 +319,17 @@ export default function AddProductScreen() {
             <Text className="text-lg font-bold text-text-primary">Basic Details</Text>
           </View>
           
+          {/* Special ID Info */}
+          <View className="p-3 bg-[#FAFAFA] border border-divider rounded-xl mb-4 flex-row items-center justify-between">
+            <View className="flex-row items-center">
+              <Ionicons name="flash" size={14} color="#fbbf24" />
+              <Text className="text-xs font-bold text-text-primary ml-1.5">Special ID:</Text>
+            </View>
+            <View className="bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+              <Text className="text-[10px] font-bold text-primary">Auto-generated (e.g. SIL-101)</Text>
+            </View>
+          </View>
+
           <TextInputField 
             label="Product Name *" 
             placeholder="e.g. Royal Diamond Bangle" 
@@ -351,7 +363,7 @@ export default function AddProductScreen() {
             <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
               <Ionicons name="grid" size={16} color="#e11d48" />
             </View>
-            <Text className="text-lg font-bold text-text-primary">Categorization</Text>
+            <Text className="text-lg font-bold text-text-primary">{STRINGS.admin.products.categorization}</Text>
           </View>
 
           <View className="flex-row items-center justify-between mb-3 px-1">
@@ -375,7 +387,7 @@ export default function AddProductScreen() {
             <>
               <View className="flex-row items-center justify-between mb-3 px-1 mt-2">
                 <View className="flex-row items-center">
-                  <Text className="text-sm font-bold text-text-secondary">Select Category *</Text>
+                  <Text className="text-sm font-bold text-text-secondary">{STRINGS.admin.products.selectCollection}</Text>
                   {errors.category && <Text className="text-xs font-bold text-red-500"> - {errors.category}</Text>}
                 </View>
                 <TouchableOpacity 
@@ -387,8 +399,8 @@ export default function AddProductScreen() {
               </View>
               
               <View className="mb-2">
-                {filteredCategories.length > 0 ? (
-                  filteredCategories.map((cat) => {
+                {(filteredCategories || []).length > 0 ? (
+                  (filteredCategories || []).map((cat) => {
                     const isSelected = selectedCategory === cat.id;
                     return (
                       <TouchableOpacity 
@@ -438,7 +450,7 @@ export default function AddProductScreen() {
                 ) : (
                   <View className="bg-surface p-6 rounded-2xl items-center border border-divider border-dashed">
                     <Ionicons name="folder-open-outline" size={32} color="#cbd5e1" />
-                    <Text className="text-text-hint font-medium mt-2">No categories found for this model.</Text>
+                    <Text className="text-text-hint font-medium mt-2">{STRINGS.admin.products.noCollectionsFound}</Text>
                   </View>
                 )}
               </View>
@@ -461,7 +473,7 @@ export default function AddProductScreen() {
               onPress={() => {
                 const nextVal = !hasVariants;
                 setHasVariants(nextVal);
-                if (nextVal && variants.length === 0 && currentCategory?.standard_sizes) {
+                if (nextVal && (variants || []).length === 0 && Array.isArray(currentCategory?.standard_sizes) && currentCategory.standard_sizes.length > 0) {
                   setVariants(currentCategory.standard_sizes.map(sz => ({
                     id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     size: sz,
@@ -519,12 +531,12 @@ export default function AddProductScreen() {
                 </TouchableOpacity>
               </View>
 
-              {variants.length === 0 ? (
+              {(variants || []).length === 0 ? (
                 <View className="p-5 border border-dashed border-divider rounded-2xl items-center">
                   <Text className="text-xs text-text-hint text-center">No sizes added yet. Use the field above to add sizes, or toggle Sizes OFF.</Text>
                 </View>
               ) : (
-                variants.map((v) => (
+                (variants || []).map((v) => (
                   <View key={v.id} className="flex-row items-center bg-surface p-3 rounded-2xl border border-divider mb-3">
                     <View className="bg-primary/10 border border-primary/20 px-3.5 py-2.5 rounded-xl mr-3 items-center justify-center min-w-[50px]">
                       <Text className="font-bold text-primary text-base">{v.size}</Text>
@@ -623,7 +635,7 @@ export default function AddProductScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {modelTypes.map((mt) => {
+              {(modelTypes || []).map((mt) => {
                 const isSelected = selectedModelType === mt.id;
                 return (
                   <TouchableOpacity

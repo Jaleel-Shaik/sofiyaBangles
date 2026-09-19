@@ -51,27 +51,33 @@ export default function SizePreferencesScreen() {
   );
 
   const configuredCategories = useMemo(() => {
-    return categories.filter(cat => preferences.some(p => p.category_id === cat.id));
+    const safeCats = Array.isArray(categories) ? categories : [];
+    const safePrefs = Array.isArray(preferences) ? preferences : [];
+    return safeCats.filter(cat => cat && safePrefs.some(p => p && p.category_id === cat.id));
   }, [categories, preferences]);
 
   const unconfiguredCategories = useMemo(() => {
-    return categories.filter(cat => !preferences.some(p => p.category_id === cat.id));
+    const safeCats = Array.isArray(categories) ? categories : [];
+    const safePrefs = Array.isArray(preferences) ? preferences : [];
+    return safeCats.filter(cat => cat && !safePrefs.some(p => p && p.category_id === cat.id));
   }, [categories, preferences]);
 
   const openSizeSelector = (cat: Category, defaultTab: 'standard' | 'custom' = 'standard') => {
+    if (!cat) return;
     setSelectedCategory(cat);
     setModalTab(defaultTab);
-    const existingStandard = preferences.find(p => p.category_id === cat.id && !p.is_custom);
+    const safePrefs = Array.isArray(preferences) ? preferences : [];
+    const existingStandard = safePrefs.find(p => p && p.category_id === cat.id && !p.is_custom);
     
     if (existingStandard) {
       setStandardSize(existingStandard.standard_size || '');
     } else {
-      setStandardSize(cat.standard_sizes?.[0] || '');
+      setStandardSize(Array.isArray(cat.standard_sizes) ? cat.standard_sizes[0] || '' : '');
     }
     
-    setProfileName(`My ${cat.category_name} Fit`);
+    setProfileName(`My ${cat.category_name || 'Category'} Fit`);
     const initialMeas: Record<string, string> = {};
-    if (cat.custom_measurement_fields && cat.custom_measurement_fields.length > 0) {
+    if (Array.isArray(cat.custom_measurement_fields) && cat.custom_measurement_fields.length > 0) {
       cat.custom_measurement_fields.forEach(field => {
         initialMeas[field] = '';
       });
@@ -118,7 +124,7 @@ export default function SizePreferencesScreen() {
       return;
     }
 
-    const filledMeasurements = Object.entries(customMeasurements).filter(([_, val]) => val.trim().length > 0);
+    const filledMeasurements = Object.entries(customMeasurements || {}).filter(([_, val]) => val && val.trim().length > 0);
     if (filledMeasurements.length === 0) {
       Alert.alert('Error', 'Please enter at least one measurement value.');
       return;
@@ -163,8 +169,10 @@ export default function SizePreferencesScreen() {
   };
 
   const renderCategoryCard = (cat: Category, isConfigured: boolean) => {
-    const standardPref = preferences.find(p => p.category_id === cat.id && !p.is_custom);
-    const customPrefs = preferences.filter(p => p.category_id === cat.id && p.is_custom);
+    if (!cat) return null;
+    const safePrefs = Array.isArray(preferences) ? preferences : [];
+    const standardPref = safePrefs.find(p => p && p.category_id === cat.id && !p.is_custom);
+    const customPrefs = safePrefs.filter(p => p && p.category_id === cat.id && p.is_custom);
     
     return (
       <View 
@@ -196,7 +204,7 @@ export default function SizePreferencesScreen() {
                     </Text>
                   </View>
                 )}
-                {customPrefs.map(cp => (
+                {(customPrefs || []).map(cp => (
                   <View key={cp.id} className="bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-100 flex-row items-center">
                     <Ionicons name="cut" size={10} color="#9333ea" />
                     <Text className="text-purple-700 font-bold text-xs ml-1">
@@ -212,17 +220,20 @@ export default function SizePreferencesScreen() {
           
           <TouchableOpacity 
             onPress={() => openSizeSelector(cat)}
-            className="w-10 h-10 bg-slate-50 rounded-full items-center justify-center ml-2 border border-slate-100"
+            className="w-11 h-11 bg-slate-50 rounded-full items-center justify-center ml-2 border border-slate-100"
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={isConfigured ? "Edit size preference" : "Set size preference"}
           >
             <Ionicons name={isConfigured ? "pencil" : "add"} size={18} color={isConfigured ? "#64748b" : "#FF1F4B"} />
           </TouchableOpacity>
         </View>
 
         {/* List of Custom Profiles if any */}
-        {customPrefs.length > 0 && (
+        {(customPrefs || []).length > 0 && (
           <View className="mt-3 pt-3 border-t border-slate-100 space-y-2">
             <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Custom Measurement Profiles:</Text>
-            {customPrefs.map(cp => (
+            {(customPrefs || []).map(cp => (
               <View key={cp.id} className="flex-row items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                 <View className="flex-1 pr-2">
                   <Text className="text-xs font-bold text-slate-800">{cp.profile_name}</Text>
@@ -236,9 +247,12 @@ export default function SizePreferencesScreen() {
                 </View>
                 <TouchableOpacity 
                   onPress={() => handleDeletePref(cp.id, cp.profile_name || 'Profile')}
-                  className="p-1.5"
+                  className="w-11 h-11 items-center justify-center -mr-2"
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete profile ${cp.profile_name}`}
                 >
-                  <Ionicons name="trash-outline" size={14} color="#ef4444" />
+                  <Ionicons name="trash-outline" size={16} color="#ef4444" />
                 </TouchableOpacity>
               </View>
             ))}
@@ -256,10 +270,13 @@ export default function SizePreferencesScreen() {
         style={{ paddingTop: Math.max(insets.top + 8, 40) }}
       >
         <TouchableOpacity 
-          className="w-10 h-10 bg-slate-50 rounded-full items-center justify-center mr-4"
+          className="w-11 h-11 bg-slate-50 rounded-full items-center justify-center mr-4 border border-slate-100"
           onPress={() => router.back()}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          <Ionicons name="arrow-back" size={22} color="#1e293b" />
         </TouchableOpacity>
         <Text className="text-xl font-extrabold text-slate-800">My Size Preferences</Text>
       </View>
@@ -295,9 +312,9 @@ export default function SizePreferencesScreen() {
             <View className="mb-5">
               <View className="flex-row items-center mb-3">
                 <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                <Text className="text-base font-extrabold text-slate-800 ml-1.5">Configured Categories</Text>
+                <Text className="text-base font-extrabold text-slate-800 ml-1.5">Configured Collections</Text>
               </View>
-              {configuredCategories.map(cat => renderCategoryCard(cat, true))}
+              {(configuredCategories || []).map(cat => renderCategoryCard(cat, true))}
             </View>
           )}
 
@@ -307,14 +324,14 @@ export default function SizePreferencesScreen() {
                 <Ionicons name="alert-circle" size={18} color="#f59e0b" />
                 <Text className="text-base font-extrabold text-slate-800 ml-1.5">Needs Setup</Text>
               </View>
-              {unconfiguredCategories.map(cat => renderCategoryCard(cat, false))}
+              {(unconfiguredCategories || []).map(cat => renderCategoryCard(cat, false))}
             </View>
           )}
 
           {categories.length === 0 && (
             <View className="items-center justify-center py-16 bg-white rounded-3xl border border-dashed border-slate-200">
-              <Text className="text-slate-800 font-bold text-base">No Categories Found</Text>
-              <Text className="text-slate-400 mt-1.5 text-center text-xs px-8">There are no categories available at this time.</Text>
+              <Text className="text-slate-800 font-bold text-base">No Collections Found</Text>
+              <Text className="text-slate-400 mt-1.5 text-center text-xs px-8">There are no collections available at this time.</Text>
             </View>
           )}
           
@@ -338,7 +355,13 @@ export default function SizePreferencesScreen() {
                 </Text>
                 <Text className="text-xs text-slate-400">Configure how you want this product fitted</Text>
               </View>
-              <TouchableOpacity onPress={() => setModalVisible(false)} className="w-8 h-8 bg-slate-100 rounded-full items-center justify-center">
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                className="w-11 h-11 bg-slate-100 rounded-full items-center justify-center"
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
                 <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
@@ -375,11 +398,11 @@ export default function SizePreferencesScreen() {
               {/* Standard Size Tab */}
               {modalTab === 'standard' && (
                 <View className="mb-6">
-                  {selectedCategory?.standard_sizes && selectedCategory.standard_sizes.length > 0 ? (
+                  {selectedCategory?.standard_sizes && Array.isArray(selectedCategory.standard_sizes) && selectedCategory.standard_sizes.length > 0 ? (
                     <View>
                       <Text className="text-xs font-extrabold text-slate-400 mb-3 uppercase tracking-wider">Select Standard Size</Text>
                       <View className="flex-row flex-wrap justify-between">
-                        {selectedCategory.standard_sizes.map(sz => (
+                        {(selectedCategory.standard_sizes || []).map(sz => (
                           <TouchableOpacity
                             key={sz}
                             onPress={() => setStandardSize(sz)}
@@ -427,7 +450,7 @@ export default function SizePreferencesScreen() {
                     Enter Measurements ({selectedCategory?.category_name})
                   </Text>
 
-                  {Object.keys(customMeasurements).map(fieldKey => (
+                  {Object.keys(customMeasurements || {}).map(fieldKey => (
                     <View key={fieldKey} className="mb-2">
                       <Text className="text-xs font-bold text-slate-700 mb-1 capitalize">
                         {fieldKey.replace(/_/g, ' ')} *

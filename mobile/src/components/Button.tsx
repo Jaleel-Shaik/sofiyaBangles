@@ -23,46 +23,46 @@ export default function Button({
 }: ButtonProps) {
   
   // Base classes
-  let bgClass = 'bg-rose-500';
+  let bgClass = 'bg-primary';
   let textClass = 'text-white';
   let borderClass = '';
   
   switch (variant) {
     case 'primary':
-      bgClass = 'bg-rose-500';
+      bgClass = 'bg-primary';
       textClass = 'text-white';
       break;
     case 'secondary':
-      bgClass = 'bg-emerald-500';
+      bgClass = 'bg-emerald-600';
       textClass = 'text-white';
       break;
     case 'outline':
       bgClass = 'bg-transparent';
-      textClass = 'text-rose-600';
-      borderClass = 'border border-rose-200';
+      textClass = 'text-primary';
+      borderClass = 'border border-rose-300';
       break;
     case 'danger':
-      bgClass = 'bg-red-500';
+      bgClass = 'bg-rose-600';
       textClass = 'text-white';
       break;
   }
 
-  // Size classes
-  let pyClass = 'py-5';
-  let textSizeClass = 'text-lg';
+  // Size classes with touch target ergonomics
+  let sizeClass = 'min-h-[48px] py-3.5 px-5';
+  let textSizeClass = 'text-label-lg';
   
   switch (size) {
     case 'small':
-      pyClass = 'py-3';
-      textSizeClass = 'text-sm';
+      sizeClass = 'min-h-[44px] py-2.5 px-4';
+      textSizeClass = 'text-label-md';
       break;
     case 'medium':
-      pyClass = 'py-4';
-      textSizeClass = 'text-base';
+      sizeClass = 'min-h-[48px] py-3.5 px-5';
+      textSizeClass = 'text-label-lg';
       break;
     case 'large':
-      pyClass = 'py-5';
-      textSizeClass = 'text-xl';
+      sizeClass = 'min-h-[52px] py-4 px-6';
+      textSizeClass = 'text-title-sm';
       break;
   }
 
@@ -70,9 +70,12 @@ export default function Button({
 
   return (
     <TouchableOpacity
-      className={`rounded-xl items-center justify-center flex-row shadow-sm ${bgClass} ${borderClass} ${pyClass} ${isDisabled ? 'opacity-70' : ''} ${className}`}
+      className={`rounded-2xl items-center justify-center flex-row shadow-sm ${bgClass} ${borderClass} ${sizeClass} ${isDisabled ? 'opacity-60' : ''} ${className}`}
       disabled={isDisabled}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      accessibilityLabel={title}
       {...props}
     >
       {loading ? (

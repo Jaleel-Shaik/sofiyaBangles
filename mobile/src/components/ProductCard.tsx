@@ -1,9 +1,10 @@
 import type { Product } from '@/src/api/products';
 import { View, Text, Image, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { useFavoriteStore } from '../store/favoriteStore';
+import { AppIcon } from '../constants/icons';
+import { STRINGS } from '../constants/strings';
 
 interface ProductCardProps {
   product: Product;
@@ -20,11 +21,18 @@ export default function ProductCard({
 }: ProductCardProps) {
   const router = useRouter();
   const { favoriteIds, toggleFavorite } = useFavoriteStore();
-  const isFavorite = favoriteIds.includes(product.id) || propIsFavorite;
+
+  if (!product || !product.id) return null;
+
+  const safeFavIds = Array.isArray(favoriteIds) ? favoriteIds : [];
+  const isFavorite = safeFavIds.includes(product.id) || propIsFavorite;
+  const productName = product.product_name || 'Bangle';
+  const price = typeof product.price === 'number' ? product.price : Number(product.price) || 0;
+  const quantity = typeof product.quantity === 'number' ? product.quantity : Number(product.quantity) || 0;
 
   return (
     <TouchableOpacity
-      className="bg-surface rounded-2xl mb-4 border border-divider overflow-hidden"
+      className="bg-surface rounded-2xl mb-4 border border-divider overflow-hidden shadow-sm"
       style={{ width: '48%' }}
       onPress={() =>
         router.push({
@@ -32,9 +40,11 @@ export default function ProductCard({
           params: { id: product.id },
         })
       }
-      activeOpacity={0.9}
+      activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${productName}, price ₹${price}`}
     >
-      <View className="w-full aspect-[4/5] bg-[#FAFAFA]">
+      <View className="w-full aspect-[4/5] bg-surface-secondary relative">
         <Image
           source={{
             uri:
@@ -45,39 +55,43 @@ export default function ProductCard({
           resizeMode="cover"
         />
         {isPurchased && (
-          <View className="absolute top-2 left-2 bg-success px-2 py-1 rounded-md">
-            <Text className="text-white text-[10px] font-bold uppercase">Bought</Text>
+          <View className="absolute top-2.5 left-2.5 bg-emerald-600 px-2.5 py-1 rounded-full shadow-sm">
+            <Text className="text-white text-overline font-bold tracking-wider">{STRINGS.common.bought}</Text>
           </View>
         )}
         <TouchableOpacity
-          className="absolute top-2 right-2 bg-white/90 rounded-full p-2 shadow-sm"
+          className="absolute top-1.5 right-1.5 w-11 h-11 rounded-full bg-white/95 items-center justify-center shadow-sm border border-black/5"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={isFavorite ? `${STRINGS.favorites.removeAccessibility} ${product.product_name}` : `${STRINGS.favorites.addAccessibility} ${product.product_name}`}
           onPress={(e) => {
             e.stopPropagation();
             toggleFavorite(product.id);
             if (onToggleFavorite) onToggleFavorite();
           }}
         >
-          <Ionicons
-            name={isFavorite ? 'heart' : 'heart-outline'}
-            size={18}
-            color={isFavorite ? '#e11d48' : '#94a3b8'}
+          <AppIcon
+            name={isFavorite ? 'heart' : 'heartOutline'}
+            size={20}
+            color={isFavorite ? '#e11d48' : '#64748b'}
           />
         </TouchableOpacity>
       </View>
 
-      <View className="p-3">
+      <View className="p-3.5">
         <Text
-          className="font-bold text-text-primary text-sm leading-5"
+          className="font-semibold text-text-primary text-title-sm leading-snug"
           numberOfLines={1}
         >
-          {product.product_name}
+          {productName}
         </Text>
-        <Text className="text-[#C25B3E] font-extrabold text-lg mt-1">
-          ₹{product.price}
+        <Text className="text-[#C25B3E] font-bold text-title-md mt-1">
+          ₹{price}
         </Text>
-        {product.quantity <= 0 && (
-          <View className="bg-error px-2 py-0.5 rounded mt-1 self-start">
-            <Text className="text-white text-[10px] font-bold">Sold Out</Text>
+        {quantity <= 0 && (
+          <View className="bg-rose-600 px-2 py-0.5 rounded-full mt-1.5 self-start">
+            <Text className="text-white text-overline font-bold">{STRINGS.common.soldOut}</Text>
           </View>
         )}
       </View>
