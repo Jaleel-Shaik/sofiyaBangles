@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Alert, AppState } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useRootNavigationState } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "@/src/utils/secureStore";
 import {
   getAuth,
   signInWithEmailAndPassword,

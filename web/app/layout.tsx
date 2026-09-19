@@ -20,6 +20,17 @@ export const metadata: Metadata = {
   title: "Sofiya Bangles - Admin Portal",
   description:
     "Enterprise admin portal for Sofiya Bangles with 2FA authentication",
+  icons: {
+    icon: [
+      { url: "/icon.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

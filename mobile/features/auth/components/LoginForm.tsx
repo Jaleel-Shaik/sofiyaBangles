@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
+import { View, Text, TouchableOpacity, useWindowDimensions, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import TextInputField from "@/src/components/TextInputField";
@@ -69,16 +69,20 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     >
       <View className="items-center mb-8 mt-8">
         <View
-          className="w-20 h-20 bg-white rounded-full items-center justify-center shadow-lg mb-4"
+          className="w-24 h-24 bg-white rounded-3xl items-center justify-center shadow-lg mb-4 p-2.5 border border-rose-100"
           style={{
             shadowColor: "#e11d48",
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
             elevation: 8,
           }}
         >
-          <Ionicons name="shield-checkmark" size={36} color="#e11d48" />
+          <Image
+            source={require("../../../assets/images/logo.png")}
+            className="w-full h-full"
+            resizeMode="contain"
+          />
         </View>
         <Text className="text-3xl font-extrabold text-primary font-serif mb-1">
           Sofiya Bangles

@@ -1,13 +1,20 @@
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithCredential, GoogleAuthProvider, getIdToken } from '@react-native-firebase/auth';
 import { getFirestore, doc, getDoc, setDoc } from '@react-native-firebase/firestore';
+import { Platform } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useAuthStore, User } from '../store/authStore';
 import { apiClient } from './client';
 
-// Configure Google Sign-In
-GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '158053850417-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
-});
+// Configure Google Sign-In (Native only)
+if (Platform.OS !== 'web') {
+  try {
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '158053850417-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+    });
+  } catch (e) {
+    console.warn('GoogleSignin.configure error:', e);
+  }
+}
 
 // Accounts are split across "users" and "admins" collections.
 const accountCollection = (role?: string): string =>
@@ -113,6 +120,9 @@ export const register = async (params: { full_name: string; email: string; passw
 };
 
 export const signInWithGoogle = async () => {
+  if (Platform.OS === 'web') {
+    throw new Error('Google Sign-In is only available on iOS and Android devices.');
+  }
   try {
     // Check if your device supports Google Play
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -176,10 +186,12 @@ export const logout = async () => {
   try {
     const auth = getAuth();
     await auth.signOut();
-    try {
-      await GoogleSignin.signOut();
-    } catch {
-      // Ignore if not signed in with Google
+    if (Platform.OS !== 'web') {
+      try {
+        await GoogleSignin.signOut();
+      } catch {
+        // Ignore if not signed in with Google
+      }
     }
     await useAuthStore.getState().logout();
     return { success: true };

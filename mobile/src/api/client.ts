@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from "./endpoints";
 import axios, { create, type InternalAxiosRequestConfig, type AxiosRequestConfig } from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../utils/secureStore';
 import { AppState, AppStateStatus, Platform, type NativeEventSubscription } from 'react-native';
 import {
   initApiClientConfig,

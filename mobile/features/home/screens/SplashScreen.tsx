@@ -109,11 +109,11 @@ export default function SplashScreen() {
                 elevation: 10,
               }}
             >
-              <View className="w-full h-full rounded-full border-4 border-rose-300 overflow-hidden relative">
+              <View className="w-full h-full rounded-full bg-white border-4 border-rose-200 overflow-hidden p-3 items-center justify-center relative">
                 <Image
-                  source={{ uri: "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca5" }}
+                  source={require("../../../assets/images/logo.png")}
                   className="w-full h-full"
-                  resizeMode="cover"
+                  resizeMode="contain"
                 />
               </View>
               <View className="absolute -top-1 -right-1 bg-white rounded-full p-2 border border-rose-200 shadow-sm">

@@ -423,8 +423,14 @@ function SidebarContent({
       {/* Brand Header */}
       <div className="flex items-center justify-between p-4 border-b border-[#E5E5E5] shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md shrink-0 bg-gradient-to-br from-[#E8436E] to-[#CC3366] text-white shadow-[#E8436E]/20">
-            <Shield className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md shrink-0 bg-white border border-rose-100 p-1 shadow-rose-500/10">
+            <Image
+              src="/logo.png"
+              alt="Sofiya Bangles"
+              width={32}
+              height={32}
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <h2 className="text-base font-bold text-[#171717] leading-tight tracking-tight">

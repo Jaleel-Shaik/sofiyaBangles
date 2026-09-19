@@ -504,43 +504,54 @@ export default function HomeScreen() {
         style={{ paddingTop: Math.max(insets.top + 8, 34) }}
       >
         <View className="flex-row items-center justify-between">
-          {/* Left Column: Greeting, Name, Tagline */}
-          <View className="flex-1 mr-3">
-            {/* Eyebrow Greeting & Role Badge */}
-            <View className="flex-row items-center">
-              <Text className="text-label-sm font-medium text-slate-500">
-                {STRINGS.home.greeting}
-              </Text>
-              {user?.role === "super_admin" && (
-                <View className="ml-2 bg-rose-600 px-2 py-0.5 rounded-full shadow-sm">
-                  <Text className="text-overline font-bold text-white uppercase tracking-wider">
-                    {STRINGS.home.roles.superAdmin}
-                  </Text>
-                </View>
-              )}
-              {user?.role === "admin" && (
-                <View className="ml-2 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200">
-                  <Text className="text-overline font-bold text-rose-700 uppercase tracking-wider">
-                    {STRINGS.home.roles.admin}
-                  </Text>
-                </View>
-              )}
+          <View className="flex-row items-center flex-1 mr-3">
+            {/* Brand Diamond Logo */}
+            <View className="w-11 h-11 rounded-2xl bg-white border border-rose-100 p-1.5 shadow-sm items-center justify-center mr-3">
+              <Image
+                source={require("../../../assets/images/logo.png")}
+                className="w-full h-full"
+                resizeMode="contain"
+              />
             </View>
 
-            {/* User Name as Primary Title */}
-            <Text
-              className="text-headline-md font-bold text-slate-900 tracking-tight mt-0.5"
-              numberOfLines={1}
-            >
-              {getDisplayName()}
-            </Text>
+            {/* Left Column: Greeting, Name, Tagline */}
+            <View className="flex-1">
+              {/* Eyebrow Greeting & Role Badge */}
+              <View className="flex-row items-center">
+                <Text className="text-label-sm font-medium text-slate-500">
+                  {STRINGS.home.greeting}
+                </Text>
+                {user?.role === "super_admin" && (
+                  <View className="ml-2 bg-rose-600 px-2 py-0.5 rounded-full shadow-sm">
+                    <Text className="text-overline font-bold text-white uppercase tracking-wider">
+                      {STRINGS.home.roles.superAdmin}
+                    </Text>
+                  </View>
+                )}
+                {user?.role === "admin" && (
+                  <View className="ml-2 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200">
+                    <Text className="text-overline font-bold text-rose-700 uppercase tracking-wider">
+                      {STRINGS.home.roles.admin}
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-            {/* Tagline */}
-            <View className="flex-row items-center mt-1">
-              <AppIcon name="sparkles" size={13} color="#e11d48" style={{ marginRight: 5 }} />
-              <Text className="text-label-md font-semibold text-rose-600 tracking-wide">
-                {STRINGS.home.tagline}
+              {/* User Name as Primary Title */}
+              <Text
+                className="text-headline-md font-bold text-slate-900 tracking-tight mt-0.5"
+                numberOfLines={1}
+              >
+                {getDisplayName()}
               </Text>
+
+              {/* Tagline */}
+              <View className="flex-row items-center mt-1">
+                <AppIcon name="sparkles" size={13} color="#e11d48" style={{ marginRight: 5 }} />
+                <Text className="text-label-md font-semibold text-rose-600 tracking-wide">
+                  {STRINGS.home.tagline}
+                </Text>
+              </View>
             </View>
           </View>
 

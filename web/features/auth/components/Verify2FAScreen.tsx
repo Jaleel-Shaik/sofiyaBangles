@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { useAuth } from "@/features/auth/lib/auth-context";
 import { motion } from "framer-motion";
 import {
@@ -160,6 +161,10 @@ export default function Verify2FAScreen() {
       {/* Left - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#FFF0F3] via-[#FFD6DE] to-[#FFB3C2] relative overflow-hidden items-center justify-center">
         <div className="relative z-10 text-center px-12">
+          <div className="flex items-center justify-center gap-2.5 mb-8 bg-white/60 backdrop-blur-sm py-2 px-5 rounded-full mx-auto w-fit border border-white/60 shadow-sm">
+            <Image src="/logo.png" alt="Sofiya Bangles" width={24} height={24} className="object-contain" />
+            <span className="text-sm font-bold text-[#7A0D3C] tracking-wide">Sofiya Bangles</span>
+          </div>
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -211,6 +216,12 @@ export default function Verify2FAScreen() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
+          {/* Mobile brand header */}
+          <div className="lg:hidden flex items-center justify-center gap-2 mb-6">
+            <Image src="/logo.png" alt="Sofiya Bangles" width={28} height={28} className="object-contain" />
+            <span className="text-base font-bold text-[#171717]">Sofiya Bangles</span>
+          </div>
+
           <div className="text-center mb-6">
             <motion.div
               initial={{ scale: 0 }}

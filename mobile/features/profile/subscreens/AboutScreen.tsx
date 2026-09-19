@@ -60,6 +60,13 @@ export default function AboutScreen() {
             resizeMode="cover"
           />
           <View className="absolute inset-0 bg-black/40 justify-end p-6">
+            <View className="w-14 h-14 rounded-2xl bg-white/95 p-2 shadow-lg mb-3 items-center justify-center border border-white/80">
+              <Image
+                source={require("../../../assets/images/logo.png")}
+                className="w-full h-full"
+                resizeMode="contain"
+              />
+            </View>
             <Text className="text-white text-3xl font-serif font-bold mb-1">{profile?.store_name || "Sofiya Bangles"}</Text>
             <Text className="text-white/80 font-medium">Crafting Elegance</Text>
           </View>

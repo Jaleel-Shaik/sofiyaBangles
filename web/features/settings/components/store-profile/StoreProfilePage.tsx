@@ -95,7 +95,7 @@ export default function StoreProfilePage() {
               ) : profile.logo_url ? (
                 <Image src={profile.logo_url} alt="Store logo" width={80} height={80} className="w-full h-full object-cover" />
               ) : (
-                <ImageIcon className="w-6 h-6 text-[#A3A3A3]" />
+                <Image src="/logo.png" alt="Sofiya Bangles Logo" width={80} height={80} className="w-full h-full object-contain p-2" />
               )}
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
                 <Camera className="w-6 h-6 text-white" />
