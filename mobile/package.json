@@ -66,6 +66,16 @@
     "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"
   },
+  "overrides": {
+    "uuid": "^11.1.1",
+    "postcss": "^8.5.23",
+    "undici": "^6.28.1",
+    "tar": "^7.5.22",
+    "fast-uri": "^4.2.1",
+    "shell-quote": "^1.8.5",
+    "js-yaml": "^4.1.0",
+    "@xmldom/xmldom": "^0.9.12"
+  },
   "private": true,
   "packageManager": "yarn@4.5.3+sha512.3003a14012e2987072d244c720506549c1aab73ee728208f1b2580a9fd67b92d61ba6b08fe93f6dce68fd771e3af1e59a0afa28dd242dd0940d73b95fedd4e90"
 }
