@@ -19,7 +19,7 @@ export const env = {
   DB_PASSWORD: process.env.DB_PASSWORD || "",
 
   // JWT
-  JWT_SECRET: process.env.JWT_SECRET || "sofiya-bangles-jwt-secret-change-me",
+  JWT_SECRET: process.env.JWT_SECRET || "",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
 
   // TOTP/2FA Encryption

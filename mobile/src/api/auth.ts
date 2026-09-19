@@ -9,7 +9,7 @@ import { apiClient } from './client';
 if (Platform.OS !== 'web') {
   try {
     GoogleSignin.configure({
-      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '158053850417-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
     });
   } catch (e) {
     console.warn('GoogleSignin.configure error:', e);
