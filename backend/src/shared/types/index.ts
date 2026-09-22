@@ -272,6 +272,9 @@ export interface Order {
   refunded_at?: string | null;
   refund_reason?: string | null;
   notes?: string | null;
+  customer_name?: string;
+  customer_phone?: string;
+  order_source?: string;
   items?: OrderItem[];
   created_at: string;
   updated_at: string;
@@ -285,9 +288,13 @@ export interface OrderItem {
   category_id?: string;
   category_name_snapshot?: string;
   product_name_snapshot: string;
+  product_name?: string;
+  productNameSnapshot?: string;
   sku_snapshot?: string | null;
   size_snapshot?: string | null;
   price_snapshot: number;
+  unit_price?: number;
+  itemPrice?: number;
   quantity: number;
   subtotal: number;
   discount?: number;

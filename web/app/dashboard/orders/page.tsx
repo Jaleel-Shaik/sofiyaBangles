@@ -82,9 +82,20 @@ export default function OrdersManagementPage() {
       const params = new URLSearchParams(window.location.search);
       if (params.get("action") === "new-sale") {
         openNewSaleModal();
+        // Clean up URL parameter cleanly so page refresh doesn't reopen modal
+        window.history.replaceState({}, "", window.location.pathname);
       }
     }
   }, [page]);
+
+  // Real-time synchronization: reload orders whenever a product is sold anywhere in admin
+  useEffect(() => {
+    const handleProductSold = () => {
+      fetchOrders(1, "");
+    };
+    window.addEventListener("product-sold", handleProductSold);
+    return () => window.removeEventListener("product-sold", handleProductSold);
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,27 +222,37 @@ export default function OrdersManagementPage() {
   };
 
   const handleShareOrderOnWhatsApp = (order: AdminOrder) => {
-    const rawPhone = order.customer_phone || order.shipping_address_snapshot?.phone || "";
+    const rawPhone =
+      order.customer_phone ||
+      (order.shipping_address_snapshot as any)?.phone ||
+      (order.shipping_address as any)?.phone ||
+      "";
     let cleanPhone = rawPhone.replace(/[^0-9]/g, "");
     if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
 
     const itemsSummary = (order.items || [])
       .map(
         (i) =>
-          `• ${i.product_name || i.productNameSnapshot || "Bangles Set"}\n  Qty: ${
+          `• ${i.product_name || i.productNameSnapshot || (i as any).product_name_snapshot || "Handcrafted Bangles"}\n  Qty: ${
             i.quantity
-          }  |  Rate: ₹${i.itemPrice || i.unit_price || 0}  |  Subtotal: ₹${
-            (i.itemPrice || i.unit_price || 0) * i.quantity
+          }  |  Rate: ₹${i.itemPrice || i.unit_price || (i as any).price_snapshot || 0}  |  Subtotal: ₹${
+            (i.itemPrice || i.unit_price || (i as any).price_snapshot || 0) * i.quantity
           }`
       )
       .join("\n");
+
+    const customerDisplayName =
+      order.customer_name ||
+      (order.shipping_address_snapshot as any)?.full_name ||
+      (order.shipping_address_snapshot as any)?.name ||
+      "Valued Customer";
 
     const messageLines = [
       "✨ *SOFIYA BANGLES — ORDER DETAILS* ✨",
       "━━━━━━━━━━━━━━━━━━━━",
       `*Order Number:* ${order.order_number}`,
-      `*Customer:* ${order.customer_name || "Valued Customer"}`,
-      `*Status:* ${(order.status || "Pending").toUpperCase()}`,
+      `*Customer:* ${customerDisplayName}`,
+      `*Status:* ${(order.status || "Completed").toUpperCase()}`,
       `*Date:* ${new Date(order.created_at).toLocaleDateString("en-IN")}`,
       "",
       "*Items Ordered:*",
@@ -240,10 +261,10 @@ export default function OrdersManagementPage() {
       `*Grand Total:* ₹${order.total_amount}`,
       "━━━━━━━━━━━━━━━━━━━━",
       order.shipping_address_snapshot?.address_line1
-        ? `*Delivery To:* ${order.shipping_address_snapshot.address_line1}`
+        ? `*Delivery / Pickup:* ${order.shipping_address_snapshot.address_line1}`
         : "",
       "",
-      "Thank you for shopping with Sofiya Bangles! 💫",
+      "Thank you for choosing Sofiya Bangles! 💫",
     ].filter(Boolean);
 
     const encoded = encodeURIComponent(messageLines.join("\n"));
@@ -319,16 +340,16 @@ export default function OrdersManagementPage() {
         (i) => `
         <tr>
           <td style="padding: 8px; border-bottom: 1px solid #eee;">${
-            i.product_name || i.productNameSnapshot || "Bangles Set"
+            i.product_name || i.productNameSnapshot || (i as any).product_name_snapshot || "Handcrafted Bangles"
           }</td>
           <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${
             i.quantity
           }</td>
           <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">₹${
-            i.itemPrice || i.unit_price || 0
+            i.itemPrice || i.unit_price || (i as any).price_snapshot || 0
           }</td>
           <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold;">₹${
-            (i.itemPrice || i.unit_price || 0) * i.quantity
+            (i.itemPrice || i.unit_price || (i as any).price_snapshot || 0) * i.quantity
           }</td>
         </tr>
       `
@@ -523,21 +544,31 @@ export default function OrdersManagementPage() {
                       {/* Customer Info */}
                       <td className="p-4">
                         <p className="font-bold text-slate-900 leading-tight">
-                          {order.customer_name || "Customer"}
+                          {order.customer_name ||
+                            (order.shipping_address_snapshot as any)?.full_name ||
+                            (order.shipping_address_snapshot as any)?.name ||
+                            "Direct Customer"}
                         </p>
-                        {order.customer_phone ? (
-                          <a
-                            href={`https://wa.me/${order.customer_phone.replace(/[^0-9]/g, "")}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold hover:underline mt-0.5"
-                          >
-                            <MessageCircle className="w-3 h-3 fill-emerald-600" />
-                            {order.customer_phone}
-                          </a>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">Direct Customer</span>
-                        )}
+                        {(() => {
+                          const phone =
+                            order.customer_phone ||
+                            (order.shipping_address_snapshot as any)?.phone ||
+                            (order.shipping_address as any)?.phone;
+                          if (!phone) return <span className="text-[11px] text-slate-400">Direct Customer</span>;
+                          const cleanPhone = phone.replace(/[^0-9]/g, "");
+                          const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+                          return (
+                            <a
+                              href={`https://wa.me/${waPhone}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold hover:underline mt-0.5"
+                            >
+                              <MessageCircle className="w-3 h-3 fill-emerald-600" />
+                              {phone}
+                            </a>
+                          );
+                        })()}
                       </td>
 
                       {/* Line Items Summary */}
@@ -545,7 +576,7 @@ export default function OrdersManagementPage() {
                         <div className="space-y-1">
                           {(order.items || []).slice(0, 2).map((item, idx) => (
                             <p key={idx} className="text-xs text-slate-800 font-medium truncate">
-                              • {item.product_name || item.productNameSnapshot || "Bangles Set"}{" "}
+                              • {item.product_name || item.productNameSnapshot || (item as any).product_name_snapshot || "Handcrafted Bangles"}{" "}
                               <span className="text-slate-400 font-normal">
                                 (Qty: {item.quantity})
                               </span>
@@ -896,15 +927,20 @@ export default function OrdersManagementPage() {
                 <div className="text-xs space-y-1 text-slate-600">
                   <p>
                     <span className="font-semibold text-slate-900">Name:</span>{" "}
-                    {selectedOrder.customer_name || "Customer"}
+                    {selectedOrder.customer_name ||
+                      (selectedOrder.shipping_address_snapshot as any)?.full_name ||
+                      (selectedOrder.shipping_address_snapshot as any)?.name ||
+                      "Direct Customer"}
                   </p>
                   <p>
                     <span className="font-semibold text-slate-900">Phone:</span>{" "}
-                    {selectedOrder.customer_phone || "Not provided"}
+                    {selectedOrder.customer_phone ||
+                      (selectedOrder.shipping_address_snapshot as any)?.phone ||
+                      "Not provided"}
                   </p>
                   <p>
                     <span className="font-semibold text-slate-900">Address:</span>{" "}
-                    {(selectedOrder.shipping_address_snapshot as any)?.address_line1 || "Store Pickup"}
+                    {(selectedOrder.shipping_address_snapshot as any)?.address_line1 || "Store Pickup / Direct Sale"}
                   </p>
                 </div>
               </div>
@@ -919,14 +955,14 @@ export default function OrdersManagementPage() {
                     <div key={i} className="p-3 flex items-center justify-between text-xs">
                       <div>
                         <p className="font-bold text-slate-900">
-                          {item.product_name || item.productNameSnapshot || "Bangles Set"}
+                          {item.product_name || item.productNameSnapshot || (item as any).product_name_snapshot || "Handcrafted Bangles"}
                         </p>
                         <p className="text-[11px] text-slate-400">
-                          Qty: {item.quantity} × ₹{item.itemPrice || item.unit_price || 0}
+                          Qty: {item.quantity} × ₹{item.itemPrice || item.unit_price || (item as any).price_snapshot || 0}
                         </p>
                       </div>
                       <span className="font-bold text-slate-900">
-                        ₹{(item.itemPrice || item.unit_price || 0) * item.quantity}
+                        ₹{(item.itemPrice || item.unit_price || (item as any).price_snapshot || 0) * item.quantity}
                       </span>
                     </div>
                   ))}

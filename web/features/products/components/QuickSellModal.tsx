@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap,
@@ -33,6 +34,7 @@ export function QuickSellModal({
   onSaleSuccess,
   initialCode = "",
 }: QuickSellModalProps) {
+  const router = useRouter();
   const [code, setCode] = useState(initialCode);
   const [lookingUp, setLookingUp] = useState(false);
   const [product, setProduct] = useState<Product | null>(null);
@@ -48,6 +50,7 @@ export function QuickSellModal({
     total: number;
     remaining: number;
     phone?: string;
+    orderNumber?: string;
   } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -138,6 +141,8 @@ export function QuickSellModal({
 
       const totalAmount = product.price * quantity;
       const remainingStock = updated.quantity;
+      const createdOrder = (updated as any)?.order;
+      const orderNumber = createdOrder?.order_number || `ORD-${Date.now().toString().slice(-6)}`;
 
       setCompletedSale({
         productName: product.product_name,
@@ -146,7 +151,21 @@ export function QuickSellModal({
         total: totalAmount,
         remaining: remainingStock,
         phone: customerPhone.trim(),
+        orderNumber,
       });
+
+      // Dispatch global product-sold event so Orders page and Dashboard instantly re-render
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("product-sold", {
+            detail: {
+              product: updated,
+              order: createdOrder,
+              quantity,
+            },
+          })
+        );
+      }
 
       toast.success(
         `Sold ${quantity} unit(s) of ${product.product_name}! Stock remaining: ${remainingStock}`
@@ -172,6 +191,7 @@ export function QuickSellModal({
     const lines = [
       "✨ *SOFIYA BANGLES — SALE RECEIPT* ✨",
       "━━━━━━━━━━━━━━━━━━━━",
+      ...(completedSale.orderNumber ? [`*Order Number:* ${completedSale.orderNumber}`] : []),
       `*Product:* ${completedSale.productName}`,
       `*Product Code:* ${completedSale.code}`,
       `*Quantity:* ${completedSale.qty} set(s)`,
@@ -298,14 +318,21 @@ export function QuickSellModal({
                 animate={{ opacity: 1, scale: 1 }}
                 className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3"
               >
-                <div className="flex items-center gap-2 text-emerald-800">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                  <div>
-                    <h4 className="text-sm font-bold">Sale Successful!</h4>
-                    <p className="text-xs text-emerald-700">
-                      Sold {completedSale.qty} unit(s) of {completedSale.productName}.
-                    </p>
+                <div className="flex items-center justify-between text-emerald-800">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-bold">Sale Successful & Order Logged!</h4>
+                      <p className="text-xs text-emerald-700">
+                        Sold {completedSale.qty} unit(s) of {completedSale.productName}.
+                      </p>
+                    </div>
                   </div>
+                  {completedSale.orderNumber && (
+                    <span className="text-[10px] font-mono font-bold bg-white px-2 py-0.5 rounded-md border border-emerald-200 text-emerald-900 shadow-xs">
+                      {completedSale.orderNumber}
+                    </span>
+                  )}
                 </div>
 
                 <div className="bg-white/80 p-3 rounded-xl border border-emerald-100 flex items-center justify-between text-xs font-semibold text-slate-700">
@@ -319,19 +346,28 @@ export function QuickSellModal({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2 pt-1 flex-wrap">
                   <button
                     onClick={handleOpenWhatsApp}
-                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                    className="flex-1 min-w-[140px] py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
                   >
                     <Share2 className="w-3.5 h-3.5" /> Share WhatsApp Bill
+                  </button>
+                  <button
+                    onClick={() => {
+                      onClose();
+                      router.push("/dashboard/orders");
+                    }}
+                    className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-colors"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" /> View in Orders
                   </button>
                   <button
                     onClick={() => {
                       setCompletedSale(null);
                       inputRef.current?.focus();
                     }}
-                    className="py-2 px-4 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors"
+                    className="py-2 px-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors"
                   >
                     Sell Next
                   </button>

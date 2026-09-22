@@ -22,6 +22,9 @@ import { getModelTypeByIdDb } from "../../../db/modelType.db";
 import { isFavoritedDb } from "../../../db/favorite.db";
 import { getSizePreferencesDb } from "../../../db/sizePreference.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
+import { insertOrderWithItemsDb } from "../../../db/order.db";
+import { createRevenueAllocationModel } from "../../order/models/revenueLedger.model";
+import { Order, OrderItem } from "../../../shared/types";
 import { v4 as uuidv4 } from "uuid";
 import { Product, ProductImage, ProductVariant } from "../../../models/product.model";
 import { UserSizePreference } from "../../../models/sizePreference.model";
@@ -592,7 +595,77 @@ export const sellProductService = async (
     new_data: newData,
   });
 
-  return product;
+  // Automatically record this sale as an Order in Firestore so it renders in the Orders & WhatsApp page
+  const orderId = uuidv4();
+  const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+  const now = new Date().toISOString();
+  const totalAmount = existing.price * quantity;
+  const customerName = extra?.customer_name?.trim() || "Direct Customer";
+  const customerPhone = extra?.customer_phone?.trim() || "";
+
+  const orderData: Order = {
+    id: orderId,
+    order_number: orderNumber,
+    user_id: actorId,
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    order_source: "whatsapp",
+    status: "completed",
+    payment_status: "paid",
+    subtotal: totalAmount,
+    shipping_fee: 0,
+    discount_amount: 0,
+    total_amount: totalAmount,
+    shipping_address_snapshot: {
+      name: customerName,
+      phone: customerPhone,
+      address_line1: "In-store / WhatsApp Direct Sale",
+      city: "Direct Sale",
+      state: "",
+      postal_code: "",
+      country: "India",
+      is_default: false,
+      created_at: now,
+      updated_at: now,
+    } as any,
+    notes: extra?.notes?.trim() || "Direct Quick Sell by Admin",
+    created_at: now,
+    updated_at: now,
+  };
+
+  const orderItem: OrderItem = {
+    id: uuidv4(),
+    order_id: orderId,
+    product_id: existing.id,
+    product_name_snapshot: existing.product_name,
+    product_name: existing.product_name,
+    productNameSnapshot: existing.product_name,
+    category_name_snapshot: existing.category_name || "Bangles",
+    category_id: existing.category_id || "",
+    price_snapshot: existing.price,
+    unit_price: existing.price,
+    itemPrice: existing.price,
+    quantity: quantity,
+    subtotal: totalAmount,
+    created_at: now,
+  };
+
+  await insertOrderWithItemsDb(orderData, [orderItem], []);
+
+  createRevenueAllocationModel({
+    orderId: orderData.id,
+    orderItemId: orderItem.id,
+    productId: existing.id,
+    grossAmount: totalAmount,
+    adminId: actorId,
+    transactionType: "SALE",
+    notes: "Direct sale quick sell revenue allocation",
+  }).catch((err) => console.error("Revenue allocation error (non-fatal):", err));
+
+  return {
+    ...product,
+    order: orderData,
+  };
 };
 
 /**

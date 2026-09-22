@@ -106,9 +106,11 @@ export default function QuickSellModal({
         total: totalAmount,
       });
 
+      const orderNumber = updated?.order?.order_number;
+
       Alert.alert(
         'Sale Recorded!',
-        `Sold ${quantity} unit(s) of "${product.product_name}". Remaining stock: ${remaining}.`
+        `Sold ${quantity} unit(s) of "${product.product_name}".\n${orderNumber ? `Order #${orderNumber} logged to Orders & WhatsApp.\n` : ''}Remaining stock: ${remaining}.`
       );
 
       onSaleSuccess?.(updated);

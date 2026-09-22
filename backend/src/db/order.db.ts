@@ -19,12 +19,20 @@ export const insertOrderWithItemsDb = async (
 ): Promise<Order> => {
   const batch = db.batch();
 
+  const sanitizeDoc = (obj: any) => {
+    const clean: any = {};
+    Object.keys(obj).forEach((k) => {
+      if (obj[k] !== undefined) clean[k] = obj[k];
+    });
+    return clean;
+  };
+
   // 1. Order document
-  batch.set(db.collection("orders").doc(order.id), order);
+  batch.set(db.collection("orders").doc(order.id), sanitizeDoc(order));
 
   // 2. Order items documents
   items.forEach((item) => {
-    batch.set(db.collection("order_items").doc(item.id), item);
+    batch.set(db.collection("order_items").doc(item.id), sanitizeDoc(item));
   });
 
   // 3. Stock deductions
@@ -103,8 +111,14 @@ export const getAllAdminOrdersDb = async (options?: {
     orders = orders.filter(
       (o) =>
         (o.order_number && o.order_number.toLowerCase().includes(s)) ||
+        (o.customer_name && o.customer_name.toLowerCase().includes(s)) ||
+        (o.customer_phone && o.customer_phone.toLowerCase().includes(s)) ||
         (o.shipping_address_snapshot?.name &&
-          o.shipping_address_snapshot.name.toLowerCase().includes(s))
+          o.shipping_address_snapshot.name.toLowerCase().includes(s)) ||
+        ((o.shipping_address_snapshot as any)?.full_name &&
+          (o.shipping_address_snapshot as any).full_name.toLowerCase().includes(s)) ||
+        (o.shipping_address_snapshot?.phone &&
+          o.shipping_address_snapshot.phone.toLowerCase().includes(s))
     );
   }
 

@@ -10,6 +10,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +45,9 @@ export default function QuickSellScreen() {
     remaining: number;
     total: number;
     paymentMethod: string;
+    orderNumber?: string;
+    customerPhone?: string;
+    customerName?: string;
   } | null>(null);
 
   const handleLookup = useCallback(async (codeToLookup?: string) => {
@@ -114,6 +118,9 @@ export default function QuickSellScreen() {
 
       const remaining = typeof updated?.quantity === 'number' ? updated.quantity : Math.max(0, product.quantity - quantity);
       const totalAmount = product.price * quantity;
+      const orderNumber = updated?.order?.order_number || `ORD-${Date.now().toString().slice(-6)}`;
+      const enteredPhone = customerPhone.trim();
+      const enteredName = customerName.trim();
 
       setCompletedSale({
         name: product.product_name,
@@ -122,6 +129,9 @@ export default function QuickSellScreen() {
         remaining,
         total: totalAmount,
         paymentMethod,
+        orderNumber,
+        customerPhone: enteredPhone,
+        customerName: enteredName,
       });
 
       // Update current product with new remaining stock
@@ -137,6 +147,36 @@ export default function QuickSellScreen() {
     } finally {
       setSelling(false);
     }
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!completedSale) return;
+    const cleanPhone = (completedSale.customerPhone || '').replace(/[^0-9]/g, '');
+    const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+
+    const lines = [
+      '✨ *SOFIYA BANGLES — SALE RECEIPT* ✨',
+      '━━━━━━━━━━━━━━━━━━━━',
+      ...(completedSale.orderNumber ? [`*Order Number:* ${completedSale.orderNumber}`] : []),
+      ...(completedSale.customerName ? [`*Customer:* ${completedSale.customerName}`] : []),
+      `*Product:* ${completedSale.name}`,
+      `*Special ID:* ${completedSale.code}`,
+      `*Quantity:* ${completedSale.qty} set(s)`,
+      `*Payment Mode:* ${completedSale.paymentMethod}`,
+      `*Total Amount:* ₹${completedSale.total}`,
+      `*Date:* ${new Date().toLocaleDateString('en-IN')}`,
+      '━━━━━━━━━━━━━━━━━━━━',
+      '💖 *Thank you for shopping with Sofiya Bangles!*',
+    ];
+
+    const encoded = encodeURIComponent(lines.join('\n'));
+    const url = formattedPhone
+      ? `https://wa.me/${formattedPhone}?text=${encoded}`
+      : `https://wa.me/?text=${encoded}`;
+
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'Could not open WhatsApp. Please ensure WhatsApp is installed.');
+    });
   };
 
   const targetCodeSummary = (p: any) => {
@@ -284,6 +324,14 @@ export default function QuickSellScreen() {
               </View>
 
               <View className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 mb-4 space-y-2">
+                {completedSale.orderNumber && (
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-xs text-text-secondary font-medium">Order Number</Text>
+                    <Text className="text-xs font-mono font-bold text-slate-800">
+                      {completedSale.orderNumber}
+                    </Text>
+                  </View>
+                )}
                 <View className="flex-row justify-between items-center">
                   <Text className="text-xs text-text-secondary font-medium">Product</Text>
                   <Text className="text-xs font-bold text-text-primary flex-1 text-right ml-2" numberOfLines={1}>
@@ -322,18 +370,27 @@ export default function QuickSellScreen() {
                 </View>
               </View>
 
+              <TouchableOpacity
+                onPress={handleShareWhatsApp}
+                className="w-full bg-[#25D366] py-3.5 rounded-2xl items-center justify-center flex-row shadow-sm mb-3"
+                activeOpacity={0.85}
+              >
+                <Ionicons name="logo-whatsapp" size={18} color="#ffffff" />
+                <Text className="text-white font-bold text-sm ml-2">Share WhatsApp Bill</Text>
+              </TouchableOpacity>
+
               <View className="flex-row gap-3">
                 <TouchableOpacity
                   onPress={handleResetForNext}
-                  className="flex-1 bg-emerald-700 py-3.5 rounded-2xl items-center justify-center shadow-sm"
+                  className="flex-1 bg-emerald-700 py-3 rounded-2xl items-center justify-center shadow-sm"
                   activeOpacity={0.8}
                 >
-                  <Text className="text-white font-bold text-sm">Sell Another Item</Text>
+                  <Text className="text-white font-bold text-sm">Sell Another</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => router.back()}
-                  className="bg-white border border-emerald-300 px-4 py-3.5 rounded-2xl items-center justify-center"
+                  className="bg-white border border-emerald-300 px-5 py-3 rounded-2xl items-center justify-center"
                   activeOpacity={0.8}
                 >
                   <Text className="text-emerald-900 font-bold text-sm">Done</Text>

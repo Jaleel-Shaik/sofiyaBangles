@@ -128,32 +128,62 @@ export class OrderService {
     const totalAmount = subtotal + shippingFee - discountAmount;
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
 
+    const isDirectWhatsAppSale =
+      shippingAddressSnapshot?.order_source === "whatsapp" ||
+      (shippingAddressSnapshot?.notes &&
+        typeof shippingAddressSnapshot.notes === "string" &&
+        shippingAddressSnapshot.notes.toLowerCase().includes("whatsapp"));
+
+    const customerName =
+      shippingAddressSnapshot?.full_name ||
+      shippingAddressSnapshot?.name ||
+      "Direct Customer";
+    const customerPhone = shippingAddressSnapshot?.phone || "";
+
     const orderData: Order = {
       id: orderId,
       order_number: orderNumber,
       user_id: userId,
-      status: "pending",
-      payment_status: "pending",
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      order_source: shippingAddressSnapshot?.order_source || "whatsapp",
+      status: isDirectWhatsAppSale ? "completed" : "pending",
+      payment_status: isDirectWhatsAppSale ? "paid" : "pending",
       subtotal,
       shipping_fee: shippingFee,
       discount_amount: discountAmount,
       total_amount: totalAmount,
       shipping_address_snapshot: shippingAddressSnapshot || {
-        name: "Valued Customer",
-        phone: "",
+        name: customerName,
+        phone: customerPhone,
         address_line1: "",
         city: "",
         state: "",
         postal_code: "",
         country: "India",
       },
-      notes: null,
+      notes: shippingAddressSnapshot?.notes || null,
       created_at: now,
       updated_at: now,
     };
 
     // Commit atomically via DB Layer
     await insertOrderWithItemsDb(orderData, orderItems, stockDeductions);
+
+    // If direct WhatsApp sale, immediately allocate revenue (70/30)
+    if (isDirectWhatsAppSale) {
+      for (const item of orderItems) {
+        createRevenueAllocationModel({
+          orderId: orderData.id,
+          orderItemId: item.id,
+          productId: item.product_id,
+          grossAmount: item.subtotal,
+          adminId: userId,
+          transactionType: "SALE",
+          notes: "WhatsApp direct order revenue allocation",
+        }).catch((err) => console.error("Revenue ledger allocation error (non-fatal):", err));
+      }
+    }
 
     // Audit trail
     await insertAuditLogDb({
@@ -196,7 +226,30 @@ export class OrderService {
     }
 
     const items = await getOrderItemsDb(orderId);
-    return { ...order, items };
+    const normalizedItems = items.map((item) => ({
+      ...item,
+      product_name: item.product_name_snapshot || item.product_name || "Handcrafted Bangles",
+      productNameSnapshot: item.product_name_snapshot || item.product_name || "Handcrafted Bangles",
+      unit_price: item.price_snapshot ?? item.unit_price ?? 0,
+      itemPrice: item.price_snapshot ?? item.unit_price ?? 0,
+    }));
+
+    const customerName =
+      order.customer_name ||
+      (order.shipping_address_snapshot as any)?.full_name ||
+      (order.shipping_address_snapshot as any)?.name ||
+      "Customer";
+    const customerPhone =
+      order.customer_phone ||
+      (order.shipping_address_snapshot as any)?.phone ||
+      "";
+
+    return {
+      ...order,
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      items: normalizedItems,
+    };
   }
 
   /**
@@ -211,8 +264,31 @@ export class OrderService {
     const result = await getAllAdminOrdersDb(params);
     const ordersWithItems = await Promise.all(
       result.orders.map(async (order) => {
-        const items = await getOrderItemsDb(order.id);
-        return { ...order, items };
+        const rawItems = await getOrderItemsDb(order.id);
+        const normalizedItems = rawItems.map((item) => ({
+          ...item,
+          product_name: item.product_name_snapshot || item.product_name || "Handcrafted Bangles",
+          productNameSnapshot: item.product_name_snapshot || item.product_name || "Handcrafted Bangles",
+          unit_price: item.price_snapshot ?? item.unit_price ?? 0,
+          itemPrice: item.price_snapshot ?? item.unit_price ?? 0,
+        }));
+
+        const customerName =
+          order.customer_name ||
+          (order.shipping_address_snapshot as any)?.full_name ||
+          (order.shipping_address_snapshot as any)?.name ||
+          "Direct Customer";
+        const customerPhone =
+          order.customer_phone ||
+          (order.shipping_address_snapshot as any)?.phone ||
+          "";
+
+        return {
+          ...order,
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          items: normalizedItems,
+        };
       })
     );
 

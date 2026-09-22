@@ -86,6 +86,27 @@ export default function DashboardPage() {
     }
   }, [selectedModelType, selectedCategory]);
 
+  // Real-time synchronization: refresh stats and recent products when any product is sold
+  useEffect(() => {
+    const handleProductSold = () => {
+      api.admin
+        .getOverviewAnalytics(
+          selectedCategory || undefined,
+          selectedModelType || undefined
+        )
+        .then(setStats)
+        .catch(() => {});
+      api.admin
+        .getAdminProducts(1, 6)
+        .then((res) => {
+          setRecentProducts(res.products || []);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("product-sold", handleProductSold);
+    return () => window.removeEventListener("product-sold", handleProductSold);
+  }, [selectedCategory, selectedModelType]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
