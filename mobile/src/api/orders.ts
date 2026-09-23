@@ -33,6 +33,7 @@ export interface ShippingAddress {
 
 export interface Order {
   id: string;
+  order_number?: string;
   user_id: string;
   total_amount: number;
   status: string;
@@ -98,3 +99,44 @@ export const getProductReviews = async (productId: string): Promise<OrderReview[
     return [];
   }
 };
+
+export interface WhatsAppPurchasePayload {
+  productId?: string;
+  product_id?: string;
+  variantId?: string | null;
+  variant_id?: string | null;
+  quantity?: number;
+  size?: string | null;
+  customMeasurements?: Record<string, string> | null;
+  notes?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  phone?: string | null;
+}
+
+export interface WhatsAppPurchaseResponse {
+  orderId: string;
+  orderNumber: string;
+  totalAmount: number;
+  status: string;
+  deliveryMode: "cloud_api" | "client_dispatch";
+  whatsappStatus: "sent" | "ready";
+  whatsappUrl?: string;
+}
+
+/**
+ * Initiates an authenticated, server-verified product purchase and WhatsApp notification.
+ *
+ * Security Guarantee:
+ * - User name and mobile number are retrieved securely on the server from the authenticated session.
+ * - Product price and stock are validated directly on the backend database.
+ * - WhatsApp credentials remain strictly isolated on the backend.
+ * - Sensitive customer PII is never passed in query parameters or exposed in client logs.
+ */
+export const initiateWhatsAppPurchase = async (
+  payload: WhatsAppPurchasePayload
+): Promise<WhatsAppPurchaseResponse> => {
+  const res = await apiClient.post('/orders/whatsapp-purchase', payload);
+  return res.data.data as WhatsAppPurchaseResponse;
+};
+

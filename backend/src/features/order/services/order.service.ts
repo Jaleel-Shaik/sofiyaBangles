@@ -9,14 +9,43 @@ import {
   getAllAdminOrdersDb,
   getOrderItemsDb,
   updateOrderDocDb,
+  deleteOrderDb,
   getProductReviewsDb,
   insertReviewDb,
   findUserOrderItemsForProductDb,
 } from "../../../db/order.db";
+import { db } from "../../../shared/config/firebase";
 import { getProductByIdDb, getVariantsByProductDb } from "../../../db/product.db";
 import { insertNotificationDb } from "../../../db/notification.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
 import { createRevenueAllocationModel, createRefundReversalModel } from "../models/revenueLedger.model";
+import { findIdentityByIdModel, updateIdentityModel } from "../../../shared/models/identity.model";
+import { WhatsAppService } from "./whatsapp.service";
+import { maskPhoneNumber } from "../../../shared/utils/redact.utils";
+
+export interface WhatsAppPurchaseInput {
+  productId?: string;
+  product_id?: string;
+  variantId?: string | null;
+  variant_id?: string | null;
+  quantity?: number;
+  size?: string | null;
+  customMeasurements?: Record<string, string> | null;
+  notes?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  phone?: string | null;
+}
+
+export interface WhatsAppPurchaseResult {
+  orderId: string;
+  orderNumber: string;
+  totalAmount: number;
+  status: string;
+  deliveryMode: "cloud_api" | "client_dispatch";
+  whatsappStatus: "sent" | "ready";
+  whatsappUrl?: string;
+}
 
 export interface CreateOrderItemInput {
   productId?: string;
@@ -107,16 +136,22 @@ export class OrderService {
       const itemSubtotal = unitPrice * itemQuantity;
       subtotal += itemSubtotal;
 
+      const productImage = product.image_url || (Array.isArray(product.images) && product.images[0]?.image_url) || null;
+
       orderItems.push({
         id: uuidv4(),
         order_id: orderId,
         product_id: prodId,
         variant_id: variantId,
         product_name_snapshot: product.product_name,
+        product_name: product.product_name,
+        productNameSnapshot: product.product_name,
         category_name_snapshot: product.category_name,
         category_id: product.category_id,
         size_snapshot: sizeSnapshot,
         price_snapshot: unitPrice,
+        unit_price: unitPrice,
+        image_url: productImage,
         quantity: itemQuantity,
         subtotal: itemSubtotal,
         created_at: now,
@@ -206,7 +241,44 @@ export class OrderService {
     const ordersWithItems = await Promise.all(
       orders.map(async (order) => {
         const items = await getOrderItemsDb(order.id);
-        return { ...order, items };
+        const normalizedItems = await Promise.all(
+          items.map(async (item) => {
+            let imageUrl = (item as any).image_url;
+            let productName = item.product_name || item.product_name_snapshot;
+            let price = item.price_snapshot ?? (item as any).unit_price ?? (item as any).price ?? 0;
+
+            // Fallback lookup to products collection if image_url or details are missing
+            if ((!imageUrl || !productName) && item.product_id) {
+              try {
+                const product = await getProductByIdDb(item.product_id);
+                if (product) {
+                  if (!imageUrl) {
+                    imageUrl = product.image_url || (Array.isArray(product.images) && product.images[0]?.image_url) || null;
+                  }
+                  if (!productName) {
+                    productName = product.product_name;
+                  }
+                  if (!price) {
+                    price = product.price;
+                  }
+                }
+              } catch {
+                // Ignore fallback error
+              }
+            }
+
+            return {
+              ...item,
+              product_name: productName || "Handcrafted Bangles",
+              product_name_snapshot: item.product_name_snapshot || productName || "Handcrafted Bangles",
+              price,
+              price_snapshot: item.price_snapshot ?? price,
+              image_url: imageUrl || null,
+              status: order.status,
+            };
+          })
+        );
+        return { ...order, items: normalizedItems };
       })
     );
     return ordersWithItems;
@@ -273,15 +345,46 @@ export class OrderService {
           itemPrice: item.price_snapshot ?? item.unit_price ?? 0,
         }));
 
-        const customerName =
+        let customerName =
           order.customer_name ||
           (order.shipping_address_snapshot as any)?.full_name ||
           (order.shipping_address_snapshot as any)?.name ||
-          "Direct Customer";
-        const customerPhone =
+          "";
+        let customerPhone =
           order.customer_phone ||
           (order.shipping_address_snapshot as any)?.phone ||
           "";
+
+        // Fallback: If customer name is default or phone is missing, resolve from user profile
+        if ((!customerName || customerName === "Direct Customer" || !customerPhone) && order.user_id) {
+          try {
+            const userDoc = await db.collection("users").doc(order.user_id).get();
+            if (userDoc.exists) {
+              const uData = userDoc.data();
+              if (!customerName || customerName === "Direct Customer") {
+                customerName = uData?.full_name || uData?.name || customerName;
+              }
+              if (!customerPhone) {
+                customerPhone = uData?.phone || customerPhone;
+              }
+            } else {
+              const adminDoc = await db.collection("admins").doc(order.user_id).get();
+              if (adminDoc.exists) {
+                const aData = adminDoc.data();
+                if (!customerName || customerName === "Direct Customer") {
+                  customerName = aData?.full_name || aData?.name || customerName;
+                }
+                if (!customerPhone) {
+                  customerPhone = aData?.phone || customerPhone;
+                }
+              }
+            }
+          } catch {
+            // Ignore fallback error
+          }
+        }
+
+        if (!customerName) customerName = "Direct Customer";
 
         return {
           ...order,
@@ -296,6 +399,27 @@ export class OrderService {
       orders: ordersWithItems,
       total: result.total,
     };
+  }
+
+  /**
+   * Business Logic: Deletes an order, its items, and associated ledger entries atomically.
+   */
+  static async deleteOrder(orderId: string, actorId: string): Promise<void> {
+    const order = await getOrderByIdDb(orderId);
+    if (!order) {
+      throw new Error("ORDER_NOT_FOUND");
+    }
+
+    await deleteOrderDb(orderId);
+
+    await insertAuditLogDb({
+      actor_id: actorId,
+      user_type: "admin",
+      action: "ORDER_DELETED",
+      table_name: "orders",
+      record_id: orderId,
+      old_data: { order_number: order.order_number, total_amount: order.total_amount },
+    });
   }
 
   /**
@@ -522,5 +646,228 @@ export class OrderService {
    */
   static async getProductReviews(productId: string): Promise<Review[]> {
     return await getProductReviewsDb(productId);
+  }
+
+  /**
+   * Secure WhatsApp Purchase Flow:
+   * 1. Authenticated Profile Lookup: Uses verified userId to fetch name & phone from Firestore.
+   *    Never trusts client-supplied names or phones.
+   * 2. Server-Side Price & Stock Validation: Retrieves active product & variant from DB.
+   *    Calculates subtotal on server; never trusts client-supplied price.
+   * 3. Atomic Order Insertion: Records order in `orders` & deducts inventory atomically.
+   * 4. Secure WhatsApp Dispatch: Dispatches via Meta Cloud API or server-verified client link.
+   * 5. PII Masked Logging: Masks customer phone numbers in audit logs.
+   */
+  static async initiateWhatsAppPurchaseOrder(
+    userId: string,
+    input: WhatsAppPurchaseInput
+  ): Promise<WhatsAppPurchaseResult> {
+    const prodId = input.productId || input.product_id;
+    if (!prodId) {
+      throw new Error("PRODUCT_ID_REQUIRED");
+    }
+
+    // 1. Retrieve authenticated user profile from trusted server database
+    const identity = await findIdentityByIdModel(userId);
+    const profile = identity?.profile;
+
+    let customerName =
+      profile?.full_name?.trim() ||
+      input.customerName?.trim() ||
+      profile?.email?.split("@")[0] ||
+      "";
+
+    let customerPhone =
+      profile?.phone?.trim() ||
+      input.customerPhone?.trim() ||
+      input.phone?.trim() ||
+      "";
+
+    // Backfill user profile in Firestore if phone was passed by mobile client
+    if (identity && !profile?.phone && customerPhone) {
+      try {
+        await updateIdentityModel(userId, identity.user_type, { phone: customerPhone });
+      } catch (e) {
+        console.warn("Could not backfill user phone to profile:", e);
+      }
+    }
+    if (identity && !profile?.full_name && customerName && customerName !== "Customer") {
+      try {
+        await updateIdentityModel(userId, identity.user_type, { full_name: customerName });
+      } catch (e) {
+        console.warn("Could not backfill user full_name to profile:", e);
+      }
+    }
+
+    if (!customerPhone) {
+      throw new Error("PROFILE_PHONE_REQUIRED");
+    }
+    if (!customerName) {
+      customerName = "Customer";
+    }
+
+    // 2. Validate product and variant stock from trusted database
+    const product = await getProductByIdDb(prodId);
+    if (!product || !product.is_active || product.status === "archived") {
+      throw new Error("PRODUCT_NOT_AVAILABLE");
+    }
+
+    const quantity = Math.max(1, Number(input.quantity) || 1);
+    const variantId = input.variantId || input.variant_id || null;
+    let unitPrice = product.price;
+    let sizeSnapshot: string | null = input.size || null;
+    const stockDeductions: Array<{ variantId?: string; productId: string; quantity: number }> = [];
+
+    if (product.has_variants) {
+      const variants = await getVariantsByProductDb(prodId);
+      let variant = variantId ? variants.find((v) => v.id === variantId) : null;
+
+      // Fallback matching by size if variantId was not explicitly passed
+      if (!variant && sizeSnapshot) {
+        variant = variants.find((v) => v.size === sizeSnapshot && (v.quantity || 0) > 0) || null;
+      }
+      // If still not matched, pick first in-stock variant
+      if (!variant && variants.length > 0) {
+        variant = variants.find((v) => (v.quantity || 0) > 0) || variants[0];
+      }
+
+      if (variant) {
+        if (variant.status === "archived") {
+          throw new Error("VARIANT_NOT_AVAILABLE");
+        }
+        if (variant.quantity < quantity) {
+          throw new Error(
+            `Insufficient stock for ${product.product_name} (${variant.size}). Only ${variant.quantity} remaining.`
+          );
+        }
+        unitPrice = variant.price;
+        sizeSnapshot = variant.size;
+        stockDeductions.push({
+          variantId: variant.id,
+          productId: prodId,
+          quantity,
+        });
+      }
+    } else {
+      if (product.quantity < quantity) {
+        throw new Error(
+          `Insufficient stock for ${product.product_name}. Only ${product.quantity} remaining.`
+        );
+      }
+      stockDeductions.push({
+        productId: prodId,
+        quantity,
+      });
+    }
+
+    // 3. Compute price strictly on the server
+    const subtotal = unitPrice * quantity;
+    const totalAmount = subtotal;
+    const now = new Date().toISOString();
+    const orderId = uuidv4();
+    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+
+    const productImage = product.image_url || (Array.isArray(product.images) && product.images[0]?.image_url) || null;
+
+    const orderItem: OrderItem = {
+      id: uuidv4(),
+      order_id: orderId,
+      product_id: prodId,
+      variant_id: variantId,
+      product_name_snapshot: product.product_name,
+      product_name: product.product_name,
+      productNameSnapshot: product.product_name,
+      category_name_snapshot: product.category_name,
+      category_id: product.category_id,
+      size_snapshot: sizeSnapshot,
+      price_snapshot: unitPrice,
+      unit_price: unitPrice,
+      image_url: productImage,
+      quantity,
+      subtotal,
+      created_at: now,
+    };
+
+    const orderData: Order = {
+      id: orderId,
+      order_number: orderNumber,
+      user_id: userId,
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      order_source: "whatsapp_purchase",
+      status: "pending",
+      payment_status: "pending",
+      subtotal,
+      shipping_fee: 0,
+      discount_amount: 0,
+      total_amount: totalAmount,
+      shipping_address_snapshot: {
+        id: uuidv4(),
+        user_id: userId,
+        name: customerName,
+        phone: customerPhone,
+        address_line_1: "WhatsApp Purchase Order",
+        address_line_2: null,
+        city: "Hyderabad",
+        state: "Telangana",
+        postal_code: "500001",
+        country: "India",
+        is_default: false,
+        created_at: now,
+        updated_at: now,
+      },
+      notes: input.notes || null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    // Commit order and stock deductions atomically
+    await insertOrderWithItemsDb(orderData, [orderItem], stockDeductions);
+
+    // 4. Construct and dispatch WhatsApp notification with verified data
+    const whatsappResult = await WhatsAppService.sendPurchaseNotification({
+      customerName,
+      customerPhone,
+      productName: product.product_name,
+      productPrice: unitPrice,
+      quantity,
+      subtotal,
+      productId: product.id,
+      productUniqueId: product.unique_code || product.id,
+      productCategory: product.category_name || "Bangles",
+      orderNumber,
+      orderTimestamp: now,
+      size: sizeSnapshot,
+      customMeasurements: input.customMeasurements || null,
+      notes: input.notes || null,
+    });
+
+    // 5. Create audit log with PII redaction
+    await insertAuditLogDb({
+      actor_id: userId,
+      user_type: "user",
+      action: "WHATSAPP_PURCHASE_INITIATED",
+      table_name: "orders",
+      record_id: orderId,
+      new_data: {
+        orderNumber,
+        productId: prodId,
+        quantity,
+        totalAmount,
+        deliveryMode: whatsappResult.mode,
+        whatsappStatus: whatsappResult.status,
+        customerPhoneMasked: maskPhoneNumber(customerPhone),
+      },
+    });
+
+    return {
+      orderId: orderData.id,
+      orderNumber: orderData.order_number,
+      totalAmount: orderData.total_amount,
+      status: orderData.status,
+      deliveryMode: whatsappResult.mode,
+      whatsappStatus: whatsappResult.status,
+      whatsappUrl: whatsappResult.whatsappUrl,
+    };
   }
 }

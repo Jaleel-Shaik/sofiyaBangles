@@ -7,7 +7,7 @@ import { ArrowLeft, Edit, Trash2, Package, Loader2, ShoppingCart, Minus, Plus } 
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { type Product, api } from "@/src/lib/api";
-import { Button, Badge, Card, CardContent, CardHeader, CardTitle, ConfirmDialog } from "@/src/components/ui";
+import { Button, Badge, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, AuthenticatedImage } from "@/src/components/ui";
 import { STRINGS } from "@/src/constants/strings";
 
 export default function ProductDetailPage() {
@@ -16,6 +16,8 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   const rawQty = searchParams?.get("qty");
+  const action = searchParams?.get("action");
+  const orderNumber = searchParams?.get("orderNumber");
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [sellQty, setSellQty] = useState(() => (rawQty ? Math.max(1, parseInt(rawQty, 10) || 1) : 1));
@@ -51,7 +53,7 @@ export default function ProductDetailPage() {
     if (!product) return;
     setDeleting(true);
     try {
-      await api.admin.deleteProduct(id);
+      await api.admin.deleteProduct(product.id);
       toast.success(STRINGS.products.deletedSuccess);
       setConfirmDeleteOpen(false);
       router.push("/dashboard/products");
@@ -74,10 +76,18 @@ export default function ProductDetailPage() {
     }
     setSelling(true);
     try {
-      const updated = await api.admin.sellProduct(id, sellQty);
+      const extraNotes = orderNumber ? `WhatsApp Order #${orderNumber}` : undefined;
+      const updated = await api.admin.sellProduct(product.id, sellQty, {
+        notes: extraNotes,
+        order_number: orderNumber || undefined,
+      });
       setProduct(updated);
       setSellQty(1);
-      toast.success(`Sold ${sellQty} unit(s)!`);
+      toast.success(
+        orderNumber
+          ? `Order #${orderNumber} fulfilled! Sold ${sellQty} unit(s).`
+          : `Sold ${sellQty} unit(s)!`
+      );
     } catch (e: any) {
       toast.error(e?.response?.data?.message || e?.message || "Failed to sell product");
     } finally {
@@ -105,6 +115,42 @@ export default function ProductDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* WhatsApp Order Action Banner */}
+      {action === "sell" && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#E8436E] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <ShoppingCart className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">
+                WhatsApp Purchase Order Fulfillment
+                {orderNumber ? (
+                  <span className="ml-2 font-mono text-xs px-2 py-0.5 rounded-md bg-white border border-rose-200 text-rose-700 font-semibold">
+                    {orderNumber}
+                  </span>
+                ) : null}
+              </p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Review available stock and complete the sale below to fulfill this customer order.
+              </p>
+            </div>
+          </div>
+          {orderNumber && (
+            <Link
+              href={`/dashboard/orders?orderNumber=${encodeURIComponent(orderNumber)}`}
+              className="text-xs font-semibold text-[#E8436E] hover:underline shrink-0 self-start sm:self-auto flex items-center gap-1"
+            >
+              View Order in Dashboard →
+            </Link>
+          )}
+        </motion.div>
+      )}
+
       {/* Top Bar Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -126,7 +172,7 @@ export default function ProductDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href={`/dashboard/products/${id}/edit`}>
+          <Link href={`/dashboard/products/${product.id}/edit`}>
             <Button
               variant="outline"
               size="md"
@@ -226,11 +272,13 @@ export default function ProductDetailPage() {
                 ).map((img, i) => (
                   <div
                     key={i}
-                    className="aspect-square rounded-xl bg-slate-50 overflow-hidden border border-slate-200/80 shadow-2xs"
+                    className="aspect-square rounded-xl bg-slate-50 overflow-hidden border border-slate-200/80 shadow-2xs relative"
                   >
-                    <img
+                    <AuthenticatedImage
                       src={typeof img === "string" ? img : img.image_url}
-                      alt=""
+                      productId={product.id}
+                      imageIndex={i}
+                      alt={product.product_name}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -245,11 +293,11 @@ export default function ProductDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={action === "sell" ? "ring-2 ring-[#E8436E]/60 border-[#E8436E]/40 shadow-md" : ""}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4 text-[#E8436E]" />
-                Sell Product Directly
+                {action === "sell" && orderNumber ? `Fulfill Order: ${orderNumber}` : "Sell Product Directly"}
               </CardTitle>
             </CardHeader>
             <CardContent>

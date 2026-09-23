@@ -4,6 +4,7 @@ import { getParam } from "../../../shared/utils/params";
 import { asyncHandler } from "../../../core/utils/async-handler";
 import { sendSuccess } from "../../../core/utils/response";
 import { OrderService } from "../services/order.service";
+import { AdminLinkService } from "../services/admin-link.service";
 import { BadRequestError, NotFoundError, ForbiddenError } from "../../../core/errors/app.error";
 
 export const createOrder = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -16,6 +17,73 @@ export const createOrder = asyncHandler(async (req: AuthRequest, res: Response) 
     if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError("Product not found.");
     if (err.message === "PRODUCT_NOT_AVAILABLE") throw new BadRequestError("Product is no longer available.");
     throw err;
+  }
+});
+
+export const initiateWhatsAppPurchase = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId;
+  const {
+    productId,
+    product_id,
+    variantId,
+    variant_id,
+    quantity,
+    size,
+    customMeasurements,
+    notes,
+    customerName,
+    customerPhone,
+    phone,
+  } = req.body;
+
+  try {
+    const result = await OrderService.initiateWhatsAppPurchaseOrder(userId, {
+      productId: productId || product_id,
+      variantId: variantId || variant_id,
+      quantity,
+      size,
+      customMeasurements,
+      notes,
+      customerName,
+      customerPhone: customerPhone || phone,
+    });
+    return sendSuccess(res, result, {
+      message: "WhatsApp purchase order initiated successfully.",
+      statusCode: 201,
+    });
+  } catch (err: any) {
+    if (err.message === "PROFILE_PHONE_REQUIRED") {
+      throw new BadRequestError(
+        "Please add a verified mobile number to your profile before purchasing.",
+        "PROFILE_PHONE_REQUIRED"
+      );
+    }
+    if (err.message === "PROFILE_NAME_REQUIRED") {
+      throw new BadRequestError(
+        "Please add your name to your profile before purchasing.",
+        "PROFILE_NAME_REQUIRED"
+      );
+    }
+    if (err.message === "PRODUCT_NOT_FOUND" || err.message === "PRODUCT_NOT_AVAILABLE") {
+      throw new NotFoundError("Selected product is currently unavailable.");
+    }
+    if (err.message === "VARIANT_NOT_AVAILABLE") {
+      throw new BadRequestError("Selected size/variant is no longer available.");
+    }
+    if (err.message?.startsWith("Insufficient stock") || err.message?.includes("Only")) {
+      throw new BadRequestError(err.message, "INSUFFICIENT_STOCK");
+    }
+    if (err.message === "USER_NOT_FOUND") {
+      throw new NotFoundError("User account not found. Please log in again.", "USER_NOT_FOUND");
+    }
+    if (err.message === "PRODUCT_ID_REQUIRED") {
+      throw new BadRequestError("Product ID is required.", "PRODUCT_ID_REQUIRED");
+    }
+    if (err instanceof BadRequestError || err instanceof NotFoundError || err instanceof ForbiddenError) {
+      throw err;
+    }
+    console.error("WhatsApp purchase initiation error:", err);
+    throw new BadRequestError(err.message || "Failed to process WhatsApp purchase request.");
   }
 });
 
@@ -91,6 +159,17 @@ export const updateOrderStatus = asyncHandler(async (req: AuthRequest, res: Resp
   }
 });
 
+export const deleteOrder = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
+  try {
+    await OrderService.deleteOrder(id, req.user!.userId);
+    return sendSuccess(res, null, "Order deleted successfully.");
+  } catch (err: any) {
+    if (err.message === "ORDER_NOT_FOUND") throw new NotFoundError("Order not found.");
+    throw err;
+  }
+});
+
 export const createReview = asyncHandler(async (req: AuthRequest, res: Response) => {
   const productId = req.body.productId || req.body.product_id;
   const rating = Number(req.body.rating);
@@ -116,4 +195,12 @@ export const getProductReviews = asyncHandler(async (req: AuthRequest, res: Resp
     : req.params.productId;
   const reviews = await OrderService.getProductReviews(productId);
   return sendSuccess(res, reviews);
+});
+
+export const verifyAdminLink = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { token } = req.body;
+  if (!token) throw new BadRequestError("Token is required.", "MISSING_TOKEN");
+
+  const result = await AdminLinkService.verifyAdminActionToken(token, req.user);
+  return sendSuccess(res, result, "Admin access link verified successfully.");
 });

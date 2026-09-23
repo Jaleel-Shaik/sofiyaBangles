@@ -22,7 +22,8 @@ import { getModelTypeByIdDb } from "../../../db/modelType.db";
 import { isFavoritedDb } from "../../../db/favorite.db";
 import { getSizePreferencesDb } from "../../../db/sizePreference.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
-import { insertOrderWithItemsDb } from "../../../db/order.db";
+import { insertOrderWithItemsDb, getOrderByOrderNumberDb, updateOrderDocDb, getOrderItemsDb } from "../../../db/order.db";
+import { insertNotificationDb } from "../../../db/notification.db";
 import { createRevenueAllocationModel } from "../../order/models/revenueLedger.model";
 import { Order, OrderItem } from "../../../shared/types";
 import { v4 as uuidv4 } from "uuid";
@@ -282,10 +283,12 @@ export const getAdminProductsService = async (options: {
  * Service: Get single product by ID with full details.
  */
 export const getProductByIdService = async (id: string, userId?: string): Promise<Product> => {
-  const product = await getProductByIdDb(id);
+  const product = await getProductByCodeOrIdDb(id);
   if (!product) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
+
+  const actualId = product.id;
 
   let category_name = undefined;
   let model_type_id = product.model_type_id;
@@ -299,9 +302,9 @@ export const getProductByIdService = async (id: string, userId?: string): Promis
     }
   }
 
-  const is_favorited = userId ? await isFavoritedDb(userId, id) : false;
-  const variants = await getVariantsByProductDb(id);
-  const images = await getImagesByProductDb(id);
+  const is_favorited = userId ? await isFavoritedDb(userId, actualId) : false;
+  const variants = await getVariantsByProductDb(actualId);
+  const images = await getImagesByProductDb(actualId);
 
   return {
     ...product,
@@ -361,10 +364,11 @@ export const updateProductService = async (
   files: Express.Multer.File[] | undefined,
   actorId: string,
 ) => {
-  const existing = await getProductByIdDb(id);
+  const existing = await getProductByCodeOrIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
+  const actualId = existing.id;
 
   const targetCategoryId = input.category_id || existing.category_id;
   const targetModelTypeId = input.model_type_id || existing.model_type_id;
@@ -384,7 +388,7 @@ export const updateProductService = async (
     imageUrls = await uploadMultipleToCloudinary(files);
   }
 
-  const existingImagesList = await getImagesByProductDb(id);
+  const existingImagesList = await getImagesByProductDb(actualId);
   const existingImagesUrls: string[] = existingImagesList.map((img) => img.image_url);
 
   const existingImages: string[] = input.existing_images !== undefined
@@ -403,7 +407,7 @@ export const updateProductService = async (
   
   const formattedImages: ProductImage[] = mergedImages.map((url, idx) => ({
     id: uuidv4(),
-    product_id: id,
+    product_id: actualId,
     image_url: url,
     public_id: null,
     alt_text: null,
@@ -439,7 +443,7 @@ export const updateProductService = async (
       (variants as VariantInput[]).forEach((v) => {
         formattedVariants!.push({
           id: uuidv4(),
-          product_id: id,
+          product_id: actualId,
           size: v.size || '',
           sku: v.sku || null,
           price: Number(v.price),
@@ -452,7 +456,7 @@ export const updateProductService = async (
     }
   }
 
-  const product = await updateProductWithRelationsDb(id, {
+  const product = await updateProductWithRelationsDb(actualId, {
     ...productFields,
     updated_by: actorId,
   }, formattedVariants, images !== undefined ? formattedImages : undefined);
@@ -476,7 +480,7 @@ export const updateProductService = async (
     actor_id: actorId,
     action: "PRODUCT_UPDATED",
     table_name: "products",
-    record_id: id,
+    record_id: actualId,
     old_data: { product_name: existing.product_name, price: existing.price },
     new_data: { product_name: product.product_name, price: product.price },
   });
@@ -492,18 +496,18 @@ export const updateStockService = async (
   quantity: number,
   actorId: string,
 ) => {
-  const existing = await getProductByIdDb(id);
+  const existing = await getProductByCodeOrIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  const product = await updateProductDocDb(id, { quantity });
+  const product = await updateProductDocDb(existing.id, { quantity });
 
   await insertAuditLogDb({
     actor_id: actorId,
     action: "STOCK_UPDATED",
     table_name: "products",
-    record_id: id,
+    record_id: existing.id,
     old_data: { quantity: existing.quantity },
     new_data: { quantity },
   });
@@ -562,12 +566,113 @@ export const sellProductService = async (
   codeOrId: string,
   quantity: number,
   actorId: string,
-  extra?: { customer_name?: string; customer_phone?: string; notes?: string }
+  extra?: {
+    customer_name?: string;
+    customer_phone?: string;
+    notes?: string;
+    order_number?: string;
+    orderNumber?: string;
+  }
 ) => {
   const existing = await getProductByCodeOrIdDb(codeOrId);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
+
+  const targetOrderNumber =
+    extra?.order_number?.trim() ||
+    extra?.orderNumber?.trim() ||
+    (extra?.notes ? extra.notes.match(/ORD-\d{4,}/i)?.[0]?.toUpperCase() : null);
+
+  // If this sale fulfills an existing customer order (e.g. from WhatsApp purchase)
+  if (targetOrderNumber) {
+    const existingOrder = await getOrderByOrderNumberDb(targetOrderNumber);
+    if (existingOrder) {
+      const now = new Date().toISOString();
+      const items = await getOrderItemsDb(existingOrder.id);
+
+      // If already completed, return existing order directly
+      if (existingOrder.status === "completed" && existingOrder.payment_status === "paid") {
+        return {
+          ...existing,
+          order: { ...existingOrder, items },
+        };
+      }
+
+      // 1. Transition existing order to completed in Firestore (Stock was ALREADY reserved/deducted at purchase initiation)
+      const updatePayload: Partial<Order> = {
+        status: "completed",
+        payment_status: "paid",
+        updated_at: now,
+      };
+      if (extra?.notes) {
+        updatePayload.notes = extra.notes;
+      }
+      await updateOrderDocDb(existingOrder.id, updatePayload);
+
+      // 2. Revenue allocations for all items in this fulfilled order
+      for (const item of items) {
+        createRevenueAllocationModel({
+          orderId: existingOrder.id,
+          orderItemId: item.id,
+          productId: item.product_id || existing.id,
+          grossAmount: item.subtotal || ((item.price_snapshot || existing.price) * (item.quantity || 1)),
+          adminId: actorId,
+          transactionType: "SALE",
+          notes: `Fulfillment of Order ${targetOrderNumber} for ${item.product_name_snapshot || existing.product_name}`,
+        }).catch((err) => console.error("Revenue allocation error (non-fatal):", err));
+      }
+
+      // 3. SuperAdmin / Admin notification
+      await insertNotificationDb({
+        id: uuidv4(),
+        title: `New Sale Completed: ${existingOrder.order_number}`,
+        body: `Order ${existingOrder.order_number} for ₹${existingOrder.total_amount} was completed successfully.`,
+        type: "NEW_SALE",
+        product_id: existing.id,
+        sent_by: actorId,
+        user_id: null,
+        is_read: false,
+        created_at: now,
+      });
+
+      // 4. In-App Notification directly to Customer user
+      if (existingOrder.user_id) {
+        await insertNotificationDb({
+          id: uuidv4(),
+          title: `Order #${existingOrder.order_number} Confirmed!`,
+          body: `Your order for "${existing.product_name}" has been marked as bought and confirmed.`,
+          type: "ORDER_STATUS_UPDATE",
+          product_id: existing.id,
+          sent_by: actorId,
+          user_id: existingOrder.user_id,
+          is_read: false,
+          created_at: now,
+        });
+      }
+
+      // 5. Audit Log
+      await insertAuditLogDb({
+        actor_id: actorId,
+        action: "ORDER_FULFILLED_AND_SOLD",
+        table_name: "orders",
+        record_id: existingOrder.id,
+        old_data: { status: existingOrder.status, payment_status: existingOrder.payment_status },
+        new_data: { status: "completed", payment_status: "paid", order_number: existingOrder.order_number },
+      });
+
+      return {
+        ...existing,
+        order: {
+          ...existingOrder,
+          ...updatePayload,
+          items,
+        },
+      };
+    }
+  }
+
+  // Fallback: Direct in-store / walk-in quick-sell (deduct stock now)
   if (existing.quantity < quantity) {
     throw new Error("INSUFFICIENT_STOCK");
   }
@@ -647,6 +752,7 @@ export const sellProductService = async (
     itemPrice: existing.price,
     quantity: quantity,
     subtotal: totalAmount,
+    image_url: existing.image_url || null,
     created_at: now,
   };
 
@@ -672,29 +778,30 @@ export const sellProductService = async (
  * Service: Soft delete product and cascade cleanups.
  */
 export const deleteProductService = async (id: string, actorId: string) => {
-  const existing = await getProductByIdDb(id);
+  const existing = await getProductByCodeOrIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
+  const actualId = existing.id;
 
-  const deletedProduct = await softDeleteProductDb(id);
+  const deletedProduct = await softDeleteProductDb(actualId);
   if (!deletedProduct) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  deleteFavoritesByProductDb(id).catch((err) =>
+  deleteFavoritesByProductDb(actualId).catch((err) =>
     console.error("Failed to cleanup favorites (non-fatal):", err)
   );
 
-  deleteReviewsByProductDb(id).catch((err) =>
+  deleteReviewsByProductDb(actualId).catch((err) =>
     console.error("Failed to cleanup reviews (non-fatal):", err)
   );
 
-  nullifyNotificationProductRefDb(id).catch((err) =>
+  nullifyNotificationProductRefDb(actualId).catch((err) =>
     console.error("Failed to cleanup notification refs (non-fatal):", err)
   );
 
-  const existingImagesList = await getImagesByProductDb(id);
+  const existingImagesList = await getImagesByProductDb(actualId);
   const existingImagesUrls = existingImagesList.map((img) => img.image_url);
   const allImageUrls = [
     ...existingImagesUrls,
@@ -702,7 +809,7 @@ export const deleteProductService = async (id: string, actorId: string) => {
   ];
   if (allImageUrls.length > 0) {
     cleanupCloudinaryImages(allImageUrls).catch((err) =>
-      console.error("Cloudinary cleanup failed (non-fatal):", err)
+      console.error("Failed to clean up Cloudinary images (non-fatal):", err)
     );
   }
 
@@ -710,7 +817,7 @@ export const deleteProductService = async (id: string, actorId: string) => {
     actor_id: actorId,
     action: "PRODUCT_DELETED",
     table_name: "products",
-    record_id: id,
+    record_id: actualId,
     old_data: { product_name: existing.product_name },
   });
 };
@@ -719,7 +826,7 @@ export const deleteProductService = async (id: string, actorId: string) => {
  * Service: Restore soft-deleted product.
  */
 export const restoreProductService = async (id: string, actorId: string) => {
-  const existing = await getProductByIdDb(id);
+  const existing = await getProductByCodeOrIdDb(id);
   if (!existing) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
@@ -728,7 +835,7 @@ export const restoreProductService = async (id: string, actorId: string) => {
     return existing;
   }
 
-  const product = await restoreProductDb(id);
+  const product = await restoreProductDb(existing.id);
   if (!product) {
     throw new Error("PRODUCT_NOT_FOUND");
   }
@@ -737,7 +844,7 @@ export const restoreProductService = async (id: string, actorId: string) => {
     actor_id: actorId,
     action: "PRODUCT_RESTORED",
     table_name: "products",
-    record_id: id,
+    record_id: existing.id,
     new_data: { product_name: product.product_name },
   });
 

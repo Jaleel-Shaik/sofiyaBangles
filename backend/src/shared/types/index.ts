@@ -300,6 +300,8 @@ export interface OrderItem {
   discount?: number;
   final_unit_price?: number;
   final_amount?: number;
+  image_url?: string | null;
+  status?: string;
   created_at: string;
 }
 

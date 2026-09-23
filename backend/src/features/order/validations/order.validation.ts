@@ -53,3 +53,22 @@ export const createReviewSchema = z
   .refine((data) => Boolean(data.productId || data.product_id), {
     message: "Product ID is required",
   });
+
+export const whatsappPurchaseSchema = z
+  .object({
+    productId: z.string().optional(),
+    product_id: z.string().optional(),
+    variantId: z.string().nullable().optional(),
+    variant_id: z.string().nullable().optional(),
+    quantity: z.coerce.number().int().positive("Quantity must be at least 1").default(1),
+    size: z.string().nullable().optional(),
+    customMeasurements: z.record(z.string(), z.string()).nullable().optional(),
+    notes: z.string().max(500, "Notes cannot exceed 500 characters").nullable().optional(),
+    customerName: z.string().optional(),
+    customerPhone: z.string().optional(),
+    phone: z.string().optional(),
+  })
+  .refine((data) => Boolean(data.productId || data.product_id), {
+    message: "Product ID is required",
+  });
+

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,6 +45,7 @@ export default function ProductDetailScreen() {
   const isFavorite = product ? favoriteIds.includes(product.id) : false;
 
   const [isOrdering, setIsOrdering] = useState(false);
+  const [isOrderingWhatsApp, setIsOrderingWhatsApp] = useState(false);
 
   // Reviews
   const [reviews, setReviews] = useState<any[]>([]);
@@ -212,7 +214,20 @@ export default function ProductDetailScreen() {
   };
 
   const openWhatsApp = async () => {
-    if (!product) return;
+    if (!product || isOrderingWhatsApp) return;
+
+    if (!token || !user) {
+      Alert.alert(
+        "Authentication Required",
+        "Please log in to purchase products and connect via WhatsApp.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Log In", onPress: () => router.push("/(auth)/login" as any) },
+        ]
+      );
+      return;
+    }
+
     let size: string | undefined;
     let customMeasurements: Record<string, string> | undefined;
 
@@ -220,7 +235,7 @@ export default function ProductDetailScreen() {
       const profile = activeCustomProfile;
       size = profile?.profile_name
         ? `Custom Made to Order (${profile.profile_name})`
-        : 'Custom Made to Order';
+        : "Custom Made to Order";
       if (profile && profile.custom_measurements) {
         customMeasurements = profile.custom_measurements as Record<string, string>;
       }
@@ -229,17 +244,61 @@ export default function ProductDetailScreen() {
       if (variant) size = variant.size;
     }
 
-    await openWhatsAppEnquiry({
-      productId: product.id,
-      productName: product.product_name,
-      description: product.description,
-      categoryId: product.unique_code || product.category_id,
-      cost: getDisplayPrice(),
-      size,
-      uniqueCode: product.unique_code,
-      quantity: selectedQuantity > 1 ? selectedQuantity : undefined,
-      customMeasurements,
-    });
+    try {
+      setIsOrderingWhatsApp(true);
+
+      // Secure purchase flow: Mobile app sends product reference and verified user profile.
+      // Backend validates user identity from JWT session, derives canonical DB price & stock,
+      // creates official order record, and formats/dispatches WhatsApp notification.
+      const result = await api.orders.initiateWhatsAppPurchase({
+        productId: product.id,
+        variantId: selectedVariantId,
+        quantity: selectedQuantity,
+        size,
+        customMeasurements,
+        customerName: user?.full_name,
+        customerPhone: user?.phone,
+      });
+
+      if (result.whatsappUrl) {
+        // Universal deep link handling: wa.me works directly or opens in browser
+        try {
+          await Linking.openURL(result.whatsappUrl);
+        } catch (linkError) {
+          const fallbackUrl = result.whatsappUrl.replace("https://wa.me/", "https://api.whatsapp.com/send?phone=");
+          await Linking.openURL(fallbackUrl).catch(() => {
+            Alert.alert("WhatsApp", "Unable to launch WhatsApp. Please make sure WhatsApp is installed.");
+          });
+        }
+      } else if (result.deliveryMode === "cloud_api") {
+        Alert.alert(
+          "Order Confirmed!",
+          `Your order #${result.orderNumber} has been placed successfully and sent to our WhatsApp sales team.`
+        );
+      }
+    } catch (error: any) {
+      const errorCode = error?.response?.data?.error?.code || error?.code;
+      const errorMessage = error?.response?.data?.error?.message || error?.message;
+
+      if (errorCode === "PROFILE_PHONE_REQUIRED" || errorMessage?.includes("mobile number")) {
+        Alert.alert(
+          "Mobile Number Required",
+          "Please add your WhatsApp number to your profile before placing an order.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Add Number",
+              onPress: () => router.push("/profile/whatsapp" as any),
+            },
+          ]
+        );
+        return;
+      }
+
+      Alert.alert("Purchase Error", errorMessage || "Failed to initiate WhatsApp purchase.");
+    } finally {
+      setIsOrderingWhatsApp(false);
+    }
   };
 
   const handleShare = async () => {
@@ -442,14 +501,22 @@ export default function ProductDetailScreen() {
           className="flex-row items-center justify-center min-h-[50px] py-3.5 rounded-2xl shadow-sm"
           style={{ backgroundColor: displayStock > 0 ? "#25D366" : "#94a3b8" }}
           onPress={openWhatsApp}
-          disabled={displayStock <= 0}
+          disabled={displayStock <= 0 || isOrderingWhatsApp}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel={displayStock > 0 ? STRINGS.productDetail.inquireWhatsApp : STRINGS.common.outOfStock}
         >
-          <AppIcon name="chatbubbleOutline" size={20} color="white" />
-          <Text className="text-white font-bold text-title-sm ml-2 mr-1">{displayStock > 0 ? STRINGS.productDetail.inquireWhatsApp : STRINGS.common.outOfStock}</Text>
-          <AppIcon name="whatsapp" size={17} color="white" />
+          {isOrderingWhatsApp ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <AppIcon name="chatbubbleOutline" size={20} color="white" />
+              <Text className="text-white font-bold text-title-sm ml-2 mr-1">
+                {displayStock > 0 ? STRINGS.productDetail.inquireWhatsApp : STRINGS.common.outOfStock}
+              </Text>
+              <AppIcon name="whatsapp" size={17} color="white" />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>

@@ -95,6 +95,9 @@ export const superAdminApi = {
   updateOrderStatus: (id: string, status: string, notes?: string) =>
     apiClient.patch(API_ENDPOINTS.ORDERS.STATUS(id), { status, notes }).then((r) => r.data),
 
+  deleteOrder: (id: string) =>
+    apiClient.delete(API_ENDPOINTS.ORDERS.BY_ID(id)).then((r) => r.data),
+
   // Customer Management
   getCustomers: (params?: { page?: number; limit?: number; search?: string }) =>
     apiClient.get(API_ENDPOINTS.USERS.BASE, { params: { ...params, role: "user" } }).then((r) => ({

@@ -14,6 +14,7 @@ import {
   getNewArrivals,
   lookupProduct,
   sellProductByCode,
+  getSecureProductImage,
 } from "../controllers/product.controller";
 import { authenticate, optionalAuthenticate } from "../../../shared/middlewares/auth.middleware";
 import { requireRole } from "../../../shared/middlewares/role.middleware";
@@ -88,6 +89,20 @@ router.delete(
   authenticate,
   requireRole("admin", "super_admin"),
   deleteProduct,
+);
+
+// Token-based secure product image endpoint for Admin Portal
+router.get(
+  "/:id/secure-image",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  getSecureProductImage
+);
+router.get(
+  "/:id/secure-image/:imageIndex",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  getSecureProductImage
 );
 
 // Customer routes (publicly browsable with optional personalization)

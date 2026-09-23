@@ -26,6 +26,7 @@ import {
   Minus,
   Check,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { type AdminOrder, type Product } from "@/src/lib/api";
 import toast from "react-hot-toast";
@@ -42,10 +43,11 @@ export default function OrdersManagementPage() {
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Accessible Complete and Refund Dialog States
+  // Accessible Complete, Refund, and Delete Dialog States
   const [confirmCompleteId, setConfirmCompleteId] = useState<string | null>(null);
   const [refundOrderId, setRefundOrderId] = useState<string | null>(null);
   const [refundReason, setRefundReason] = useState("");
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
 
   // New WhatsApp Sale Modal State
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
@@ -331,6 +333,25 @@ export default function OrdersManagementPage() {
     }
   };
 
+  const handleDeleteOrderConfirm = async () => {
+    if (!deleteOrderId) return;
+    const orderId = deleteOrderId;
+    setActionLoading(true);
+    try {
+      await api.superAdmin.deleteOrder(orderId);
+      toast.success("Order deleted successfully");
+      setDeleteOrderId(null);
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(null);
+      }
+      await fetchOrders();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to delete order");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handlePrintInvoice = (order: AdminOrder) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -547,14 +568,14 @@ export default function OrdersManagementPage() {
                           {order.customer_name ||
                             (order.shipping_address_snapshot as any)?.full_name ||
                             (order.shipping_address_snapshot as any)?.name ||
-                            "Direct Customer"}
+                            "In-Store Customer"}
                         </p>
                         {(() => {
                           const phone =
                             order.customer_phone ||
                             (order.shipping_address_snapshot as any)?.phone ||
                             (order.shipping_address as any)?.phone;
-                          if (!phone) return <span className="text-[11px] text-slate-400">Direct Customer</span>;
+                          if (!phone) return <span className="text-[11px] text-slate-400 italic">No phone provided</span>;
                           const cleanPhone = phone.replace(/[^0-9]/g, "");
                           const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
                           return (
@@ -574,14 +595,18 @@ export default function OrdersManagementPage() {
                       {/* Line Items Summary */}
                       <td className="p-4 max-w-xs">
                         <div className="space-y-1">
-                          {(order.items || []).slice(0, 2).map((item, idx) => (
-                            <p key={idx} className="text-xs text-slate-800 font-medium truncate">
-                              • {item.product_name || item.productNameSnapshot || (item as any).product_name_snapshot || "Handcrafted Bangles"}{" "}
-                              <span className="text-slate-400 font-normal">
-                                (Qty: {item.quantity})
-                              </span>
-                            </p>
-                          ))}
+                          {(order.items || []).length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">• Handcrafted Bangles (Qty: 1)</p>
+                          ) : (
+                            (order.items || []).slice(0, 2).map((item, idx) => (
+                              <p key={idx} className="text-xs text-slate-800 font-medium truncate">
+                                • {item.product_name || item.productNameSnapshot || (item as any).product_name_snapshot || "Handcrafted Bangles"}{" "}
+                                <span className="text-slate-400 font-normal">
+                                  (Qty: {item.quantity})
+                                </span>
+                              </p>
+                            ))
+                          )}
                           {(order.items || []).length > 2 && (
                             <span className="text-[10px] text-slate-400 font-semibold">
                               +{(order.items || []).length - 2} more item(s)
@@ -654,6 +679,15 @@ export default function OrdersManagementPage() {
                             className="p-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors text-[11px] font-bold flex items-center gap-1"
                           >
                             <Eye className="w-3.5 h-3.5" /> View
+                          </button>
+
+                          {/* Delete Order Button */}
+                          <button
+                            onClick={() => setDeleteOrderId(order.id)}
+                            title="Delete Order"
+                            className="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -1020,6 +1054,14 @@ export default function OrdersManagementPage() {
                 >
                   Cancel / Refund
                 </button>
+                <button
+                  disabled={actionLoading}
+                  onClick={() => setDeleteOrderId(selectedOrder.id)}
+                  className="p-2.5 min-h-[44px] rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center"
+                  title="Delete Order"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
 
               <button
@@ -1043,6 +1085,19 @@ export default function OrdersManagementPage() {
         confirmLabel="Complete Order"
         cancelLabel={STRINGS.common.cancel}
         variant="primary"
+        isLoading={actionLoading}
+      />
+
+      {/* Accessible Delete Order Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteOrderId)}
+        onClose={() => setDeleteOrderId(null)}
+        onConfirm={handleDeleteOrderConfirm}
+        title="Delete Order Record"
+        message="Are you sure you want to permanently delete this order and its items? This action cannot be undone."
+        confirmLabel="Delete Order"
+        cancelLabel={STRINGS.common.cancel}
+        variant="danger"
         isLoading={actionLoading}
       />
 

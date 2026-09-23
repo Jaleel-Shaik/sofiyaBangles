@@ -25,6 +25,10 @@ export default function QuickSellScreen() {
     code?: string;
     id?: string;
     initialCode?: string;
+    orderNumber?: string;
+    qty?: string;
+    customerName?: string;
+    customerPhone?: string;
   }>();
 
   const incomingTarget = (params.code || params.id || params.initialCode || '').trim();
@@ -33,11 +37,11 @@ export default function QuickSellScreen() {
   const [lookingUp, setLookingUp] = useState(false);
   const [product, setProduct] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(() => (params.qty ? Math.max(1, parseInt(params.qty, 10) || 1) : 1));
   const [selling, setSelling] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'UPI' | 'Card'>('Cash');
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(params.customerName || '');
+  const [customerPhone, setCustomerPhone] = useState(params.customerPhone || '');
   const [completedSale, setCompletedSale] = useState<{
     name: string;
     code: string;
@@ -93,7 +97,11 @@ export default function QuickSellScreen() {
       setCode(params.code || params.initialCode || '');
       handleLookup(incomingTarget);
     }
-  }, [incomingTarget, handleLookup]);
+    if (params.qty) {
+      const q = parseInt(params.qty, 10);
+      if (q && q >= 1) setQuantity(q);
+    }
+  }, [incomingTarget, params.qty, handleLookup]);
 
   const handleSell = async () => {
     if (!product) return;
@@ -110,15 +118,20 @@ export default function QuickSellScreen() {
 
     setSelling(true);
     try {
+      const notes = params.orderNumber
+        ? `WhatsApp Order #${params.orderNumber} (${paymentMethod})`
+        : `Quick Sell via Mobile Admin (${paymentMethod})`;
+
       const updated = await sellProductByCode(product.unique_code || product.id, quantity, {
         customer_name: customerName.trim() || undefined,
         customer_phone: customerPhone.trim() || undefined,
-        notes: `Quick Sell via Mobile Admin (${paymentMethod})`,
+        notes,
+        order_number: params.orderNumber || undefined,
       });
 
       const remaining = typeof updated?.quantity === 'number' ? updated.quantity : Math.max(0, product.quantity - quantity);
       const totalAmount = product.price * quantity;
-      const orderNumber = updated?.order?.order_number || `ORD-${Date.now().toString().slice(-6)}`;
+      const orderNumber = params.orderNumber || updated?.order?.order_number || `ORD-${Date.now().toString().slice(-6)}`;
       const enteredPhone = customerPhone.trim();
       const enteredName = customerName.trim();
 
@@ -236,6 +249,28 @@ export default function QuickSellScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* WhatsApp Order Fulfillment Header Banner */}
+          {params.orderNumber ? (
+            <View className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex-row items-center shadow-xs">
+              <View className="w-10 h-10 rounded-xl bg-[#E8436E] items-center justify-center mr-3 shadow-xs">
+                <Ionicons name="cart" size={20} color="#ffffff" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-slate-900">
+                  WhatsApp Order Fulfillment
+                </Text>
+                <Text className="text-xs text-rose-700 font-mono font-semibold mt-0.5">
+                  Order #{params.orderNumber}
+                </Text>
+                {params.customerName || params.customerPhone ? (
+                  <Text className="text-[11px] text-slate-500 mt-0.5">
+                    Customer: {[params.customerName, params.customerPhone].filter(Boolean).join(" • ")}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
           {/* Lookup Input Card */}
           <View className="bg-surface rounded-2xl border border-divider p-4 mb-4 shadow-sm">
             <View className="flex-row items-center justify-between mb-2">

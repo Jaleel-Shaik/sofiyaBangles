@@ -15,6 +15,7 @@ import {
   ConfirmDialog,
   EmptyState,
   AppIcon,
+  AuthenticatedImage,
 } from "@/src/components/ui";
 import { STRINGS } from "@/src/constants/strings";
 
@@ -192,8 +193,10 @@ export default function ProductsPage() {
                   <Link href={`/dashboard/products/${product.id}`} className="block">
                     <div className="aspect-4/3 bg-slate-100 overflow-hidden relative">
                       {product.image_url ? (
-                        <img
+                        <AuthenticatedImage
                           src={product.image_url}
+                          productId={product.id}
+                          imageIndex={0}
                           alt={product.product_name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />

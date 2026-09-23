@@ -131,9 +131,13 @@ export const updateProduct = async (id: string, productData: Partial<CreateProdu
   }
 };
 
-export const sellProduct = async (id: string, quantity = 1) => {
+export const sellProduct = async (
+  id: string,
+  quantity = 1,
+  extra?: { customer_name?: string; customer_phone?: string; notes?: string; order_number?: string; orderNumber?: string }
+) => {
   try {
-    const res = await apiClient.patch(API_ENDPOINTS.PRODUCTS.SELL(id), { quantity });
+    const res = await apiClient.patch(API_ENDPOINTS.PRODUCTS.SELL(id), { quantity, ...extra });
     return res.data.data;
   } catch (error: unknown) {
     const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to sell product');
@@ -154,7 +158,7 @@ export const lookupProductByCode = async (code: string) => {
 export const sellProductByCode = async (
   code: string,
   quantity = 1,
-  extra?: { customer_name?: string; customer_phone?: string; notes?: string }
+  extra?: { customer_name?: string; customer_phone?: string; notes?: string; order_number?: string; orderNumber?: string }
 ) => {
   try {
     const res = await apiClient.post(API_ENDPOINTS.PRODUCTS.SELL_BY_CODE, {

@@ -186,22 +186,85 @@ test('Product Model Setup and Lifecycle', async (t) => {
       assert.equal(serviceLookup.category_name, "Silk Thread Regular");
       assert.equal(serviceLookup.model_type_name, "Silk Bangles");
 
-      // 3. Test sellProductService using the special code
-      const soldProduct = await sellProductService(specialCode, 3, 'test-admin-actor');
-      assert.ok(soldProduct, 'Sold product must be returned');
-      assert.equal(soldProduct.quantity, 12, 'Stock quantity must decrement from 15 to 12');
+      let soldProductOrderId: string | null = null;
+      try {
+        // 3. Test sellProductService using the special code
+        const soldProduct = await sellProductService(specialCode, 3, 'test-admin-actor');
+        assert.ok(soldProduct, 'Sold product must be returned');
+        assert.equal(soldProduct.quantity, 12, 'Stock quantity must decrement from 15 to 12');
+        soldProductOrderId = (soldProduct as any)?.order?.id || null;
 
-      // Verify Firestore state
-      const docCheck = await db.collection("products").doc(testProdId).get();
-      assert.equal(docCheck.data()?.quantity, 12, 'Persisted Firestore quantity must be 12');
+        // Verify Firestore state
+        const docCheck = await db.collection("products").doc(testProdId).get();
+        assert.equal(docCheck.data()?.quantity, 12, 'Persisted Firestore quantity must be 12');
 
-      // 4. Test insufficient stock throws error
-      await assert.rejects(
-        async () => {
-          await sellProductService(specialCode, 20, 'test-admin-actor');
-        },
-        { message: 'INSUFFICIENT_STOCK' }
-      );
+        // 4. Test insufficient stock throws error
+        await assert.rejects(
+          async () => {
+            await sellProductService(specialCode, 20, 'test-admin-actor');
+          },
+          { message: 'INSUFFICIENT_STOCK' }
+        );
+
+        // 5. Test sellProductService fulfilling an existing customer order by order_number
+        const customerOrderId = "test-ord-" + Date.now();
+        const customerOrderNumber = "ORD-" + Date.now().toString().slice(-6);
+        const testCustomerUserId = "cust-" + Date.now();
+
+        await db.collection("orders").doc(customerOrderId).set({
+          id: customerOrderId,
+          order_number: customerOrderNumber,
+          user_id: testCustomerUserId,
+          status: "pending",
+          payment_status: "pending",
+          total_amount: 1500,
+          subtotal: 1500,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+        await db.collection("order_items").doc("item-" + customerOrderId).set({
+          id: "item-" + customerOrderId,
+          order_id: customerOrderId,
+          product_id: testProdId,
+          product_name_snapshot: "Test Special Bangles",
+          price_snapshot: 500,
+          quantity: 3,
+          subtotal: 1500,
+          image_url: "https://example.com/bangles.jpg",
+          created_at: new Date().toISOString(),
+        });
+
+        // Admin fulfills the order using the order_number
+        const fulfilledResult = await sellProductService(specialCode, 3, 'test-admin-actor', {
+          order_number: customerOrderNumber,
+        });
+
+        // Verify customer order transitioned to completed in Firestore
+        const updatedOrderDoc = await db.collection("orders").doc(customerOrderId).get();
+        assert.equal(updatedOrderDoc.data()?.status, "completed", "Order must transition to completed");
+        assert.equal(updatedOrderDoc.data()?.payment_status, "paid", "Order payment_status must transition to paid");
+
+        // Verify stock was NOT decremented again (remains 12)
+        assert.equal(fulfilledResult.quantity, 12, "Stock must NOT be double deducted when fulfilling an existing order");
+
+        // Cleanup customer test order
+        await db.collection("orders").doc(customerOrderId).delete();
+        await db.collection("order_items").doc("item-" + customerOrderId).delete();
+      } finally {
+        // Cleanup all test orders created during sellProductService
+        if (soldProductOrderId) {
+          await db.collection("orders").doc(soldProductOrderId).delete();
+          const itemsSnap = await db.collection("order_items").where("order_id", "==", soldProductOrderId).get();
+          for (const itemDoc of itemsSnap.docs) {
+            await db.collection("order_items").doc(itemDoc.id).delete();
+          }
+          const revSnap = await db.collection("revenue_ledger").where("order_id", "==", soldProductOrderId).get();
+          for (const revDoc of revSnap.docs) {
+            await db.collection("revenue_ledger").doc(revDoc.id).delete();
+          }
+        }
+      }
     } finally {
       // Cleanup
       await db.collection("products").doc(testProdId).delete();

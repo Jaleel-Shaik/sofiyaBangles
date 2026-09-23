@@ -499,8 +499,20 @@ export default function HomeScreen() {
       )}
 
       <View className="px-5 mt-5 mb-3">
-        <Text className="text-title-lg font-bold text-text-primary">
-          {STRINGS.home.sections.recommended}
+        <View className="flex-row items-center justify-between">
+          <Text className="text-title-lg font-bold text-text-primary">
+            {STRINGS.home.sections.recommended}
+          </Text>
+          {filteredProducts.length > 0 && (
+            <View className="bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full">
+              <Text className="text-[11px] font-bold text-rose-600">
+                {filteredProducts.length} {filteredProducts.length === 1 ? 'Design' : 'Designs'}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text className="text-caption text-text-secondary mt-0.5">
+          Handcrafted bangles with live stock status & instant WhatsApp orders
         </Text>
       </View>
     </>

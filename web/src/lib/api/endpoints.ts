@@ -58,6 +58,7 @@ export const API_ENDPOINTS = {
   ORDERS: {
     BASE: '/orders',
     ADMIN_ALL: '/orders/admin/all',
+    BY_ID: (id: string) => `/orders/${id}`,
     COMPLETE: (id: string) => `/orders/${id}/complete`,
     REFUND: (id: string) => `/orders/${id}/refund`,
     STATUS: (id: string) => `/orders/${id}/status`,

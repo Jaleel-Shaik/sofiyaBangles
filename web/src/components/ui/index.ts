@@ -7,3 +7,4 @@ export * from './Modal';
 export * from './ConfirmDialog';
 export * from './EmptyState';
 export * from './SearchInput';
+export * from './AuthenticatedImage';

@@ -1,4 +1,5 @@
 import { db } from "../shared/config/firebase";
+import { FieldValue } from "firebase-admin/firestore";
 import { Order, OrderItem, Review } from "../shared/types";
 
 export interface StockDeductionItem {
@@ -45,13 +46,13 @@ export const insertOrderWithItemsDb = async (
       if (isVariant) {
         const vRef = db.collection("product_variants").doc(targetId);
         batch.update(vRef, {
-          quantity: FirebaseFirestore.FieldValue.increment(-deduction.quantity),
+          quantity: FieldValue.increment(-deduction.quantity),
           updated_at: now,
         });
       } else {
         const pRef = db.collection("products").doc(targetId);
         batch.update(pRef, {
-          quantity: FirebaseFirestore.FieldValue.increment(-deduction.quantity),
+          quantity: FieldValue.increment(-deduction.quantity),
           updated_at: now,
         });
       }
@@ -69,6 +70,21 @@ export const getOrderByIdDb = async (id: string): Promise<Order | null> => {
   const doc = await db.collection("orders").doc(id).get();
   if (!doc.exists) return null;
   return doc.data() as Order;
+};
+
+/**
+ * Pure Database Operation: Retrieve order by its unique order number (e.g. ORD-123456).
+ */
+export const getOrderByOrderNumberDb = async (orderNumber: string): Promise<Order | null> => {
+  if (!orderNumber) return null;
+  const snapshot = await db
+    .collection("orders")
+    .where("order_number", "==", orderNumber.trim())
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return null;
+  return snapshot.docs[0].data() as Order;
 };
 
 /**
@@ -205,4 +221,25 @@ export const findUserOrderItemsForProductDb = async (
   return itemsSnap.docs
     .map((d) => d.data() as OrderItem)
     .filter((i) => completedOrderIds.includes(i.order_id));
+};
+
+/**
+ * Pure Database Operation: Delete an order and its items and revenue entries atomically.
+ */
+export const deleteOrderDb = async (orderId: string): Promise<void> => {
+  const batch = db.batch();
+
+  // Delete order doc
+  const orderRef = db.collection("orders").doc(orderId);
+  batch.delete(orderRef);
+
+  // Delete order_items
+  const itemsSnap = await db.collection("order_items").where("order_id", "==", orderId).get();
+  itemsSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  // Delete revenue_ledger
+  const revSnap = await db.collection("revenue_ledger").where("order_id", "==", orderId).get();
+  revSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  await batch.commit();
 };

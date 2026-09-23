@@ -109,6 +109,11 @@ export default function ProductSalesRevenuePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full">
+              ROLE: PLATFORM SUPER ADMIN (FINANCIAL SETTLEMENT HUB)
+            </span>
+          </div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-[#E8436E]" /> {STRINGS.revenue.title}
           </h1>
@@ -140,6 +145,11 @@ export default function ProductSalesRevenuePage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Gross Sales */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded">
+              [TOTAL GMV]
+            </span>
+          </div>
           <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.grossVolume}</p>
           <p className="text-2xl font-bold text-slate-900">₹{totalGross.toLocaleString()}</p>
           <p className="text-[11px] text-slate-400">{STRINGS.revenue.grossVolumeDesc}</p>
@@ -148,11 +158,14 @@ export default function ProductSalesRevenuePage() {
         {/* Admin Share */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.adminSharePayout}</p>
+            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded">
+              [STORE PAYOUT]
+            </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
               {commissionSettings.admin_percentage}%
             </span>
           </div>
+          <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.adminSharePayout}</p>
           <p className="text-2xl font-bold text-emerald-600">₹{totalAdminShare.toLocaleString()}</p>
           <p className="text-[11px] text-slate-400">{STRINGS.revenue.adminSharePayoutDesc}</p>
         </div>
@@ -160,11 +173,14 @@ export default function ProductSalesRevenuePage() {
         {/* SuperAdmin Share */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.superAdminShare}</p>
+            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider bg-rose-50 px-2 py-0.5 rounded">
+              [PLATFORM SHARE]
+            </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-[#E8436E]">
               {commissionSettings.super_admin_percentage}%
             </span>
           </div>
+          <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.superAdminShare}</p>
           <p className="text-2xl font-bold text-[#E8436E]">
             ₹{totalSuperAdminShare.toLocaleString()}
           </p>
@@ -173,9 +189,14 @@ export default function ProductSalesRevenuePage() {
 
         {/* Split Rule */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-violet-700 uppercase tracking-wider bg-violet-50 px-2 py-0.5 rounded">
+              [PROFIT SPLIT FORMULA]
+            </span>
+          </div>
           <p className="text-xs font-semibold text-slate-500">{STRINGS.revenue.commissionRule}</p>
           <p className="text-2xl font-bold text-slate-900">
-            {commissionSettings.admin_percentage} / {commissionSettings.super_admin_percentage}
+            {commissionSettings.admin_percentage}% Store / {commissionSettings.super_admin_percentage}% Platform
           </p>
           <p className="text-[11px] text-slate-400">{STRINGS.revenue.commissionRuleDesc}</p>
         </div>
@@ -183,24 +204,32 @@ export default function ProductSalesRevenuePage() {
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Search */}
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-          <input
-            type="text"
-            placeholder={STRINGS.revenue.searchPlaceholder}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 min-h-[44px] rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#E8436E]"
-          />
+        {/* Search with label */}
+        <div className="flex items-center gap-2 w-full md:w-auto flex-1">
+          <label htmlFor="searchTransactions" className="text-xs font-semibold text-slate-500 whitespace-nowrap hidden sm:inline">
+            Search Ledger:
+          </label>
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+            <input
+              id="searchTransactions"
+              type="text"
+              placeholder={STRINGS.revenue.searchPlaceholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 min-h-[44px] rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#E8436E]"
+            />
+          </div>
         </div>
 
-        {/* Transaction Type Filter */}
+        {/* Transaction Type Filter with label */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold">
-            <Filter className="w-4 h-4 text-slate-400" /> Type:
+            <Filter className="w-4 h-4 text-slate-400" />
+            <label htmlFor="transTypeSelect" className="cursor-pointer">Transaction Type:</label>
           </div>
           <select
+            id="transTypeSelect"
             value={transactionType}
             onChange={(e) => {
               setTransactionType(e.target.value);
@@ -209,8 +238,8 @@ export default function ProductSalesRevenuePage() {
             className="text-xs border border-slate-200 rounded-xl px-3 py-2 min-h-[44px] bg-white text-slate-700 focus:outline-none focus:border-[#E8436E] font-medium"
           >
             <option value="">{STRINGS.revenue.allTransactions}</option>
-            <option value="SALE">SALE</option>
-            <option value="REFUND">REFUND</option>
+            <option value="SALE">SALE (Completed)</option>
+            <option value="REFUND">REFUND (Reversed)</option>
           </select>
           <span className="text-xs text-slate-400 font-medium">({total} Records)</span>
         </div>

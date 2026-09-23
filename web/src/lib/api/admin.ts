@@ -81,11 +81,11 @@ export const adminApi = {
   },
   deleteProduct: (id: string) =>
     apiClient.delete(API_ENDPOINTS.PRODUCTS.BY_ID(id)).then(r => r.data),
-  sellProduct: (id: string, quantity = 1) =>
-    apiClient.patch(API_ENDPOINTS.PRODUCTS.SELL(id), { quantity }).then(r => r.data.data),
+  sellProduct: (id: string, quantity = 1, extra?: { customer_name?: string; customer_phone?: string; notes?: string; order_number?: string; orderNumber?: string }) =>
+    apiClient.patch(API_ENDPOINTS.PRODUCTS.SELL(id), { quantity, ...extra }).then(r => r.data.data as Product),
   lookupProductByCode: (code: string) =>
     apiClient.get(API_ENDPOINTS.PRODUCTS.LOOKUP_CODE(code)).then(r => r.data.data as Product),
-  sellProductByCode: (code: string, quantity = 1, extra?: { customer_name?: string; customer_phone?: string; notes?: string }) =>
+  sellProductByCode: (code: string, quantity = 1, extra?: { customer_name?: string; customer_phone?: string; notes?: string; order_number?: string; orderNumber?: string }) =>
     apiClient.post(API_ENDPOINTS.PRODUCTS.SELL_BY_CODE, { code, quantity, ...extra }).then(r => r.data.data as Product),
 
   // Categories
@@ -165,4 +165,20 @@ export const adminApi = {
     apiClient.get(API_ENDPOINTS.USERS.BASE).then(r => extractData<UserProfile[]>(r)),
   getUserById: (id: string) =>
     apiClient.get(API_ENDPOINTS.USERS.BY_ID(id)).then(r => extractData<UserProfile>(r)),
+
+  // WhatsApp Admin Action Verification
+  verifyAdminLink: (token: string) =>
+    apiClient
+      .post<{
+        success: boolean;
+        data: {
+          valid: boolean;
+          orderNumber: string;
+          productId?: string | null;
+          adminPhoneMasked: string;
+          targetUrl: string;
+          mobileAppUrl?: string;
+        };
+      }>("/orders/verify-admin-link", { token })
+      .then((r) => r.data.data),
 };

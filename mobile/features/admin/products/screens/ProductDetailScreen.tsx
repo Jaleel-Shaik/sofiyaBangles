@@ -9,7 +9,12 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { sellProduct, deleteProduct } from '@/src/api/admin';
 
 export default function ProductDetailScreen() {
-  const { id, qty } = useLocalSearchParams();
+  const { id, qty, orderNumber, action } = useLocalSearchParams<{
+    id: string;
+    qty?: string;
+    orderNumber?: string;
+    action?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -47,10 +52,18 @@ export default function ProductDetailScreen() {
     if (sellQty > product.quantity) { Alert.alert('Error', 'Not enough stock'); return; }
     setSelling(true);
     try {
-      const updated = await sellProduct(id as string, sellQty);
+      const extra = orderNumber
+        ? { notes: `WhatsApp Order #${orderNumber}`, order_number: orderNumber }
+        : undefined;
+      const updated = await sellProduct(product.id || (id as string), sellQty, extra);
       setProduct(updated);
       setSellQty(1);
-      Alert.alert('Success', `Sold ${sellQty} unit(s)!`);
+      Alert.alert(
+        'Success',
+        orderNumber
+          ? `Order #${orderNumber} fulfilled! Sold ${sellQty} unit(s)!`
+          : `Sold ${sellQty} unit(s)!`
+      );
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to sell product');
     } finally {
@@ -142,6 +155,22 @@ export default function ProductDetailScreen() {
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        {orderNumber ? (
+          <View className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex-row items-center shadow-xs">
+            <View className="w-10 h-10 rounded-xl bg-[#E8436E] items-center justify-center mr-3 shadow-xs">
+              <Ionicons name="cart" size={20} color="#ffffff" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-xs font-bold text-slate-900">
+                WhatsApp Purchase Order Fulfillment
+              </Text>
+              <Text className="text-xs text-rose-700 font-mono font-semibold mt-0.5">
+                Order #{orderNumber}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {images.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5">
             {images.map((uri, idx) => (

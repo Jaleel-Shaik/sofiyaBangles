@@ -97,6 +97,7 @@ export default function RootLayout() {
         <Stack.Screen name="orders" />
         <Stack.Screen name="server-settings" />
         <Stack.Screen name="error-center" />
+        <Stack.Screen name="quick-sell" />
       </Stack>
       {isNavigating && (
         <View style={StyleSheet.absoluteFill}>
