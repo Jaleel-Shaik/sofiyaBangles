@@ -13,13 +13,16 @@ import {
   getProductReviewsDb,
   insertReviewDb,
   findUserOrderItemsForProductDb,
+  getAllReviewsForAdminDb,
+  markOrderItemReviewedDb,
 } from "../../../db/order.db";
 import { db } from "../../../shared/config/firebase";
-import { getProductByIdDb, getVariantsByProductDb } from "../../../db/product.db";
+import { getProductByIdDb, getVariantsByProductDb, updateProductDocDb } from "../../../db/product.db";
+import { calculateReviewStats } from "../../product/models/product.model";
 import { insertNotificationDb } from "../../../db/notification.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
 import { createRevenueAllocationModel, createRefundReversalModel } from "../models/revenueLedger.model";
-import { findIdentityByIdModel, updateIdentityModel } from "../../../shared/models/identity.model";
+import { findIdentityByIdModel, updateIdentityModel, findUserByPhoneModel } from "../../../shared/models/identity.model";
 import { WhatsAppService } from "./whatsapp.service";
 import { maskPhoneNumber } from "../../../shared/utils/redact.utils";
 
@@ -96,30 +99,30 @@ export class OrderService {
       let unitPrice = product.price;
       let sizeSnapshot = null;
 
-      if (product.has_variants) {
-        if (!variantId) {
-          throw new Error(`Variant selection required for ${product.product_name}`);
-        }
+      if (product.has_variants && variantId) {
         const variants = await getVariantsByProductDb(prodId);
         const variant = variants.find((v) => v.id === variantId);
 
-        if (!variant || variant.status === "archived") {
-          throw new Error(`Selected variant is no longer available.`);
-        }
-        if (variant.quantity < itemQuantity) {
-          throw new Error(
-            `Insufficient stock for ${product.product_name} (${variant.size}). Only ${variant.quantity} remaining.`
-          );
-        }
+        if (variant && variant.status !== "archived" && variant.quantity >= itemQuantity) {
+          unitPrice = variant.price;
+          sizeSnapshot = variant.size;
 
-        unitPrice = variant.price;
-        sizeSnapshot = variant.size;
-
-        stockDeductions.push({
-          variantId: variant.id,
-          productId: prodId,
-          quantity: itemQuantity,
-        });
+          stockDeductions.push({
+            variantId: variant.id,
+            productId: prodId,
+            quantity: itemQuantity,
+          });
+        } else {
+          if (product.quantity < itemQuantity) {
+            throw new Error(
+              `Insufficient stock for ${product.product_name}. Only ${product.quantity} remaining.`
+            );
+          }
+          stockDeductions.push({
+            productId: prodId,
+            quantity: itemQuantity,
+          });
+        }
       } else {
         if (product.quantity < itemQuantity) {
           throw new Error(
@@ -175,10 +178,22 @@ export class OrderService {
       "Direct Customer";
     const customerPhone = shippingAddressSnapshot?.phone || "";
 
+    let targetUserId = userId;
+    if (customerPhone) {
+      try {
+        const customerUser = await findUserByPhoneModel(customerPhone);
+        if (customerUser) {
+          targetUserId = customerUser.id;
+        }
+      } catch {
+        // preserve original userId if lookup fails
+      }
+    }
+
     const orderData: Order = {
       id: orderId,
       order_number: orderNumber,
-      user_id: userId,
+      user_id: targetUserId,
       customer_name: customerName,
       customer_phone: customerPhone,
       order_source: shippingAddressSnapshot?.order_source || "whatsapp",
@@ -237,7 +252,15 @@ export class OrderService {
    * Business Logic: Retrieves user's orders with item snapshots.
    */
   static async getUserOrders(userId: string): Promise<Order[]> {
-    const orders = await getUserOrdersDb(userId);
+    let userPhone: string | null = null;
+    try {
+      const identity = await findIdentityByIdModel(userId);
+      userPhone = identity?.profile?.phone || null;
+    } catch {
+      // Ignore profile lookup error
+    }
+
+    const orders = await getUserOrdersDb(userId, userPhone);
     const ordersWithItems = await Promise.all(
       orders.map(async (order) => {
         const items = await getOrderItemsDb(order.id);
@@ -613,39 +636,226 @@ export class OrderService {
 
   /**
    * Business Logic: Verifies product purchase prior to review insertion.
+   * Records user quality rating (1-5), suggestions, defect/damage reports,
+   * stores user personal info for admin review, and maintains public anonymity.
    */
   static async createReview(
     userId: string,
-    data: { productId: string; rating: number; comment?: string; customerName?: string }
+    data: {
+      productId: string;
+      orderId?: string | null;
+      orderItemId?: string | null;
+      rating: number;
+      qualityRating?: number;
+      comment?: string | null;
+      suggestion?: string | null;
+      isDefective?: boolean;
+      damageDetails?: string | null;
+      customerName?: string | null;
+    }
   ): Promise<Review> {
-    const { productId, rating, comment, customerName } = data;
+    const {
+      productId,
+      orderId,
+      orderItemId,
+      rating,
+      comment,
+      suggestion,
+      isDefective,
+      damageDetails,
+      customerName,
+    } = data;
 
-    const completedItems = await findUserOrderItemsForProductDb(userId, productId);
-    if (completedItems.length === 0) {
+    // Verify purchase: User must have placed a non-cancelled order containing this product
+    const purchasedItems = await findUserOrderItemsForProductDb(userId, productId, orderId);
+    if (purchasedItems.length === 0) {
       throw new Error("CANNOT_REVIEW_UNPURCHASED_PRODUCT");
     }
 
+    // Fetch user profile for personal information (Admin view)
+    let userProfile = null;
+    try {
+      userProfile = await findIdentityByIdModel(userId);
+    } catch (err) {
+      console.warn("Could not fetch user profile for review:", err);
+    }
+
+    // Fetch product details for snapshot
+    let productDetails = null;
+    try {
+      productDetails = await getProductByIdDb(productId);
+    } catch (err) {
+      console.warn("Could not fetch product details for review:", err);
+    }
+
+    // Fetch order details if available
+    let orderNumber: string | null = null;
+    const targetOrderId = orderId || purchasedItems[0]?.order_id;
+    if (targetOrderId) {
+      try {
+        const orderDoc = await getOrderByIdDb(targetOrderId);
+        orderNumber = orderDoc?.order_number || null;
+      } catch (err) {
+        console.warn("Could not fetch order details for review:", err);
+      }
+    }
+
     const now = new Date().toISOString();
+    const finalRating = Math.max(1, Math.min(5, Number(rating) || 5));
 
     const review: Review = {
       id: uuidv4(),
       user_id: userId,
       product_id: productId,
-      rating,
-      comment: comment || null,
-      damage_details: null,
+      order_id: targetOrderId || null,
+      order_item_id: orderItemId || purchasedItems[0]?.id || null,
+      order_number: orderNumber,
+      rating: finalRating,
+      suggestion: suggestion?.trim() || null,
+      comment: comment?.trim() || null,
+      is_defective: Boolean(isDefective),
+      damage_details: damageDetails?.trim() || null,
+      // Personal information stored for Admin viewing:
+      user_name: userProfile?.profile?.full_name || customerName?.trim() || "Customer",
+      user_email: userProfile?.profile?.email || undefined,
+      user_phone: userProfile?.profile?.phone || undefined,
+      // Product snapshot:
+      product_name: productDetails?.product_name || purchasedItems[0]?.product_name || "Handcrafted Bangles",
+      product_image: productDetails?.image_url || purchasedItems[0]?.image_url || null,
       created_at: now,
       updated_at: now,
     };
 
-    return await insertReviewDb(review);
+    // 1. Insert review
+    const savedReview = await insertReviewDb(review);
+
+    // 2. Mark order item as reviewed
+    try {
+      await markOrderItemReviewedDb(targetOrderId, productId, savedReview.id);
+    } catch (err) {
+      console.error("Non-fatal: failed to mark order item reviewed:", err);
+    }
+
+    // 3. Update product rating & reviews count
+    try {
+      const allProductReviews = await getProductReviewsDb(productId);
+      const stats = calculateReviewStats(allProductReviews);
+      await updateProductDocDb(productId, {
+        rating: stats.rating,
+        reviews: stats.reviews,
+      });
+    } catch (err) {
+      console.error("Non-fatal: failed to update product review stats:", err);
+    }
+
+    // 4. Create in-app notification for Admin / SuperAdmin
+    try {
+      const notifId = uuidv4();
+      const userName = userProfile?.profile?.full_name || customerName?.trim() || "Customer";
+      const productName = productDetails?.product_name || purchasedItems[0]?.product_name || "Handcrafted Bangles";
+      const productCode = productDetails?.unique_code ? ` (#${productDetails.unique_code})` : "";
+
+      await insertNotificationDb({
+        id: notifId,
+        title: `New Review for ${productName} (${finalRating}★)`,
+        body: `${userName} rated ${productName}${productCode} ${finalRating}/5 stars. "${comment || suggestion || 'Customer submitted a rating/review.'}"`,
+        type: "REVIEW",
+        product_id: productId,
+        sent_by: userId,
+        user_id: null, // Broadcast notification visible to all admin dashboard users
+        is_read: false,
+        created_at: now,
+      });
+    } catch (err) {
+      console.error("Non-fatal: failed to create admin review notification:", err);
+    }
+
+    return savedReview;
   }
 
   /**
-   * Business Logic: Retrieves reviews for a product.
+   * Business Logic: Retrieves publicly viewable reviews for a product.
+   * STRICT PRIVACY GUARANTEE: Strips all personal PII (email, phone, user_id, order_id).
+   * Only returns username and product review details so other buyers can browse safely.
    */
-  static async getProductReviews(productId: string): Promise<Review[]> {
-    return await getProductReviewsDb(productId);
+  static async getProductReviews(productId: string): Promise<Partial<Review>[]> {
+    const rawReviews = await getProductReviewsDb(productId);
+    return rawReviews.map((r) => ({
+      id: r.id,
+      product_id: r.product_id,
+      rating: r.rating,
+      comment: r.comment,
+      suggestion: r.suggestion || null,
+      is_defective: Boolean(r.is_defective),
+      damage_details: r.damage_details || null,
+      user_name: r.user_name || "Verified Customer",
+      created_at: r.created_at,
+    }));
+  }
+
+  /**
+   * Business Logic: Retrieves all reviews with full customer personal information for Admin Portal.
+   */
+  static async getAllReviewsForAdmin(): Promise<Review[]> {
+    const rawReviews = await getAllReviewsForAdminDb();
+
+    // Enrich with user and order info if missing (e.g. for legacy records)
+    const enriched = await Promise.all(
+      rawReviews.map(async (r) => {
+        let user_name = r.user_name;
+        let user_email = r.user_email;
+        let user_phone = r.user_phone;
+        let product_name = r.product_name;
+        let product_image = r.product_image;
+        let order_number = r.order_number;
+
+        if (!user_email && r.user_id) {
+          try {
+            const identityRef = await findIdentityByIdModel(r.user_id);
+            if (identityRef?.profile) {
+              user_name = user_name || identityRef.profile.full_name;
+              user_email = identityRef.profile.email;
+              user_phone = user_phone || identityRef.profile.phone || undefined;
+            }
+          } catch {}
+        }
+
+        let unique_code = (r as any).unique_code || (r as any).product_code;
+
+        if (r.product_id) {
+          try {
+            const product = await getProductByIdDb(r.product_id);
+            if (product) {
+              product_name = product_name || product.product_name;
+              product_image = product_image || product.image_url;
+              unique_code = unique_code || product.unique_code;
+            }
+          } catch {}
+        }
+
+        if (!order_number && r.order_id) {
+          try {
+            const order = await getOrderByIdDb(r.order_id);
+            if (order) {
+              order_number = order.order_number;
+            }
+          } catch {}
+        }
+
+        return {
+          ...r,
+          user_name: user_name || "Customer",
+          user_email,
+          user_phone,
+          product_name: product_name || "Product",
+          product_image,
+          order_number,
+          unique_code: unique_code || null,
+        };
+      })
+    );
+
+    return enriched;
   }
 
   /**

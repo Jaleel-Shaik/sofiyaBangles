@@ -17,6 +17,7 @@ export const API_ENDPOINTS = {
     LOOKUP_CODE: (code: string) => `/products/lookup/${encodeURIComponent(code)}`,
     SELL: (id: string) => `/products/${id}/sell`,
     SELL_BY_CODE: '/products/sell-by-code',
+    UPDATE_STOCK: (id: string) => `/products/${id}/stock`,
   },
   CATEGORIES: {
     BASE: '/categories',
@@ -36,6 +37,8 @@ export const API_ENDPOINTS = {
   USERS: {
     BASE: '/users',
     BY_ID: (id: string) => `/users/${id}`,
+    LOOKUP: '/users/lookup',
+    CUSTOMERS: '/users/customers',
   },
   SUPER_ADMIN: {
     DASHBOARD: '/super-admin/dashboard',

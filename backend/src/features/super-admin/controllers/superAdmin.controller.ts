@@ -94,6 +94,8 @@ export const getRevenueLedger = asyncHandler(async (req: AuthRequest, res: Respo
   const limit = getQuery(req, "limit") ? Number(getQuery(req, "limit")) : 20;
   const fromDate = getQuery(req, "fromDate");
   const toDate = getQuery(req, "toDate");
+  const month = getQuery(req, "month") ? Number(getQuery(req, "month")) : undefined;
+  const year = getQuery(req, "year") ? Number(getQuery(req, "year")) : undefined;
   const transactionType = getQuery(req, "transactionType") as RevenueTransactionType | undefined;
   const adminId = getQuery(req, "adminId");
 
@@ -102,6 +104,8 @@ export const getRevenueLedger = asyncHandler(async (req: AuthRequest, res: Respo
     limit,
     fromDate,
     toDate,
+    month,
+    year,
     transactionType,
     adminId,
   });

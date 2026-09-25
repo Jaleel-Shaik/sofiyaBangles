@@ -68,7 +68,6 @@ export default function ProfileScreen() {
     { icon: "person-outline", title: "Personal Info", route: "/profile/personal-info" },
     { icon: "location-outline", title: "My Addresses", route: "/profile/addresses" },
     { icon: "logo-whatsapp", title: "WhatsApp Number", route: "/profile/whatsapp" },
-    { icon: "pricetag-outline", title: "Size Preferences", route: "/(tabs)/size-preferences" },
     { icon: "bag-outline", title: "My Orders", subtitle: "View purchased items", route: "/orders" },
   ];
 

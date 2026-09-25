@@ -519,6 +519,8 @@ export class SuperAdminService {
     limit?: number;
     fromDate?: string;
     toDate?: string;
+    month?: number;
+    year?: number;
     transactionType?: RevenueTransactionType;
     adminId?: string;
   }) {

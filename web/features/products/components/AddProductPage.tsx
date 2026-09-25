@@ -73,31 +73,6 @@ export default function AddProductPage() {
     setForm(f => ({ ...f, category_id: "" }));
   }, [selectedModelType]);
 
-  useEffect(() => {
-    if (currentCategory) {
-      if (currentCategory.size_type === "standard" || currentCategory.size_type === "both") {
-        setHasVariants(true);
-        if (currentCategory.standard_sizes && currentCategory.standard_sizes.length > 0) {
-          setVariants(currentCategory.standard_sizes.map(sz => ({
-            id: `v-${sz.replace(/\s+/g, "_")}`,
-            size: sz,
-            price: form.price || "0",
-            quantity: form.quantity || "0",
-          })));
-        }
-      } else {
-        setHasVariants(false);
-        setVariants([]);
-      }
-      if (currentCategory.size_type === "custom" || currentCategory.size_type === "both") {
-        setAcceptsCustomSize(true);
-        setCustomSizePrice(form.price);
-      } else {
-        setAcceptsCustomSize(false);
-      }
-    }
-  }, [currentCategory]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
@@ -109,10 +84,6 @@ export default function AddProductPage() {
     if (!selectedModelType) newErrors.model_type_id = "Model Type is required";
     if (!form.category_id) newErrors.category_id = "Category is required";
     if (imageFiles.length === 0) newErrors.images = "Please select at least one image";
-
-    if (hasVariants && variants.length === 0) {
-      newErrors.variants = "Please add at least one size variant or disable sizes";
-    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -132,26 +103,14 @@ export default function AddProductPage() {
       formData.append("category_id", form.category_id);
       if (selectedModelType) formData.append("model_type_id", selectedModelType);
       
-      const totalQuantity = hasVariants 
-        ? variants.reduce((sum, v) => sum + (parseInt(v.quantity) || 0), 0)
-        : (parseInt(form.quantity) || 0);
+      const totalQuantity = parseInt(form.quantity) || 0;
 
       formData.append("quantity", String(totalQuantity));
       formData.append("status", form.status);
       formData.append("is_active", form.status === "active" || form.status === "out_of_stock" ? "true" : "false");
       if (form.unique_code) formData.append("unique_code", form.unique_code);
-      formData.append("has_variants", String(hasVariants));
-      formData.append("accepts_custom_size", String(acceptsCustomSize));
-      
-      if (hasVariants && variants.length > 0) {
-        formData.append("variants", JSON.stringify(variants.map(v => ({
-          id: v.id, size: v.size, price: parseFloat(v.price) || parseFloat(form.price) || 0, quantity: parseInt(v.quantity) || 0,
-        }))));
-      }
-      
-      if (acceptsCustomSize) {
-        formData.append("custom_size_price", String(parseFloat(customSizePrice) || parseFloat(form.price)));
-      }
+      formData.append("has_variants", "false");
+      formData.append("accepts_custom_size", "false");
       
       imageFiles.forEach(file => formData.append("images", file));
       
@@ -213,23 +172,6 @@ export default function AddProductPage() {
           setForm={setForm}
           errors={errors}
           setErrors={setErrors}
-        />
-
-        <ProductVariants
-          form={form}
-          setForm={setForm}
-          hasVariants={hasVariants}
-          setHasVariants={setHasVariants}
-          variants={variants}
-          setVariants={setVariants}
-          currentCategory={currentCategory}
-          customSizeName={customSizeName}
-          setCustomSizeName={setCustomSizeName}
-          acceptsCustomSize={acceptsCustomSize}
-          setAcceptsCustomSize={setAcceptsCustomSize}
-          customSizePrice={customSizePrice}
-          setCustomSizePrice={setCustomSizePrice}
-          errors={errors}
         />
 
         <div className="flex justify-end gap-3 pt-2">

@@ -84,14 +84,6 @@ export const STRINGS = {
         buttonText: 'Browse All',
         route: '/(tabs)/categories',
       },
-      sizePreferences: {
-        id: 'size-preferences',
-        badge: 'CUSTOM TAILORED 📏',
-        title: 'Perfect Fit Guide',
-        subtitle: 'Set your custom size for tailored bangle fittings',
-        buttonText: 'Set My Size',
-        route: '/(tabs)/size-preferences',
-      },
     },
     sections: {
       collections: 'Collections',
@@ -100,7 +92,6 @@ export const STRINGS = {
     searchPlaceholder: 'Search bangles, styles, collections...',
     searchResults: (query: string) => `Results for "${query}"`,
     filterBySize: 'Filter by Size',
-    mySizePreferences: 'My Size Preferences',
     states: {
       loadingRecommendations: 'Loading recommendations...',
       noProductsTitle: 'No products found',

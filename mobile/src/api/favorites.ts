@@ -1,4 +1,4 @@
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { API_ENDPOINTS } from "./endpoints";
 import { apiClient } from './client';
 import { Product } from "./products";
@@ -26,7 +26,7 @@ export const addFavorite = async (productId: string): Promise<unknown> => {
     const res = await apiClient.post(API_ENDPOINTS.FAVORITES.BY_ID(productId));
     return res.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to add favorite');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to add favorite');
     throw new Error(message);
   }
 };
@@ -36,7 +36,7 @@ export const removeFavorite = async (productId: string): Promise<unknown> => {
     const res = await apiClient.delete(API_ENDPOINTS.FAVORITES.BY_ID(productId));
     return res.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to remove favorite');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to remove favorite');
     throw new Error(message);
   }
 };

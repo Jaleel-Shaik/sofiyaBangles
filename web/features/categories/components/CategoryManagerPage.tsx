@@ -1,11 +1,9 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FolderOpen, Layers, Plus } from "lucide-react";
+import { FolderOpen, Layers, Plus, LayoutGrid, List } from "lucide-react";
 import toast from "react-hot-toast";
 import { api, type Category, type ModelType } from "@/src/lib/api";
-import { Button, Input, Card, Badge, ConfirmDialog, EmptyState, AppIcon } from "@/src/components/ui";
+import { Button, Input, Card, Badge, ConfirmDialog, EmptyState, AppIcon, AuthenticatedImage } from "@/src/components/ui";
 import { STRINGS } from "@/src/constants/strings";
 
 export default function CategoriesPage() {
@@ -18,6 +16,7 @@ export default function CategoriesPage() {
   const [name, setName] = useState("");
   const [selectedModelType, setSelectedModelType] = useState("");
   const [sizes, setSizes] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Confirm delete dialog state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -120,15 +119,47 @@ export default function CategoriesPage() {
           </p>
         </div>
 
-        {!showForm && (
-          <Button
-            onClick={() => setShowForm(true)}
-            variant="primary"
-            leftIcon={<Plus className="w-4 h-4" />}
-          >
-            {STRINGS.categories.addCategory}
-          </Button>
-        )}
+        <div className="flex items-center gap-2.5">
+          {/* View Mode Toggle Buttons (Grid / Table) */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`p-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                viewMode === "grid"
+                  ? "bg-rose-50 text-[#E8436E] border border-rose-200"
+                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+              title="Compact Grid View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">Grid</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`p-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                viewMode === "table"
+                  ? "bg-rose-50 text-[#E8436E] border border-rose-200"
+                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+              title="Table List View"
+            >
+              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">Table</span>
+            </button>
+          </div>
+
+          {!showForm && (
+            <Button
+              onClick={() => setShowForm(true)}
+              variant="primary"
+              leftIcon={<Plus className="w-4 h-4" />}
+            >
+              {STRINGS.categories.addCategory}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Add / Edit Form Card */}
@@ -192,14 +223,6 @@ export default function CategoriesPage() {
                   </div>
                 </div>
 
-                <Input
-                  label={STRINGS.categories.standardSizes}
-                  value={sizes}
-                  onChange={(e) => setSizes(e.target.value)}
-                  placeholder={STRINGS.categories.standardSizesPlaceholder}
-                  helperText={STRINGS.categories.standardSizesHelp}
-                />
-
                 <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                   <Button variant="outline" onClick={resetForm} disabled={saving}>
                     {STRINGS.common.cancel}
@@ -214,7 +237,7 @@ export default function CategoriesPage() {
         )}
       </AnimatePresence>
 
-      {/* Grid of Categories / Empty State */}
+      {/* Grid / Table of Categories / Empty State */}
       {loading ? (
         <div className="flex justify-center py-24">
           <div className="text-center">
@@ -230,8 +253,83 @@ export default function CategoriesPage() {
           actionLabel={STRINGS.categories.addCategory}
           onAction={() => setShowForm(true)}
         />
+      ) : viewMode === "table" ? (
+        /* Standardized Table View */
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase font-black tracking-wider">
+                <tr>
+                  <th className="p-3.5 pl-4">Collection Info</th>
+                  <th className="p-3.5">Model Type</th>
+                  <th className="p-3.5 text-right pr-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {categories.map((cat) => {
+                  const mt = modelTypes.find((m) => m.id === cat.model_type_id);
+                  return (
+                    <tr key={cat.id} className="hover:bg-slate-50/80 transition-colors group">
+                      <td className="p-3.5 pl-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0 relative shadow-2xs">
+                            {cat.image_url ? (
+                              <AuthenticatedImage
+                                src={cat.image_url}
+                                alt={cat.category_name}
+                                className="w-full h-full object-cover"
+                                fallbackIcon={<FolderOpen className="w-4 h-4 text-slate-400" />}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                <FolderOpen className="w-4 h-4" />
+                              </div>
+                            )}
+                          </div>
+                          <span className="font-extrabold text-slate-900">{cat.category_name}</span>
+                        </div>
+                      </td>
+
+                      <td className="p-3.5">
+                        {mt ? (
+                          <Badge variant="neutral" leftIcon={<Layers className="w-3 h-3" />}>
+                            {mt.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-slate-400 font-medium">Bangles</span>
+                        )}
+                      </td>
+
+                      <td className="p-3.5 pr-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(cat)}
+                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                            title={STRINGS.common.edit}
+                          >
+                            <AppIcon name="edit" size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget({ id: cat.id, name: cat.category_name })}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title={STRINGS.common.delete}
+                          >
+                            <AppIcon name="delete" size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        /* Standardized Compact Grid View */
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
           {categories.map((cat, i) => {
             const mt = modelTypes.find((m) => m.id === cat.model_type_id);
             return (
@@ -241,60 +339,58 @@ export default function CategoriesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
               >
-                <Card hoverable className="flex flex-col h-full">
-                  <div className="aspect-4/3 bg-slate-100 overflow-hidden relative">
+                <Card hoverable className="flex flex-col h-full overflow-hidden group">
+                  {/* Compact Image Container (h-28) */}
+                  <div className="h-28 bg-slate-100 overflow-hidden relative shrink-0">
                     {cat.image_url ? (
-                      <img
+                      <AuthenticatedImage
                         src={cat.image_url}
                         alt={cat.category_name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fallbackIcon={<FolderOpen className="w-7 h-7 text-slate-300" />}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-300">
-                        <FolderOpen className="w-12 h-12" />
+                        <FolderOpen className="w-7 h-7" />
                       </div>
                     )}
                   </div>
 
-                  <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
                     <div>
-                      <h3 className="font-bold text-slate-900 text-sm truncate leading-snug">
+                      <h3 className="font-extrabold text-slate-900 text-xs truncate leading-snug">
                         {cat.category_name}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
                         {mt && (
-                          <Badge variant="neutral" leftIcon={<Layers className="w-3 h-3" />}>
+                          <Badge variant="neutral" leftIcon={<Layers className="w-2.5 h-2.5" />}>
                             {mt.name}
                           </Badge>
                         )}
-                        {cat.standard_sizes && cat.standard_sizes.length > 0 && (
-                          <span className="text-[11px] text-slate-400 font-medium">
-                            Sizes: {cat.standard_sizes.join(', ')}
-                          </span>
-                        )}
+
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
                         Collection
                       </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleEdit(cat)}
-                          className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors border border-slate-200/60"
+                          className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors border border-slate-200/60"
                           title={STRINGS.common.edit}
                           aria-label={`Edit ${cat.category_name}`}
                         >
-                          <AppIcon name="edit" size={15} />
+                          <AppIcon name="edit" size={13} />
                         </button>
                         <button
                           onClick={() => setDeleteTarget({ id: cat.id, name: cat.category_name })}
-                          className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors border border-rose-100"
+                          className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors border border-rose-100"
                           title={STRINGS.common.delete}
                           aria-label={`Delete ${cat.category_name}`}
                         >
-                          <AppIcon name="delete" size={15} />
+                          <AppIcon name="delete" size={13} />
                         </button>
                       </div>
                     </div>
@@ -313,7 +409,7 @@ export default function CategoriesPage() {
         onConfirm={confirmDeleteCategory}
         isLoading={isDeleting}
         title={STRINGS.categories.deleteConfirmTitle}
-        message={deleteTarget ? STRINGS.categories.deleteConfirmMessage(deleteTarget.name) : ''}
+        message={deleteTarget ? STRINGS.categories.deleteConfirmMessage(deleteTarget.name) : ""}
       />
     </div>
   );

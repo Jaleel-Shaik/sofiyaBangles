@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from "./endpoints";
 import { apiClient, extractData } from "./client";
-import { Product, Category, ModelType, BusinessProfile, AnalyticsOverview, UserProfile, ProductVariant } from "./types";
+import { Product, Category, ModelType, BusinessProfile, AnalyticsOverview, UserProfile, User, ProductVariant, AdminReview } from "./types";
 export interface CreateProductData {
   product_name: string;
   category_id: string;
@@ -87,6 +87,24 @@ export const adminApi = {
     apiClient.get(API_ENDPOINTS.PRODUCTS.LOOKUP_CODE(code)).then(r => r.data.data as Product),
   sellProductByCode: (code: string, quantity = 1, extra?: { customer_name?: string; customer_phone?: string; notes?: string; order_number?: string; orderNumber?: string }) =>
     apiClient.post(API_ENDPOINTS.PRODUCTS.SELL_BY_CODE, { code, quantity, ...extra }).then(r => r.data.data as Product),
+  updateStock: (
+    id: string,
+    payload: number | { quantity?: number; variant_id?: string; variants?: Array<{ id: string; size?: string; quantity: number }> }
+  ) => {
+    const data = typeof payload === "number" ? { quantity: payload } : payload;
+    return apiClient.patch(API_ENDPOINTS.PRODUCTS.UPDATE_STOCK(id), data).then(r => r.data.data as Product);
+  },
+
+
+  // Customer Lookup & Creation (for verified Quick Sell)
+  lookupCustomerByPhone: (phone: string) =>
+    apiClient
+      .get(API_ENDPOINTS.USERS.LOOKUP, { params: { phone } })
+      .then((r) => r.data.data as { found: boolean; user: User | null }),
+  createCustomer: (data: { full_name: string; phone: string; email: string; password?: string }) =>
+    apiClient
+      .post(API_ENDPOINTS.USERS.CUSTOMERS, data)
+      .then((r) => r.data.data as User),
 
   // Categories
   getCategories: async (modelTypeId?: string) => {
@@ -181,4 +199,8 @@ export const adminApi = {
         };
       }>("/orders/verify-admin-link", { token })
       .then((r) => r.data.data),
+
+  // Customer Reviews & Ratings
+  getAllReviews: () =>
+    apiClient.get("/orders/admin/reviews").then((r) => extractData<AdminReview[]>(r)),
 };

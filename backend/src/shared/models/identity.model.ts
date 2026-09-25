@@ -2,6 +2,7 @@ import { db } from "../config/firebase";
 import { Profile, UserRole, UserType } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import { nowISTISO } from "../utils/datetime";
+import bcrypt from "bcryptjs";
 
 /**
  * The app splits accounts across two collections instead of keeping
@@ -88,6 +89,93 @@ export const findAdminByIdModel = async (
 ): Promise<Profile | null> => {
   const doc = await db.collection(identityCollection("admin")).doc(id).get();
   return doc.exists ? (doc.data() as Profile) : null;
+};
+
+/**
+ * Looks up an authenticated customer account in the "users" collection by phone number.
+ * Robust matching across multiple representations: 10-digit mobile, E.164, +91 prefix, and stripped digits.
+ */
+export const findUserByPhoneModel = async (
+  phone: string
+): Promise<Profile | null> => {
+  const rawClean = phone.trim();
+  if (!rawClean) return null;
+
+  const digits = rawClean.replace(/\D/g, "");
+  const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  const e164 = last10.length === 10 ? `91${last10}` : digits;
+  const plusE164 = `+${e164}`;
+
+  // Candidate formats in priority order
+  const candidates = Array.from(
+    new Set([rawClean, digits, last10, e164, plusE164, `+91${last10}`, `+91 ${last10}`])
+  ).filter(Boolean);
+
+  for (const cand of candidates) {
+    const snap = await db
+      .collection(identityCollection("user"))
+      .where("phone", "==", cand)
+      .limit(1)
+      .get();
+    if (!snap.empty) {
+      return snap.docs[0].data() as Profile;
+    }
+  }
+
+  // Scan fallback for last 10 digits
+  if (last10 && last10.length === 10) {
+    const snap = await db.collection(identityCollection("user")).limit(200).get();
+    for (const doc of snap.docs) {
+      const data = doc.data() as Profile;
+      if (data.phone) {
+        const uDigits = data.phone.replace(/\D/g, "");
+        if (uDigits.endsWith(last10)) {
+          return data;
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Explicitly creates an authorized customer account in the "users" collection.
+ * Required when an admin creates a customer account for buying products.
+ */
+export const createCustomerAccountModel = async (data: {
+  full_name: string;
+  phone: string;
+  email: string;
+  password?: string;
+}): Promise<Profile> => {
+  const rawPhone = data.phone.trim();
+  const digits = rawPhone.replace(/\D/g, "");
+  const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  const formattedPhone = last10.length === 10 ? `+91${last10}` : rawPhone;
+
+  let passwordHash = "";
+  if (data.password && data.password.trim()) {
+    const salt = await bcrypt.genSalt(10);
+    passwordHash = await bcrypt.hash(data.password.trim(), salt);
+  } else {
+    // Generate a default initial password hash if none specified (e.g. Sofiya@<last4>)
+    const salt = await bcrypt.genSalt(10);
+    const pass = `Sofiya@${last10.slice(-4) || "1234"}`;
+    passwordHash = await bcrypt.hash(pass, salt);
+  }
+
+  const identity = await createIdentityModel({
+    full_name: data.full_name.trim(),
+    email: data.email.trim().toLowerCase(),
+    phone: formattedPhone,
+    password_hash: passwordHash,
+    role: "user",
+    is_active: true,
+    isActive: true,
+  });
+
+  return identity.profile;
 };
 
 /**

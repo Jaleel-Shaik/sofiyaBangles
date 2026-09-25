@@ -45,10 +45,21 @@ export const createReviewSchema = z
   .object({
     productId: z.string().optional(),
     product_id: z.string().optional(),
+    orderId: z.string().nullable().optional(),
+    order_id: z.string().nullable().optional(),
+    orderItemId: z.string().nullable().optional(),
+    order_item_id: z.string().nullable().optional(),
     rating: z.coerce.number().int().min(1).max(5, "Rating must be between 1 and 5"),
+    qualityRating: z.coerce.number().int().min(1).max(5).optional(),
+    quality_rating: z.coerce.number().int().min(1).max(5).optional(),
     comment: z.string().nullable().optional(),
+    suggestion: z.string().nullable().optional(),
+    isDefective: z.boolean().optional(),
+    is_defective: z.boolean().optional(),
     damageDetails: z.string().nullable().optional(),
     damage_details: z.string().nullable().optional(),
+    customerName: z.string().nullable().optional(),
+    customer_name: z.string().nullable().optional(),
   })
   .refine((data) => Boolean(data.productId || data.product_id), {
     message: "Product ID is required",

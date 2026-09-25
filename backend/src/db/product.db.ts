@@ -97,13 +97,39 @@ export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product 
     }
   }
 
+  // 4. Fallback: Query by internal 'id' field
+  const snapById = await db
+    .collection("products")
+    .where("id", "==", trimmed)
+    .limit(1)
+    .get();
+  if (!snapById.empty) {
+    const matchedDoc = snapById.docs[0];
+    return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
+  }
+
+  // 5. Fallback: Query without leading '#' if present (e.g. #SIL-101)
+  const unhashed = trimmed.replace(/^#/, "").trim();
+  if (unhashed && unhashed !== trimmed) {
+    const unhashedUpper = unhashed.toUpperCase();
+    const snapUnhashed = await db
+      .collection("products")
+      .where("unique_code", "==", unhashedUpper)
+      .limit(1)
+      .get();
+    if (!snapUnhashed.empty) {
+      const matchedDoc = snapUnhashed.docs[0];
+      return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
+    }
+  }
+
   return null;
 };
 
 /**
  * Pure Database Operation: Retrieve all active product documents.
  */
-export const getActiveProductsDb = async (categoryId?: string): Promise<Product[]> => {
+export const getActiveProductsDb = async (categoryId?: string, modelTypeId?: string): Promise<Product[]> => {
   try {
     let query: FirebaseFirestore.Query = db
       .collection("products")
@@ -111,6 +137,9 @@ export const getActiveProductsDb = async (categoryId?: string): Promise<Product[
 
     if (categoryId) {
       query = query.where("category_id", "==", categoryId);
+    }
+    if (modelTypeId) {
+      query = query.where("model_type_id", "==", modelTypeId);
     }
 
     const snapshot = await query.get();
@@ -255,6 +284,38 @@ export const getVariantsByProductDb = async (productId: string): Promise<Product
 
   const variants = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as ProductVariant));
   return variants.filter((v) => v.status === "active" || v.status === "out_of_stock");
+};
+
+/**
+ * Pure Database Operation: Update a single variant document.
+ */
+export const updateVariantDocDb = async (
+  id: string,
+  data: Partial<ProductVariant>
+): Promise<void> => {
+  await db.collection("product_variants").doc(id).update({
+    ...data,
+    updated_at: new Date().toISOString(),
+  });
+};
+
+/**
+ * Pure Database Operation: Batch update multiple variants.
+ */
+export const updateVariantsBatchDb = async (
+  variants: Array<{ id: string; quantity: number; status?: 'active' | 'out_of_stock' }>
+): Promise<void> => {
+  if (variants.length === 0) return;
+  const batch = db.batch();
+  variants.forEach((v) => {
+    const ref = db.collection("product_variants").doc(v.id);
+    batch.update(ref, {
+      quantity: v.quantity,
+      status: v.status || (v.quantity > 0 ? "active" : "out_of_stock"),
+      updated_at: new Date().toISOString(),
+    });
+  });
+  await batch.commit();
 };
 
 /**

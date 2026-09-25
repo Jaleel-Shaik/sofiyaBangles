@@ -20,7 +20,7 @@ import { authenticate, optionalAuthenticate } from "../../../shared/middlewares/
 import { requireRole } from "../../../shared/middlewares/role.middleware";
 import { upload } from "../../../shared/middlewares/upload.middleware";
 import { validate } from "../../../shared/middlewares/validate.middleware";
-import { createProductSchema, updateProductSchema, sellProductByCodeSchema } from "../validations/product.validation";
+import { createProductSchema, updateProductSchema, updateStockSchema, sellProductByCodeSchema } from "../validations/product.validation";
 
 const router = Router();
 
@@ -64,6 +64,7 @@ router.patch(
   "/:id/stock",
   authenticate,
   requireRole("admin", "super_admin"),
+  validate(updateStockSchema),
   updateStock,
 );
 router.patch(

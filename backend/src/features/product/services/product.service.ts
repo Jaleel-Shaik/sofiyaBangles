@@ -12,6 +12,8 @@ import {
   restoreProductDb,
   deleteProductsByCategoryBatchDb,
   getVariantsByProductDb,
+  updateVariantDocDb,
+  updateVariantsBatchDb,
   getImagesByProductDb,
   deleteFavoritesByProductDb,
   deleteReviewsByProductDb,
@@ -20,7 +22,6 @@ import {
 import { getCategoryByIdDb, getCategoriesDb } from "../../../db/category.db";
 import { getModelTypeByIdDb } from "../../../db/modelType.db";
 import { isFavoritedDb } from "../../../db/favorite.db";
-import { getSizePreferencesDb } from "../../../db/sizePreference.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
 import { insertOrderWithItemsDb, getOrderByOrderNumberDb, updateOrderDocDb, getOrderItemsDb } from "../../../db/order.db";
 import { insertNotificationDb } from "../../../db/notification.db";
@@ -28,8 +29,8 @@ import { createRevenueAllocationModel } from "../../order/models/revenueLedger.m
 import { Order, OrderItem } from "../../../shared/types";
 import { v4 as uuidv4 } from "uuid";
 import { Product, ProductImage, ProductVariant } from "../../../models/product.model";
-import { UserSizePreference } from "../../../models/sizePreference.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.validation";
+import { findUserByPhoneModel } from "../../../shared/models/identity.model";
 import { v2 as cloudinary } from "cloudinary";
 import "multer"; // Fix for ts-node Express.Multer resolution
 
@@ -45,28 +46,6 @@ interface VariantInput {
   quantity?: number | string;
   [key: string]: unknown;
 }
-
-/**
- * Domain filter for user size preferences.
- */
-const applySizeFilter = (p: Product, prefs: UserSizePreference[]): boolean => {
-  if (!p.category_id) return true;
-  const pref = prefs.find((pr) => pr.category_id === p.category_id);
-  if (!pref) return true;
-
-  if (pref.is_custom) {
-    return p.accepts_custom_size === true;
-  } else {
-    if (p.has_variants) {
-      if (!p.variants || p.variants.length === 0) return false;
-      return p.variants.some(
-        (v) => v.size === pref.standard_size && v.quantity > 0
-      );
-    } else {
-      return true;
-    }
-  }
-};
 
 /**
  * Service: Create a new product with relations (variants, images)
@@ -189,56 +168,32 @@ export const createProductService = async (
 };
 
 /**
- * Service: Query active products with size filtering, search, pagination, and category enrichment.
+ * Service: Query active products with size/model filtering, search, price range, stock state, sorting, and pagination.
  */
 export const getProductsService = async (options: {
   page?: number;
   limit?: number;
   categoryId?: string;
+  modelTypeId?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  inStock?: boolean;
   search?: string;
+  sort?: "newest" | "rating";
   userId?: string;
 }): Promise<{ products: Product[]; total: number }> => {
   const page = Math.max(1, Math.floor(Number(options.page) || 1));
   const limit = Math.max(1, Math.min(100, Math.floor(Number(options.limit) || 20)));
 
-  let allProducts = await getActiveProductsDb(options.categoryId);
-
-  let sizePreferences: UserSizePreference[] = [];
-  if (options.userId) {
-    sizePreferences = await getSizePreferencesDb(options.userId);
-  }
-
-  if (sizePreferences.length > 0) {
-    allProducts = allProducts.filter((p) => applySizeFilter(p, sizePreferences));
-  }
-
-  allProducts.sort((a, b) => {
-    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-    return dateB - dateA;
-  });
-
-  if (options.search) {
-    const lowerSearch = options.search.toLowerCase();
-    allProducts = allProducts.filter(
-      (p) =>
-        (p.product_name && p.product_name.toLowerCase().includes(lowerSearch)) ||
-        (p.unique_code && p.unique_code.toLowerCase().includes(lowerSearch)) ||
-        (p.description && p.description.toLowerCase().includes(lowerSearch))
-    );
-  }
-
-  const total = allProducts.length;
-  const offset = (page - 1) * limit;
-  const paginatedProducts = allProducts.slice(offset, offset + limit);
+  const rawProducts = await getActiveProductsDb(options.categoryId, options.modelTypeId);
 
   const categories = await getCategoriesDb();
   const safeCategories = Array.isArray(categories) ? categories : [];
   const categoryMap = new Map(safeCategories.map((c) => [c.id, c.category_name]));
 
-  const safePaginated = Array.isArray(paginatedProducts) ? paginatedProducts : [];
-  const productsWithDetails = await Promise.all(
-    safePaginated.map(async (p) => {
+  // 1. Enrich products with relations (variants, images, category name, favorite status)
+  let enrichedProducts = await Promise.all(
+    rawProducts.map(async (p) => {
       const category_name = p.category_id ? categoryMap.get(p.category_id) : undefined;
       const is_favorited = options.userId ? await isFavoritedDb(options.userId, p.id) : false;
       const variants = await getVariantsByProductDb(p.id);
@@ -248,7 +203,66 @@ export const getProductsService = async (options: {
     })
   );
 
-  return { products: productsWithDetails, total };
+  // 2. Filter by search query
+  if (options.search && options.search.trim().length > 0) {
+    const lowerSearch = options.search.trim().toLowerCase();
+    enrichedProducts = enrichedProducts.filter(
+      (p) =>
+        (p.product_name && p.product_name.toLowerCase().includes(lowerSearch)) ||
+        (p.unique_code && p.unique_code.toLowerCase().includes(lowerSearch)) ||
+        (p.description && p.description.toLowerCase().includes(lowerSearch)) ||
+        (p.category_name && p.category_name.toLowerCase().includes(lowerSearch))
+    );
+  }
+
+  // 3. Filter by price range (minPrice / maxPrice)
+  if (options.minPrice !== undefined && !isNaN(options.minPrice)) {
+    const minP = options.minPrice;
+    enrichedProducts = enrichedProducts.filter((p) => {
+      const priceVal = Number(p.price) || 0;
+      return priceVal >= minP;
+    });
+  }
+
+  if (options.maxPrice !== undefined && !isNaN(options.maxPrice)) {
+    const maxP = options.maxPrice;
+    enrichedProducts = enrichedProducts.filter((p) => {
+      const priceVal = Number(p.price) || 0;
+      return priceVal <= maxP;
+    });
+  }
+
+  // 4. Filter by inStock status
+  if (options.inStock) {
+    enrichedProducts = enrichedProducts.filter((p) => {
+      const mainQty = Number(p.quantity) || 0;
+      const variantQty = Array.isArray(p.variants)
+        ? p.variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0)
+        : 0;
+      return mainQty > 0 || variantQty > 0;
+    });
+  }
+
+  // 5. Apply sorting: 'newest' (default) vs 'rating'
+  enrichedProducts.sort((a, b) => {
+    if (options.sort === "rating") {
+      const ratingA = Number(a.rating) || 0;
+      const ratingB = Number(b.rating) || 0;
+      if (ratingB !== ratingA) {
+        return ratingB - ratingA;
+      }
+    }
+    // Default or "newest": created_at descending
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  const total = enrichedProducts.length;
+  const offset = (page - 1) * limit;
+  const paginatedProducts = enrichedProducts.slice(offset, offset + limit);
+
+  return { products: paginatedProducts, total };
 };
 
 /**
@@ -490,10 +504,18 @@ export const updateProductService = async (
 
 /**
  * Service: Update product inventory stock.
+ * Supports:
+ * 1. Single total quantity update (syncs variants and updates status)
+ * 2. Variant-specific stock updates (updates specific variant in product_variants and re-sums total)
+ * 3. Batch variants stock update ({ variants: [{ id, quantity }] })
  */
 export const updateStockService = async (
   id: string,
-  quantity: number,
+  inputOrQty: number | {
+    quantity?: number;
+    variant_id?: string;
+    variants?: Array<{ id: string; size?: string; quantity: number }>;
+  },
   actorId: string,
 ) => {
   const existing = await getProductByCodeOrIdDb(id);
@@ -501,18 +523,118 @@ export const updateStockService = async (
     throw new Error("PRODUCT_NOT_FOUND");
   }
 
-  const product = await updateProductDocDb(existing.id, { quantity });
+  const existingVariants = await getVariantsByProductDb(existing.id);
+
+  let newTotalQuantity = existing.quantity;
+  const oldQuantity = existing.quantity;
+
+  if (typeof inputOrQty === "number") {
+    newTotalQuantity = Math.max(0, inputOrQty);
+    // If product has variants, distribute / sync stock across variants
+    if (existingVariants.length > 0) {
+      if (existingVariants.length === 1) {
+        await updateVariantDocDb(existingVariants[0].id, {
+          quantity: newTotalQuantity,
+          status: newTotalQuantity > 0 ? "active" : "out_of_stock",
+        });
+      } else {
+        // Distribute stock across variants
+        const count = existingVariants.length;
+        const perVariant = Math.floor(newTotalQuantity / count);
+        let remainder = newTotalQuantity % count;
+        const updates: Array<{ id: string; quantity: number; status?: 'active' | 'out_of_stock' }> = [];
+        for (let i = 0; i < count; i++) {
+          const v = existingVariants[i];
+          const q = perVariant + (remainder > 0 ? 1 : 0);
+          if (remainder > 0) remainder--;
+          updates.push({
+            id: v.id,
+            quantity: q,
+            status: q > 0 ? "active" : "out_of_stock",
+          });
+        }
+        await updateVariantsBatchDb(updates);
+      }
+    }
+  } else if (inputOrQty && typeof inputOrQty === "object") {
+    if (Array.isArray(inputOrQty.variants) && inputOrQty.variants.length > 0) {
+      // Direct per-variant updates
+      const updates: Array<{ id: string; quantity: number; status?: 'active' | 'out_of_stock' }> = [];
+      let sum = 0;
+      inputOrQty.variants.forEach((v) => {
+        const q = Math.max(0, Number(v.quantity) || 0);
+        sum += q;
+        updates.push({
+          id: v.id,
+          quantity: q,
+          status: q > 0 ? "active" : "out_of_stock",
+        });
+      });
+      await updateVariantsBatchDb(updates);
+      newTotalQuantity = sum;
+    } else if (inputOrQty.variant_id && inputOrQty.quantity !== undefined) {
+      const q = Math.max(0, Number(inputOrQty.quantity) || 0);
+      await updateVariantDocDb(inputOrQty.variant_id, {
+        quantity: q,
+        status: q > 0 ? "active" : "out_of_stock",
+      });
+      // Sum all variants
+      const remainingVariants = existingVariants.filter((v) => v.id !== inputOrQty.variant_id);
+      const otherSum = remainingVariants.reduce((s, v) => s + (v.quantity || 0), 0);
+      newTotalQuantity = otherSum + q;
+    } else if (inputOrQty.quantity !== undefined) {
+      newTotalQuantity = Math.max(0, Number(inputOrQty.quantity) || 0);
+      if (existingVariants.length > 0) {
+        if (existingVariants.length === 1) {
+          await updateVariantDocDb(existingVariants[0].id, {
+            quantity: newTotalQuantity,
+            status: newTotalQuantity > 0 ? "active" : "out_of_stock",
+          });
+        } else {
+          const count = existingVariants.length;
+          const perVariant = Math.floor(newTotalQuantity / count);
+          let remainder = newTotalQuantity % count;
+          const updates: Array<{ id: string; quantity: number; status?: 'active' | 'out_of_stock' }> = [];
+          for (let i = 0; i < count; i++) {
+            const v = existingVariants[i];
+            const q = perVariant + (remainder > 0 ? 1 : 0);
+            if (remainder > 0) remainder--;
+            updates.push({
+              id: v.id,
+              quantity: q,
+              status: q > 0 ? "active" : "out_of_stock",
+            });
+          }
+          await updateVariantsBatchDb(updates);
+        }
+      }
+    }
+  }
+
+  // Determine new product status based on total inventory
+  let newStatus = existing.status;
+  if (newTotalQuantity > 0 && existing.status === "out_of_stock") {
+    newStatus = "active";
+  } else if (newTotalQuantity === 0 && existing.status === "active") {
+    newStatus = "out_of_stock";
+  }
+
+  await updateProductDocDb(existing.id, {
+    quantity: newTotalQuantity,
+    status: newStatus,
+    is_active: newStatus === "active",
+  });
 
   await insertAuditLogDb({
     actor_id: actorId,
     action: "STOCK_UPDATED",
     table_name: "products",
     record_id: existing.id,
-    old_data: { quantity: existing.quantity },
-    new_data: { quantity },
+    old_data: { quantity: oldQuantity, status: existing.status },
+    new_data: { quantity: newTotalQuantity, status: newStatus },
   });
 
-  return product;
+  return await lookupProductByCodeOrIdService(existing.id, actorId);
 };
 
 /**
@@ -547,9 +669,12 @@ export const lookupProductByCodeOrIdService = async (codeOrId: string, userId?: 
   const is_favorited = userId ? await isFavoritedDb(userId, product.id) : false;
   const variants = await getVariantsByProductDb(product.id);
   const images = await getImagesByProductDb(product.id);
+  const primaryImg = images.find((img) => img.is_primary) || images[0];
+  const resolvedImageUrl = product.image_url || primaryImg?.image_url || null;
 
   return {
     ...product,
+    image_url: resolvedImageUrl,
     category_name,
     model_type_name,
     model_type_id: model_type_id || "",
@@ -705,16 +830,30 @@ export const sellProductService = async (
   const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
   const now = new Date().toISOString();
   const totalAmount = existing.price * quantity;
-  const customerName = extra?.customer_name?.trim() || "Direct Customer";
+  let customerName = extra?.customer_name?.trim() || "Direct Customer";
   const customerPhone = extra?.customer_phone?.trim() || "";
+
+  let targetUserId = actorId;
+
+  // Strict Authentication Check: If a customer phone was supplied, verify the account exists
+  if (customerPhone) {
+    const customerUser = await findUserByPhoneModel(customerPhone);
+    if (!customerUser) {
+      throw new Error("CUSTOMER_NOT_FOUND");
+    }
+    targetUserId = customerUser.id;
+    if (customerUser.full_name && customerUser.full_name !== "Customer") {
+      customerName = customerUser.full_name;
+    }
+  }
 
   const orderData: Order = {
     id: orderId,
     order_number: orderNumber,
-    user_id: actorId,
+    user_id: targetUserId,
     customer_name: customerName,
     customer_phone: customerPhone,
-    order_source: "whatsapp",
+    order_source: "quick_sell",
     status: "completed",
     payment_status: "paid",
     subtotal: totalAmount,
@@ -722,9 +861,11 @@ export const sellProductService = async (
     discount_amount: 0,
     total_amount: totalAmount,
     shipping_address_snapshot: {
+      id: uuidv4(),
+      user_id: targetUserId,
       name: customerName,
       phone: customerPhone,
-      address_line1: "In-store / WhatsApp Direct Sale",
+      address_line1: "In-store / Direct Quick Sell",
       city: "Direct Sale",
       state: "",
       postal_code: "",
@@ -737,6 +878,11 @@ export const sellProductService = async (
     created_at: now,
     updated_at: now,
   };
+
+  const productImage =
+    existing.image_url ||
+    (Array.isArray(existing.images) && existing.images[0]?.image_url) ||
+    (Array.isArray(existing.images) && typeof existing.images[0] === "string" ? existing.images[0] : null);
 
   const orderItem: OrderItem = {
     id: uuidv4(),
@@ -752,11 +898,26 @@ export const sellProductService = async (
     itemPrice: existing.price,
     quantity: quantity,
     subtotal: totalAmount,
-    image_url: existing.image_url || null,
+    image_url: productImage,
     created_at: now,
   };
 
   await insertOrderWithItemsDb(orderData, [orderItem], []);
+
+  // Dispatch live in-app notification directly to the customer user
+  if (targetUserId !== actorId) {
+    await insertNotificationDb({
+      id: uuidv4(),
+      title: `Order #${orderNumber} Confirmed!`,
+      body: `Your purchase of "${existing.product_name}" (Qty: ${quantity}, ₹${totalAmount}) was completed.`,
+      type: "ORDER_STATUS_UPDATE",
+      product_id: existing.id,
+      sent_by: actorId,
+      user_id: targetUserId,
+      is_read: false,
+      created_at: now,
+    });
+  }
 
   createRevenueAllocationModel({
     orderId: orderData.id,
@@ -770,7 +931,10 @@ export const sellProductService = async (
 
   return {
     ...product,
-    order: orderData,
+    order: {
+      ...orderData,
+      items: [orderItem],
+    },
   };
 };
 

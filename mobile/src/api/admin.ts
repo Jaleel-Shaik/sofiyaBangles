@@ -1,4 +1,4 @@
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { API_ENDPOINTS } from "./endpoints";
 import { apiClient } from './client';
 import { Product } from "./products";
@@ -92,7 +92,7 @@ export const createProduct = async (productData: CreateProductPayload, imageUris
       unique_code: res.data.data.unique_code,
     };
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to create product');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to create product');
     throw new Error(message);
   }
 };
@@ -126,7 +126,7 @@ export const updateProduct = async (id: string, productData: Partial<CreateProdu
     });
     return { success: true, id: res.data.data.id };
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to update product');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to update product');
     throw new Error(message);
   }
 };
@@ -140,7 +140,7 @@ export const sellProduct = async (
     const res = await apiClient.patch(API_ENDPOINTS.PRODUCTS.SELL(id), { quantity, ...extra });
     return res.data.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to sell product');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to sell product');
     throw new Error(message);
   }
 };
@@ -148,9 +148,21 @@ export const sellProduct = async (
 export const lookupProductByCode = async (code: string) => {
   try {
     const res = await apiClient.get(API_ENDPOINTS.PRODUCTS.LOOKUP_CODE(code));
-    return res.data.data;
+    const data = res.data.data;
+    if (data) {
+      let image_url = typeof data.image_url === 'string' ? data.image_url.trim() : '';
+      if (!image_url && Array.isArray(data.images) && data.images.length > 0) {
+        const primary = data.images.find((img: any) => img && typeof img === 'object' && img.is_primary);
+        const first = primary || data.images[0];
+        if (typeof first === 'string') image_url = first.trim();
+        else if (first && typeof first.image_url === 'string') image_url = first.image_url.trim();
+        else if (first && typeof first.url === 'string') image_url = first.url.trim();
+      }
+      data.image_url = image_url;
+    }
+    return data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Product not found');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Product not found');
     throw new Error(message);
   }
 };
@@ -168,17 +180,34 @@ export const sellProductByCode = async (
     });
     return res.data.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to sell product');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to sell product');
     throw new Error(message);
   }
 };
+
+export const updateProductStock = async (
+  id: string,
+  payload: number | { quantity?: number; variant_id?: string; variants?: Array<{ id: string; size?: string; quantity: number }> }
+) => {
+  try {
+    const data = typeof payload === 'number' ? { quantity: payload } : payload;
+    const res = await apiClient.patch(API_ENDPOINTS.PRODUCTS.UPDATE_STOCK(id), data);
+    return res.data.data;
+  } catch (error: unknown) {
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to update stock');
+    throw new Error(message);
+  }
+};
+
+export const updateStock = updateProductStock;
+
 
 export const deleteProduct = async (id: string) => {
   try {
     const res = await apiClient.delete(API_ENDPOINTS.PRODUCTS.BY_ID(id));
     return res.data.success;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to delete product');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to delete product');
     throw new Error(message);
   }
 };
@@ -215,7 +244,7 @@ export const createCategoryWithImage = async (
     });
     return res.data.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to create category');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to create category');
     throw new Error(message);
   }
 };
@@ -253,7 +282,7 @@ export const updateCategoryWithImage = async (
     });
     return res.data.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to update category');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to update category');
     throw new Error(message);
   }
 };
@@ -263,7 +292,7 @@ export const deleteCategory = async (categoryId: string) => {
     const res = await apiClient.delete(`/categories/${categoryId}`);
     return res.data.success;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to delete category');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to delete category');
     throw new Error(message);
   }
 };
@@ -279,7 +308,7 @@ export const broadcastNotification = async (notificationData: {
     const res = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.BROADCAST, notificationData);
     return res.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to send notification');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to send notification');
     throw new Error(message);
   }
 };
@@ -289,7 +318,7 @@ export const createModelType = async (modelTypeData: { name: string }) => {
     const res = await apiClient.post(API_ENDPOINTS.MODEL_TYPES.BASE, modelTypeData);
     return res.data.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to create model type');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to create model type');
     throw new Error(message);
   }
 };
@@ -299,7 +328,7 @@ export const updateModelType = async (id: string, modelTypeData: { name: string 
     const res = await apiClient.put(API_ENDPOINTS.MODEL_TYPES.BY_ID(id), modelTypeData);
     return res.data.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to update model type');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to update model type');
     throw new Error(message);
   }
 };
@@ -309,7 +338,27 @@ export const deleteModelType = async (id: string) => {
     const res = await apiClient.delete(API_ENDPOINTS.MODEL_TYPES.BY_ID(id));
     return res.data.data;
   } catch (error: unknown) {
-    const message = (axios.isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to delete model type');
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to delete model type');
+    throw new Error(message);
+  }
+};
+
+export const lookupCustomerByPhone = async (phone: string) => {
+  try {
+    const res = await apiClient.get(API_ENDPOINTS.USERS.LOOKUP(phone));
+    return res.data.data as { found: boolean; user: any | null };
+  } catch (error: unknown) {
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to look up customer');
+    throw new Error(message);
+  }
+};
+
+export const createCustomer = async (data: { full_name: string; phone: string; email?: string; password?: string }) => {
+  try {
+    const res = await apiClient.post(API_ENDPOINTS.USERS.CUSTOMERS, data);
+    return res.data.data;
+  } catch (error: unknown) {
+    const message = (isAxiosError(error) && error.response?.data?.message) || (error instanceof Error ? error.message : 'Failed to create customer');
     throw new Error(message);
   }
 };

@@ -125,13 +125,10 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest bg-rose-600/30 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded">
-                  ROLE: PLATFORM SUPER ADMIN
+                  Super Admin
                 </span>
-                <span className="text-xs text-slate-400 font-semibold">• 70% Store / 30% Platform Active</span>
+                <span className="text-xs text-slate-400 font-semibold">• 70/30 Ledger Active</span>
               </div>
-              <p className="text-xs text-slate-300 mt-1">
-                Toggle between Executive Financial Analytics and Store Operations Catalog
-              </p>
             </div>
           </div>
 
@@ -144,7 +141,7 @@ export default function DashboardPage() {
                   : "text-slate-300 hover:text-white hover:bg-slate-700/50"
               }`}
             >
-              Executive Financial Hub
+              Financial Hub
             </button>
             <button
               onClick={() => setSuperAdminView("operations")}
@@ -154,7 +151,7 @@ export default function DashboardPage() {
                   : "text-slate-300 hover:text-white hover:bg-slate-700/50"
               }`}
             >
-              Store Operations & Catalog
+              Store Operations
             </button>
           </div>
         </motion.div>
@@ -174,15 +171,12 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-white/10 text-rose-200 border border-white/20 px-2.5 py-0.5 rounded-full">
-                  {isSuperAdmin ? "ROLE: STORE OPERATIONS (SUPER ADMIN INSPECTION)" : "ROLE: STORE OPERATIONS ADMIN (CATALOG & PHYSICAL INVENTORY)"}
+                  {isSuperAdmin ? "Super Admin" : "Store Admin"}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                 {STRINGS.adminDashboard.welcome(user?.full_name || "Admin")}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                Real-time inventory levels, bangle model types, catalog showcase & WhatsApp sale logs.
-              </p>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -208,14 +202,11 @@ export default function DashboardPage() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
               <div>
                 <h2 className="text-lg font-bold text-[#171717]">
-                  Store Inventory & Catalog Performance
+                  Overview
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Live data filtered by model category and bangle collections
-                </p>
               </div>
 
-              {/* Filters with explicit labels */}
+              {/* Filters with clean labels */}
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <label htmlFor="modelTypeFilter" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
@@ -276,13 +267,13 @@ export default function DashboardPage() {
                   className="bg-white rounded-2xl border border-[#E5E5E5] hover:border-blue-400 hover:shadow-lg hover:shadow-blue-50 transition-all duration-200 p-5 flex flex-col justify-between group"
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider bg-blue-50 px-2.5 py-0.5 rounded">
-                        [CATALOG BREADTH]
-                      </span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <Package className="w-5 h-5" />
+                      </div>
                       <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100 flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                        {stats?.activeProducts ?? stats?.totalProducts ?? 0} Active Designs
+                        {stats?.activeProducts ?? stats?.totalProducts ?? 0} Active
                       </span>
                     </div>
 
@@ -290,28 +281,25 @@ export default function DashboardPage() {
                       href={selectedCategory ? `/dashboard/products?category=${selectedCategory}` : "/dashboard/products"}
                       className="block focus:outline-none"
                     >
-                      <div className="flex items-baseline justify-between mt-2">
+                      <div className="flex items-baseline justify-between mt-1">
                         <p className="text-3xl font-black text-[#171717] tracking-tight group-hover:text-blue-600 transition-colors">
-                          {stats?.totalProducts || 0} <span className="text-sm font-semibold text-slate-400">designs</span>
+                          {stats?.totalProducts || 0}
                         </p>
                         <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
                       </div>
                       <p className="text-sm text-[#171717] font-bold mt-1">
-                        Total Catalog Designs {selectedCategory || selectedModelType ? "(Filtered)" : ""}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Number of distinct bangle design entries registered in store catalog
+                        Total Products {selectedCategory || selectedModelType ? "(Filtered)" : ""}
                       </p>
                     </Link>
                   </div>
 
                   {/* Functional Action Footer */}
-                  <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                     <Link
                       href={selectedCategory ? `/dashboard/products?category=${selectedCategory}` : "/dashboard/products"}
                       className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 group-hover:underline"
                     >
-                      Manage Full Catalog
+                      Manage Catalog
                       <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                     </Link>
                     <Link
@@ -319,7 +307,7 @@ export default function DashboardPage() {
                       className="text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
                     >
                       <PlusCircle className="w-3.5 h-3.5" />
-                      Add Bangles
+                      Add Product
                     </Link>
                   </div>
                 </motion.div>
@@ -332,13 +320,13 @@ export default function DashboardPage() {
                   className="bg-white rounded-2xl border border-[#E5E5E5] hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-50 transition-all duration-200 p-5 flex flex-col justify-between group"
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2.5 py-0.5 rounded">
-                        [PHYSICAL INVENTORY]
-                      </span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <Layers className="w-5 h-5" />
+                      </div>
                       <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        Live Warehouse Units
+                        In Stock
                       </span>
                     </div>
 
@@ -346,33 +334,27 @@ export default function DashboardPage() {
                       href="/dashboard/products"
                       className="block focus:outline-none"
                     >
-                      <div className="flex items-baseline justify-between mt-2">
+                      <div className="flex items-baseline justify-between mt-1">
                         <p className="text-3xl font-black text-[#171717] tracking-tight group-hover:text-emerald-600 transition-colors">
-                          {stats?.totalStock || 0} <span className="text-sm font-semibold text-slate-400">units</span>
+                          {stats?.totalStock || 0}
                         </p>
                         <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
                       </div>
                       <p className="text-sm text-[#171717] font-bold mt-1">
-                        Physical Stock on Hand {selectedCategory || selectedModelType ? "(Filtered)" : ""}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Total physical count of bangles across all sizes (2.4, 2.6, 2.8) in warehouse
+                        Physical Stock {selectedCategory || selectedModelType ? "(Filtered)" : ""}
                       </p>
                     </Link>
                   </div>
 
                   {/* Functional Action Footer */}
-                  <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                     <Link
                       href="/dashboard/products"
                       className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 group-hover:underline"
                     >
-                      Check Stock & Sizes
+                      Stock Details
                       <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                     </Link>
-                    <span className="text-[11px] text-emerald-600 font-medium bg-emerald-50/70 px-2 py-0.5 rounded">
-                      In Stock
-                    </span>
                   </div>
                 </motion.div>
 
@@ -384,13 +366,13 @@ export default function DashboardPage() {
                   className="bg-white rounded-2xl border border-[#E5E5E5] hover:border-amber-400 hover:shadow-lg hover:shadow-amber-50 transition-all duration-200 p-5 flex flex-col justify-between group"
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider bg-amber-50 px-2.5 py-0.5 rounded">
-                        [SALES VOLUME]
-                      </span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <ShoppingBag className="w-5 h-5" />
+                      </div>
                       <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100 flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        {stats?.totalOrders || 0} Orders Cleared
+                        {stats?.totalOrders || 0} Orders
                       </span>
                     </div>
 
@@ -398,28 +380,25 @@ export default function DashboardPage() {
                       href="/dashboard/orders"
                       className="block focus:outline-none"
                     >
-                      <div className="flex items-baseline justify-between mt-2">
+                      <div className="flex items-baseline justify-between mt-1">
                         <p className="text-3xl font-black text-[#171717] tracking-tight group-hover:text-amber-600 transition-colors">
-                          {stats?.itemsSold || 0} <span className="text-sm font-semibold text-slate-400">units sold</span>
+                          {stats?.itemsSold || 0}
                         </p>
                         <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-amber-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
                       </div>
                       <p className="text-sm text-[#171717] font-bold mt-1">
-                        Completed Customer Sales {selectedCategory || selectedModelType ? "(Filtered)" : ""}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Total units purchased and cleared through WhatsApp & store sales
+                        Units Sold {selectedCategory || selectedModelType ? "(Filtered)" : ""}
                       </p>
                     </Link>
                   </div>
 
                   {/* Functional Action Footer */}
-                  <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                     <Link
                       href="/dashboard/orders"
                       className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 group-hover:underline"
                     >
-                      WhatsApp Orders & Bills
+                      WhatsApp Orders
                       <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                     </Link>
                     <Link
@@ -454,14 +433,9 @@ export default function DashboardPage() {
           {/* Recent Products */}
           <div className="pb-6">
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-bold text-[#171717]">
-                  {STRINGS.adminDashboard.recentProductsTitle}
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Review retail pricing, unique product codes, and remaining stock on hand
-                </p>
-              </div>
+              <h2 className="text-lg font-bold text-[#171717]">
+                Recent Products
+              </h2>
               <Link
                 href="/dashboard/products"
                 className="text-sm text-[#E8436E] hover:text-[#CC3366] font-medium transition-colors flex items-center gap-1.5"
@@ -471,14 +445,13 @@ export default function DashboardPage() {
               </Link>
             </div>
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="bg-white rounded-2xl border border-[#E5E5E5] animate-pulse shadow-sm overflow-hidden">
-                    <div className="aspect-[4/3] bg-gray-200" />
-                    <div className="p-4 space-y-2.5">
-                      <div className="h-5 w-3/4 bg-gray-200 rounded" />
-                      <div className="h-3.5 w-1/2 bg-gray-200 rounded" />
-                      <div className="h-5 w-1/3 bg-gray-200 rounded" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3.5">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="bg-white rounded-2xl border border-[#E5E5E5] animate-pulse shadow-2xs overflow-hidden">
+                    <div className="h-32 bg-gray-200" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-4 w-3/4 bg-gray-200 rounded" />
+                      <div className="h-3 w-1/2 bg-gray-200 rounded" />
                     </div>
                   </div>
                 ))}
@@ -498,8 +471,14 @@ export default function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3.5">
                 {recentProducts.slice(0, 6).map((product, index) => {
+                  const hasStock = (product.quantity || 0) > 0;
+                  const imageUrl =
+                    product.image_url ||
+                    (typeof product.images?.[0] === 'string' ? product.images[0] : product.images?.[0]?.image_url) ||
+                    "https://via.placeholder.com/150";
+
                   return (
                     <Link
                       key={product.id}
@@ -508,43 +487,33 @@ export default function DashboardPage() {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="bg-white rounded-2xl border border-[#E5E5E5] shadow-sm hover:shadow-lg hover:border-[#E8436E]/20 hover:-translate-y-1 transition-all duration-200 group overflow-hidden"
+                        transition={{ delay: index * 0.04 }}
+                        className="bg-white rounded-xl border border-[#E5E5E5] shadow-2xs hover:shadow-xs hover:border-[#E8436E]/30 transition-all duration-200 group overflow-hidden flex flex-col h-full"
                       >
-                        <div className="aspect-[4/3] bg-[#F5F5F5] overflow-hidden relative">
+                        {/* Compact Image Thumb Container (h-32) */}
+                        <div className="h-32 bg-slate-100 overflow-hidden relative shrink-0">
                           <img
-                            src={
-                              product.image_url ||
-                              (typeof product.images?.[0] === 'string' ? product.images[0] : product.images?.[0]?.image_url) ||
-                              "https://via.placeholder.com/150"
-                            }
+                            src={imageUrl}
                             alt={product.product_name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                           {product.unique_code && (
-                            <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded">
-                              Code: {product.unique_code}
+                            <span className="absolute top-2 left-2 bg-slate-900/85 backdrop-blur-xs text-white text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                              {product.unique_code.startsWith("#") ? product.unique_code : `#${product.unique_code}`}
                             </span>
                           )}
                         </div>
-                        <div className="p-4 space-y-2">
+                        <div className="p-3 space-y-1.5 flex-1 flex flex-col justify-between">
                           <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Design Name</span>
-                            <p className="font-bold text-[#171717] text-sm truncate">
+                            <p className="font-extrabold text-[#171717] text-xs truncate group-hover:text-[#E8436E] transition-colors">
                               {product.product_name}
                             </p>
                           </div>
                           <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                            <div>
-                              <span className="text-[10px] text-slate-400 font-semibold block">Retail Price</span>
-                              <span className="text-base font-extrabold text-[#E8436E]">₹{product.price}</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[10px] text-slate-400 font-semibold block">Stock on Hand</span>
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full inline-block ${(product.quantity || 0) > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                                {(product.quantity || 0) > 0 ? `${product.quantity} units` : 'Out of stock'}
-                              </span>
-                            </div>
+                            <span className="text-xs font-black text-[#E8436E]">₹{product.price}</span>
+                            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full inline-block ${hasStock ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-rose-50 text-rose-700 border border-rose-200/60'}`}>
+                              {hasStock ? `${product.quantity} in stock` : 'Out of stock'}
+                            </span>
                           </div>
                         </div>
                       </motion.div>

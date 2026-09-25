@@ -1,4 +1,4 @@
-import axios, { type AxiosError } from "axios";
+import { isAxiosError, type AxiosError } from "axios";
 
 export type ApiErrorType =
   | "TIMEOUT"
@@ -44,7 +44,7 @@ function serverMessage(error: AxiosError<ErrorResponseBody>, fallback: string): 
  * HTTP status code and a clear reason.
  */
 export function classifyApiError(error: unknown, url?: string): ClassifiedApiError {
-  const isAxios = axios.isAxiosError(error);
+  const isAxios = isAxiosError(error);
   const axiosErr = isAxios ? (error as AxiosError<ErrorResponseBody>) : null;
   const attemptedUrl = url || axiosErr?.config?.url || "";
 
@@ -178,7 +178,7 @@ export function classifyApiError(error: unknown, url?: string): ClassifiedApiErr
  * (server `message` field first, then axios message).
  */
 export function getApiErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
+  if (isAxiosError(error)) {
     const data = error.response?.data as ErrorResponseBody | undefined;
     if (typeof data?.message === 'string' && data.message.trim()) return data.message;
     if (typeof data?.error === 'string' && data.error.trim()) return data.error;

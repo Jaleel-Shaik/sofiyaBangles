@@ -462,9 +462,23 @@ export interface Review {
   id: string;
   user_id: string;
   product_id: string;
-  rating: number;
-  comment: string | null;
-  damage_details: string | null;
+  order_id?: string | null;
+  order_item_id?: string | null;
+  order_number?: string | null;
+  unique_code?: string | null;
+  product_code?: string | null;
+  rating: number; // 1 to 5 stars (Product Quality)
+  suggestion?: string | null; // Any suggestions for improvement
+  comment: string | null; // Review comments
+  is_defective?: boolean; // Damage or defective flag
+  damage_details: string | null; // Damage / defect details
+  // Customer personal details (stored for admin view, omitted from public view for privacy)
+  user_name?: string;
+  user_email?: string;
+  user_phone?: string;
+  // Product info snapshot
+  product_name?: string;
+  product_image?: string | null;
   created_at: string;
   updated_at: string;
 }

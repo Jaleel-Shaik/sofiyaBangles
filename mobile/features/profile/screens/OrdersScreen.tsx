@@ -13,38 +13,20 @@ import {
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useOrderStore } from "@/src/store/orderStore";
 
 export default function OrdersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { orders, loading, fetchOrders } = useOrderStore();
   const [refreshing, setRefreshing] = useState(false);
-
-  const fetchOrders = async (silent = false) => {
-    try {
-      const data = await api.orders.getUserOrders();
-      setOrders(Array.isArray(data) ? data : []);
-    } catch (error) {
-      if (!silent) {
-        console.warn("Failed to fetch orders:", error);
-      }
-      if (!silent && orders.length === 0) {
-        setOrders([]);
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
 
   // Re-fetch orders whenever the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      fetchOrders();
-    }, [])
+      fetchOrders(true);
+    }, [fetchOrders])
   );
 
   // Layer 1 Sync: Re-sync immediately when customer returns from WhatsApp / switches back to app
@@ -69,9 +51,10 @@ export default function OrdersScreen() {
     return () => clearInterval(intervalId);
   }, [orders]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchOrders();
+    await fetchOrders(true);
+    setRefreshing(false);
   };
 
   const openOrderProduct = (order: OrderItem) => {
@@ -79,6 +62,23 @@ export default function OrdersScreen() {
     router.push({
       pathname: "/products/[id]",
       params: { id: order.product_id, fromOrders: "true", orderId: order.id },
+    } as any);
+  };
+
+  const openRateProduct = (order: Order, item: OrderItem) => {
+    if (!item?.product_id) return;
+    router.push({
+      pathname: "/order-review",
+      params: {
+        orderId: order.id,
+        orderNumber: order.order_number || "",
+        itemId: item.id,
+        productId: item.product_id,
+        productName: item.product_name,
+        productImage: item.image_url || "",
+        price: String(item.price ?? 0),
+        size: item.size || "",
+      },
     } as any);
   };
 
@@ -98,28 +98,22 @@ export default function OrdersScreen() {
         className="px-5 pb-3 bg-surface border-b border-divider"
         style={{ paddingTop: Math.max(insets.top + 8, 36) }}
       >
-        <View className="flex-row items-center mb-2">
+        <View className="flex-row items-center mb-1">
           <TouchableOpacity
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-full bg-slate-50 border border-divider items-center justify-center mr-3"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/home" as any))}
+            className="w-10 h-10 rounded-full bg-slate-50 border border-slate-200/80 items-center justify-center mr-3 shadow-xs active:scale-95"
             activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
             <Ionicons name="arrow-back" size={20} color="#0f172a" />
           </TouchableOpacity>
           <View className="flex-1">
-            <View className="flex-row items-center gap-1.5">
-              <View className="bg-primary/10 px-2 py-0.5 rounded-full">
-                <Text className="text-[10px] font-extrabold text-primary uppercase tracking-wider">
-                  ROLE: CUSTOMER ORDERS
-                </Text>
-              </View>
-            </View>
-            <Text className="text-xl font-bold text-text-primary mt-0.5">My Purchases</Text>
+            <Text className="text-xl font-bold text-text-primary">My Purchases</Text>
           </View>
         </View>
-        <Text className="text-xs text-text-secondary">
+        <Text className="text-xs text-text-secondary ml-13">
           Track WhatsApp orders, live confirmation status & purchase history
         </Text>
       </View>
@@ -156,13 +150,15 @@ export default function OrdersScreen() {
             const isCancelled = order.status === "cancelled";
 
             return (
-              <TouchableOpacity
+              <View
                 key={item.id}
-                onPress={() => openOrderProduct(item)}
-                activeOpacity={0.7}
                 className="bg-surface rounded-2xl mb-4 border border-divider overflow-hidden shadow-xs"
               >
-                <View className="flex-row p-4">
+                <TouchableOpacity
+                  onPress={() => openOrderProduct(item)}
+                  activeOpacity={0.7}
+                  className="flex-row p-4"
+                >
                   <View className="w-24 h-24 rounded-xl bg-slate-100 overflow-hidden mr-3.5">
                     {item.image_url ? (
                       <Image
@@ -187,12 +183,14 @@ export default function OrdersScreen() {
                           {item.product_name || "Handcrafted Bangles"}
                         </Text>
 
-                        <View className="flex-row items-center mb-1">
-                          <Text className="text-[10px] text-text-secondary font-medium">Order #: </Text>
-                          <Text className="text-[11px] font-mono font-bold text-slate-800">
-                            {order.order_number || "ORD-N/A"}
-                          </Text>
-                        </View>
+                        {item.size ? (
+                          <View className="flex-row items-center mb-1">
+                            <Text className="text-[10px] text-text-secondary font-medium mr-1">Size:</Text>
+                            <Text className="text-[11px] font-semibold text-slate-700">
+                              {item.size}
+                            </Text>
+                          </View>
+                        ) : null}
 
                         <View className="flex-row items-baseline">
                           <Text className="text-[10px] text-text-secondary font-medium mr-1">Price: </Text>
@@ -227,35 +225,85 @@ export default function OrdersScreen() {
                       </Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
 
-                {isPending ? (
-                  <View className="flex-row items-center mx-4 mb-4 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200/70">
-                    <View className="w-8 h-8 rounded-full items-center justify-center mr-3 bg-amber-100">
-                      <Ionicons name="logo-whatsapp" size={17} color="#d97706" />
+                {isPending && (
+                  <View className="flex-row items-center mx-4 mb-2.5 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200/70">
+                    <View className="w-7 h-7 rounded-full items-center justify-center mr-2.5 bg-amber-100">
+                      <Ionicons name="logo-whatsapp" size={15} color="#d97706" />
                     </View>
                     <View className="flex-1">
                       <Text className="text-xs font-bold text-amber-900">Sent to WhatsApp</Text>
-                      <Text className="text-[11px] text-amber-700 mt-0.5">
-                        Awaiting admin confirmation. This screen updates live when confirmed.
+                      <Text className="text-[11px] text-amber-700">
+                        Order placed • Awaiting confirmation
                       </Text>
                     </View>
-                  </View>
-                ) : (
-                  <View className="flex-row items-center mx-4 mb-4 px-4 py-3 rounded-2xl bg-slate-50 border border-divider">
-                    <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${item.is_reviewed ? "bg-success/20" : "bg-warning/20"}`}>
-                      <Ionicons name={item.is_reviewed ? "star" : "star-outline"} size={16} color={item.is_reviewed ? "#059669" : "#d97706"} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-sm font-bold text-text-primary">{item.is_reviewed ? "Reviewed" : "Tap to rate"}</Text>
-                      <Text className="text-xs text-text-secondary mt-0.5">
-                        {item.is_reviewed ? "Your feedback has been saved" : "Share your experience"}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
                   </View>
                 )}
-              </TouchableOpacity>
+
+                {/* Dedicated Review & Rating Action */}
+                {!isCancelled && (
+                  <TouchableOpacity
+                    onPress={() => openRateProduct(order, item)}
+                    activeOpacity={0.8}
+                    className={`flex-row items-center mx-4 mb-4 px-4 py-3 rounded-2xl border ${
+                      item.is_reviewed
+                        ? "bg-emerald-50/70 border-emerald-300"
+                        : "bg-amber-50/70 border-amber-300"
+                    }`}
+                  >
+                    <View
+                      className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
+                        item.is_reviewed ? "bg-emerald-100" : "bg-amber-100"
+                      }`}
+                    >
+                      <Ionicons
+                        name={item.is_reviewed ? "star" : "star-outline"}
+                        size={17}
+                        color={item.is_reviewed ? "#059669" : "#d97706"}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <View className="flex-row items-center gap-1.5">
+                        <Text
+                          className={`text-sm font-bold ${
+                            item.is_reviewed ? "text-emerald-950" : "text-amber-950"
+                          }`}
+                        >
+                          {item.is_reviewed ? "Reviewed & Rated" : "Rate & Review Product"}
+                        </Text>
+                        <View
+                          className={`px-1.5 py-0.2 rounded ${
+                            item.is_reviewed ? "bg-emerald-200/80" : "bg-amber-200/80"
+                          }`}
+                        >
+                          <Text
+                            className={`text-[9px] font-extrabold uppercase ${
+                              item.is_reviewed ? "text-emerald-800" : "text-amber-800"
+                            }`}
+                          >
+                            {item.is_reviewed ? "COMPLETED" : "TAP TO RATE"}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text
+                        className={`text-xs mt-0.5 ${
+                          item.is_reviewed ? "text-emerald-700" : "text-amber-700"
+                        }`}
+                      >
+                        {item.is_reviewed
+                          ? "Your rating is saved. Tap to view or update feedback."
+                          : "Rate quality (1-5★) • suggestions • defect check"}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={item.is_reviewed ? "#059669" : "#d97706"}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
             );
           }))
         )}

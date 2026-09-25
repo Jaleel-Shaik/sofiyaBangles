@@ -230,6 +230,8 @@ export interface RevenueLedgerItem {
   order_item_id: string;
   product_id: string;
   product_name?: string;
+  unique_code?: string;
+  order_number?: string;
   sale_rate?: number;
   quantity?: number;
   admin_id: string;
@@ -398,4 +400,26 @@ export interface ProductAnalyticsItem {
   net_sales?: number;
   status: string;
   image_url?: string;
+}
+
+export interface AdminReview {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_email?: string;
+  user_phone?: string;
+  product_id: string;
+  product_name?: string;
+  product_image?: string | null;
+  unique_code?: string | null;
+  product_code?: string | null;
+  order_id?: string | null;
+  order_number?: string | null;
+  rating: number; // 1 to 5 stars (Product Quality)
+  suggestion?: string | null; // Customer suggestions
+  comment?: string | null; // Review comments
+  is_defective?: boolean; // Damage or defective flag
+  damage_details?: string | null; // Damage details if defective
+  created_at: string;
+  updated_at?: string;
 }

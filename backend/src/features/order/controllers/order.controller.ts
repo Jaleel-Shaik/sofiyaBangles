@@ -172,18 +172,31 @@ export const deleteOrder = asyncHandler(async (req: AuthRequest, res: Response) 
 
 export const createReview = asyncHandler(async (req: AuthRequest, res: Response) => {
   const productId = req.body.productId || req.body.product_id;
-  const rating = Number(req.body.rating);
+  const rating = Number(req.body.rating || req.body.qualityRating || req.body.quality_rating || 5);
   const comment = req.body.comment;
+  const suggestion = req.body.suggestion;
+  const isDefective = req.body.isDefective !== undefined ? req.body.isDefective : req.body.is_defective;
+  const damageDetails = req.body.damageDetails || req.body.damage_details;
+  const orderId = req.body.orderId || req.body.order_id;
+  const orderItemId = req.body.orderItemId || req.body.order_item_id;
 
   try {
     const review = await OrderService.createReview(req.user!.userId, {
       productId,
+      orderId,
+      orderItemId,
       rating,
       comment,
+      suggestion,
+      isDefective,
+      damageDetails,
       customerName: req.body.customerName || req.body.customer_name,
     });
     return sendSuccess(res, review, { statusCode: 201 });
   } catch (err: any) {
+    if (err.message === "CANNOT_REVIEW_UNPURCHASED_PRODUCT") {
+      throw new BadRequestError("You can only review products from your purchased orders.", "UNPURCHASED_PRODUCT");
+    }
     if (err.message === "ORDER_NOT_FOUND") throw new NotFoundError("Purchase record not found.");
     throw err;
   }
@@ -194,6 +207,11 @@ export const getProductReviews = asyncHandler(async (req: AuthRequest, res: Resp
     ? req.params.productId[0]
     : req.params.productId;
   const reviews = await OrderService.getProductReviews(productId);
+  return sendSuccess(res, reviews);
+});
+
+export const getAllReviewsForAdmin = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const reviews = await OrderService.getAllReviewsForAdmin();
   return sendSuccess(res, reviews);
 });
 

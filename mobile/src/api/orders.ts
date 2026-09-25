@@ -45,16 +45,32 @@ export interface Order {
 
 export interface ReviewPayload {
   productId: string;
-  rating: number;
+  orderId?: string | null;
+  orderItemId?: string | null;
+  rating: number; // 1-5 stars (Product Quality)
+  qualityRating?: number;
   comment?: string | null;
-  damageDetails?: string | null;
+  suggestion?: string | null; // Any suggestions
+  isDefective?: boolean; // Damage or defective flag
+  damageDetails?: string | null; // Defect details
+  customerName?: string | null;
 }
 
 export interface OrderReview {
   id: string;
+  product_id?: string;
   rating: number;
   comment: string | null;
+  suggestion?: string | null;
+  is_defective?: boolean;
   damage_details: string | null;
+  user_name?: string;
+  user_email?: string;
+  user_phone?: string;
+  order_id?: string | null;
+  order_number?: string | null;
+  product_name?: string;
+  product_image?: string | null;
   created_at: string;
 }
 
@@ -96,6 +112,17 @@ export const getProductReviews = async (productId: string): Promise<OrderReview[
     return (res.data?.data || []) as OrderReview[];
   } catch (error) {
     console.warn(`Failed to fetch reviews for product ${productId}:`, error);
+    return [];
+  }
+};
+
+export const getAdminReviews = async (): Promise<OrderReview[]> => {
+  try {
+    const res = await apiClient.get('/orders/admin/reviews');
+    const data = Array.isArray(res.data?.data) ? res.data.data : [];
+    return data as OrderReview[];
+  } catch (error) {
+    console.warn('Failed to fetch admin reviews:', error);
     return [];
   }
 };

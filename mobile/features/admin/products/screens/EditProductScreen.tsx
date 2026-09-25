@@ -192,16 +192,7 @@ export default function EditProductScreen() {
 
     const catName = categories.find(c => c.id === selectedCategory)?.category_name || 'PRD';
 
-    const parsedVariants = variants.map(v => ({
-      id: v.id,
-      size: v.size,
-      price: parseFloat(v.price) || parseFloat(price) || 0,
-      quantity: parseInt(v.quantity, 10) || 0
-    }));
-
-    const totalQuantity = hasVariants
-      ? variants.reduce((sum, v) => sum + (parseInt(v.quantity, 10) || 0), 0)
-      : (parseInt(quantity, 10) || 0);
+    const totalQuantity = parseInt(quantity, 10) || 0;
 
     setLoading(true);
     try {
@@ -215,10 +206,10 @@ export default function EditProductScreen() {
         quantity: totalQuantity,
         unique_code: uniqueCode,
         is_active: isActive,
-        has_variants: hasVariants,
-        variants: hasVariants && parsedVariants.length > 0 ? JSON.stringify(parsedVariants) : '[]',
-        accepts_custom_size: acceptsCustomSize,
-        custom_size_price: parseFloat(customSizePrice) || parseFloat(price)
+        has_variants: false,
+        variants: '[]',
+        accepts_custom_size: false,
+        custom_size_price: parseFloat(price)
       }, imageUrls);
       Alert.alert('Success', 'Product updated successfully', [
         { text: 'OK', onPress: () => router.back() }
@@ -258,11 +249,6 @@ export default function EditProductScreen() {
   const removeImage = (index: number) => {
     setImageUrls(prev => prev.filter((_, i) => i !== index));
   };
-
-  const updateVariant = (id: string, field: 'price' | 'quantity', value: string) => {
-    setVariants(prev => prev.map(v => v.id === id ? { ...v, [field]: value } : v));
-  };
-
 
   return (
     <View className="flex-1 bg-surface">
@@ -461,18 +447,7 @@ export default function EditProductScreen() {
                           <View className="flex-row items-center mt-1">
                             <Ionicons name="layers-outline" size={14} color="#64748b" />
                             <Text className="text-text-secondary text-xs font-bold ml-1">{mt.name}</Text>
-                            {cat.size_type && (
-                              <View className={`${isSelected ? 'bg-primary/10' : 'bg-surface'} px-1.5 py-0.5 rounded-md ml-2 border border-divider`}>
-                                <Text className={`text-[9px] font-bold uppercase ${isSelected ? 'text-primary' : 'text-text-secondary'}`}>{cat.size_type}</Text>
-                              </View>
-                            )}
                           </View>
-                        )}
-                        {(cat.size_type === 'standard' || cat.size_type === 'both') && cat.standard_sizes && cat.standard_sizes.length > 0 && (
-                          <Text className="text-xs text-text-hint mt-1">Sizes: {cat.standard_sizes.join(', ')}</Text>
-                        )}
-                        {(cat.size_type === 'custom' || cat.size_type === 'both') && cat.custom_measurement_fields && cat.custom_measurement_fields.length > 0 && (
-                          <Text className="text-xs text-text-hint mt-1">Custom: {cat.custom_measurement_fields.join(', ')}</Text>
                         )}
                       </View>
                       
@@ -492,154 +467,22 @@ export default function EditProductScreen() {
         ) : null}
         </View>
 
-        {/* Inventory & Sizing Card */}
+        {/* Stock Inventory Card */}
         <View className="bg-surface p-5 rounded-2xl mb-6 border border-divider">
-          <View className="flex-row items-center justify-between mb-4 pb-2 border-b border-divider">
-            <View className="flex-row items-center">
-              <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
-                <Ionicons name="layers" size={16} color="#e11d48" />
-              </View>
-              <Text className="text-lg font-bold text-text-primary">Inventory & Sizing</Text>
+          <View className="flex-row items-center mb-4 pb-2 border-b border-divider">
+            <View className="w-8 h-8 bg-primary/10 rounded-full items-center justify-center mr-3">
+              <Ionicons name="layers" size={16} color="#e11d48" />
             </View>
-
-            {/* Toggle Size Variants */}
-            <TouchableOpacity
-              onPress={() => {
-                const nextVal = !hasVariants;
-                setHasVariants(nextVal);
-                if (nextVal && (variants || []).length === 0 && Array.isArray(currentCategory?.standard_sizes) && currentCategory.standard_sizes.length > 0) {
-                  setVariants(currentCategory.standard_sizes.map(sz => ({
-                    id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    size: sz,
-                    price: price || '0',
-                    quantity: quantity || '0'
-                  })));
-                }
-              }}
-              className={`px-3 py-1.5 rounded-xl border flex-row items-center ${
-                hasVariants ? 'bg-primary/10 border-primary' : 'bg-surface border-divider'
-              }`}
-            >
-              <View className={`w-2 h-2 rounded-full mr-1.5 ${hasVariants ? 'bg-primary' : 'bg-slate-300'}`} />
-              <Text className={`text-xs font-bold ${hasVariants ? 'text-primary' : 'text-text-secondary'}`}>
-                {hasVariants ? 'Sizes: ON' : 'Sizes: OFF'}
-              </Text>
-            </TouchableOpacity>
+            <Text className="text-lg font-bold text-text-primary">Stock Inventory</Text>
           </View>
           
-          {!hasVariants ? (
-            <View>
-              <TextInputField 
-                label="Total Available Stock Quantity" 
-                placeholder="e.g. 10" 
-                keyboardType="numeric" 
-                value={quantity} 
-                onChangeText={setQuantity} 
-              />
-              <Text className="text-xs text-text-hint mt-1 ml-1">Single-size / free-size product with standard price ₹{price || '0'}.</Text>
-            </View>
-          ) : (
-            <View className="mb-4">
-              <View className="flex-row items-center justify-between mb-3">
-                <Text className="text-sm font-bold text-text-secondary ml-1">Size Variants</Text>
-                {variants.length > 0 && (
-                  <Text className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                    Total: {variants.reduce((sum, v) => sum + (parseInt(v.quantity, 10) || 0), 0)} units
-                  </Text>
-                )}
-              </View>
-
-              {/* Add Custom Size Bar */}
-              <View className="flex-row items-center bg-[#FAFAFA] p-2 rounded-2xl border border-divider mb-4">
-                <TextInput
-                  placeholder="Add size (e.g. 2.10, L, XL)..."
-                  value={customSizeInput}
-                  onChangeText={setCustomSizeInput}
-                  className="flex-1 px-3 py-2 text-text-primary text-sm font-semibold"
-                />
-                <TouchableOpacity
-                  onPress={addCustomSize}
-                  className="bg-[#111827] px-4 py-2 rounded-xl"
-                >
-                  <Text className="text-white text-xs font-bold">+ Add Size</Text>
-                </TouchableOpacity>
-              </View>
-
-              {(variants || []).length === 0 ? (
-                <View className="p-5 border border-dashed border-divider rounded-2xl items-center">
-                  <Text className="text-xs text-text-hint text-center">No sizes added yet. Use the field above to add sizes, or toggle Sizes OFF.</Text>
-                </View>
-              ) : (
-                (variants || []).map((v) => (
-                  <View key={v.id} className="flex-row items-center bg-surface p-3 rounded-2xl border border-divider mb-3">
-                    <View className="bg-primary/10 border border-primary/20 px-3.5 py-2.5 rounded-xl mr-3 items-center justify-center min-w-[50px]">
-                      <Text className="font-bold text-primary text-base">{v.size}</Text>
-                    </View>
-                    <View className="flex-1 mr-2">
-                      <Text className="text-[10px] text-text-secondary font-bold mb-1 uppercase ml-1">Price (₹)</Text>
-                      <TextInput 
-                        placeholder="Price" 
-                        value={v.price} 
-                        onChangeText={(val) => updateVariant(v.id, 'price', val)} 
-                        keyboardType="numeric" 
-                        className="bg-[#FAFAFA] border border-divider rounded-xl px-3 py-2 text-text-primary font-semibold text-sm" 
-                      />
-                    </View>
-                    <View className="w-20 mr-2">
-                      <Text className="text-[10px] text-text-secondary font-bold mb-1 uppercase ml-1">Stock</Text>
-                      <TextInput 
-                        placeholder="Qty" 
-                        value={v.quantity} 
-                        onChangeText={(val) => updateVariant(v.id, 'quantity', val)} 
-                        keyboardType="numeric" 
-                        className="bg-[#FAFAFA] border border-divider rounded-xl px-3 py-2 text-text-primary font-semibold text-sm" 
-                      />
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => removeVariant(v.id)}
-                      className="p-2 self-end mb-1"
-                    >
-                      <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                    </TouchableOpacity>
-                  </View>
-                ))
-              )}
-            </View>
-          )}
-
-          {/* Custom Sizing Toggle */}
-          <View className="pt-3 border-t border-divider mt-2">
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-sm font-bold text-text-primary">Accepts Custom Measurements</Text>
-              <TouchableOpacity
-                onPress={() => setAcceptsCustomSize(!acceptsCustomSize)}
-                className={`px-3 py-1.5 rounded-xl border ${
-                  acceptsCustomSize ? 'bg-primary/10 border-primary' : 'bg-surface border-divider'
-                }`}
-              >
-                <Text className={`text-xs font-bold ${acceptsCustomSize ? 'text-primary' : 'text-text-secondary'}`}>
-                  {acceptsCustomSize ? 'Custom: ON' : 'Custom: OFF'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {acceptsCustomSize && (
-              <View className="bg-primary/5 p-4 rounded-2xl border border-primary/20 space-y-3">
-                <Text className="text-xs text-text-secondary font-medium leading-5">
-                  Customers can enter custom measurements {currentCategory?.custom_measurement_fields?.length ? `(${currentCategory.custom_measurement_fields.join(', ')})` : ''} when ordering.
-                </Text>
-                <View className="bg-surface p-1 rounded-2xl">
-                  <TextInputField 
-                    label="Custom Size Price (₹)" 
-                    placeholder="e.g. 3000" 
-                    keyboardType="numeric" 
-                    value={customSizePrice} 
-                    onChangeText={setCustomSizePrice} 
-                  />
-                </View>
-              </View>
-            )}
-          </View>
+          <TextInputField 
+            label="Total Available Stock Quantity *" 
+            placeholder="e.g. 10" 
+            keyboardType="numeric" 
+            value={quantity} 
+            onChangeText={setQuantity} 
+          />
         </View>
 
         <View className="h-32" />

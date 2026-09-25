@@ -16,7 +16,6 @@ import {
 import { useState, useCallback, useRef, useMemo } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useAuthStore } from "@/src/store/authStore";
-import { useSizeStore } from "@/src/store/sizeStore";
 
 import { getCategories, Category } from "@/src/api/categories";
 import { getUserOrders } from "@/src/api/orders";
@@ -26,11 +25,11 @@ import { AppIcon } from "@/src/constants/icons";
 import { STRINGS } from "@/src/constants/strings";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuthStore();
-  const { preferences, fetchPreferences } = useSizeStore();
   const router = useRouter();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -104,14 +103,8 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // Fetch size preferences and orders if logged in as customer
+      // Fetch orders if logged in as customer
       if (token && user?.role === 'user') {
-        try {
-          fetchPreferences();
-        } catch (e) {
-          console.warn("Error fetching size preferences", e);
-        }
-
         const loadPurchasedProducts = async () => {
           try {
             const orders = await getUserOrders();
@@ -162,16 +155,16 @@ export default function HomeScreen() {
   // Define banners FIRST so snapOffsets and JSX always have valid array
   const banners = [
     {
+      ...STRINGS.home.banners.newArrivals,
+      gradient: ["#e11d48", "#be123c", "#881337"],
+      textColor: "text-[#e11d48]",
+      icon: "sparkles",
+    },
+    {
       ...STRINGS.home.banners.collections,
       gradient: ["#4f46e5", "#4338ca", "#312e81"],
       textColor: "text-[#4f46e5]",
       icon: "grid",
-    },
-    {
-      ...STRINGS.home.banners.sizePreferences,
-      gradient: ["#d97706", "#b45309", "#78350f"],
-      textColor: "text-[#b45309]",
-      icon: "ruler",
     },
   ];
 
@@ -226,33 +219,9 @@ export default function HomeScreen() {
     return Array.from(sizeSet);
   }, [products]);
 
-  const hasConfiguredSizes = (preferences || []).length > 0;
-
   const filteredProducts = useMemo(() => {
     const safeProducts = Array.isArray(products) ? products.filter(Boolean) : [];
     if (selectedSizeFilter === "all") return safeProducts;
-
-    const safePrefs = Array.isArray(preferences) ? preferences : [];
-    if (selectedSizeFilter === "my_sizes") {
-      return safeProducts.filter((p) => {
-        if (!p) return false;
-        const hasCustomPref = safePrefs.some(
-          (pref) => pref && pref.category_id === p.category_id && pref.is_custom
-        );
-        if (p.accepts_custom_size && hasCustomPref) return true;
-
-        const standardPref = safePrefs.find(
-          (pref) => pref && pref.category_id === p.category_id && !pref.is_custom
-        );
-        if (standardPref?.standard_size && p.has_variants && Array.isArray(p.variants)) {
-          return p.variants.some(
-            (v) => v && v.size === standardPref.standard_size && (v.quantity || 0) > 0
-          );
-        }
-        if (!p.has_variants) return true;
-        return false;
-      });
-    }
 
     return safeProducts.filter((p) => {
       if (!p) return false;
@@ -263,7 +232,7 @@ export default function HomeScreen() {
       }
       return false;
     });
-  }, [products, selectedSizeFilter, preferences]);
+  }, [products, selectedSizeFilter]);
 
   const renderHeader = () => (
     <>
@@ -398,27 +367,14 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Size Preferences & Filter Bar (renders if sizes exist) */}
-      {((availableSizes || []).length > 0 || hasConfiguredSizes) && (
+      {/* Size Filter Bar (renders if sizes exist) */}
+      {(availableSizes || []).length > 0 && (
         <View className="mt-5 px-5">
-          <View className="flex-row justify-between items-center mb-2.5">
-            <View className="flex-row items-center">
-              <AppIcon name="filter" size={14} color="#e11d48" />
-              <Text className="text-label-md font-bold text-text-primary ml-1.5">
-                {STRINGS.home.filterBySize}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => router.push("/(tabs)/size-preferences" as any)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={STRINGS.home.mySizePreferences}
-            >
-              <Text className="text-label-sm font-bold text-primary">
-                {STRINGS.home.mySizePreferences}
-              </Text>
-            </TouchableOpacity>
+          <View className="flex-row items-center mb-2.5">
+            <AppIcon name="filter" size={14} color="#e11d48" />
+            <Text className="text-label-md font-bold text-text-primary ml-1.5">
+              {STRINGS.home.filterBySize}
+            </Text>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 px-5">
@@ -442,34 +398,6 @@ export default function HomeScreen() {
                 {STRINGS.common.allSizes}
               </Text>
             </TouchableOpacity>
-
-            {/* My Sizes Option */}
-            {hasConfiguredSizes && (
-              <TouchableOpacity
-                onPress={() => setSelectedSizeFilter("my_sizes")}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="My Sizes"
-                className={`mr-2.5 px-4 min-h-[44px] justify-center items-center rounded-full border flex-row shadow-xs ${
-                  selectedSizeFilter === "my_sizes"
-                    ? "bg-primary border-primary"
-                    : "bg-rose-50 border-rose-200"
-                }`}
-              >
-                <AppIcon
-                  name="sparkles"
-                  size={13}
-                  color={selectedSizeFilter === "my_sizes" ? "white" : "#e11d48"}
-                />
-                <Text
-                  className={`text-label-sm font-semibold ml-1.5 ${
-                    selectedSizeFilter === "my_sizes" ? "text-white font-bold" : "text-primary"
-                  }`}
-                >
-                  My Sizes ★
-                </Text>
-              </TouchableOpacity>
-            )}
 
             {/* Individual sizes found in products */}
             {(availableSizes || []).map((sz) => (
@@ -631,8 +559,26 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Flipkart-Style Search Bar Entry Button */}
+        <TouchableOpacity
+          onPress={() => router.push("/search" as any)}
+          className="mt-3 bg-white border border-rose-200/90 rounded-2xl py-3 px-3.5 flex-row items-center shadow-xs active:bg-rose-50/50"
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Search products and apply filters"
+        >
+          <AppIcon name="search" size={17} color="#e11d48" style={{ marginRight: 9 }} />
+          <Text className="text-slate-400 text-xs font-medium flex-1">
+            Search bangles, bridal sets, models, codes...
+          </Text>
+          <View className="bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-200/70 flex-row items-center">
+            <Ionicons name="options-outline" size={13} color="#e11d48" style={{ marginRight: 4 }} />
+            <Text className="text-[11px] font-bold text-rose-700">Filters</Text>
+          </View>
+        </TouchableOpacity>
+
         {/* Bottom Tagline Banner: Clean & Seamless */}
-        <View className="flex-row items-center mt-2">
+        <View className="flex-row items-center mt-2.5">
           <AppIcon name="sparkles" size={12} color="#e11d48" style={{ marginRight: 6 }} />
           <Text className="text-[11px] font-semibold text-rose-600 tracking-wide flex-1" numberOfLines={1}>
             {STRINGS.home.tagline}

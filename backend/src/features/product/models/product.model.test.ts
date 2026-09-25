@@ -5,6 +5,8 @@ import { createProductService, lookupProductByCodeOrIdService, sellProductServic
 import { createProductSchema } from '../validations/product.validation';
 import { db } from '../../../shared/config/firebase';
 import { getProductByCodeOrIdDb } from '../../../db/product.db';
+import { createCustomerAccountModel } from '../../../shared/models/identity.model';
+import { OrderService } from '../../order/services/order.service';
 
 test('Product Model Setup and Lifecycle', async (t) => {
   await t.test('calculateReviewStats averages ratings and preserves review count', () => {
@@ -251,6 +253,62 @@ test('Product Model Setup and Lifecycle', async (t) => {
         // Cleanup customer test order
         await db.collection("orders").doc(customerOrderId).delete();
         await db.collection("order_items").doc("item-" + customerOrderId).delete();
+
+        // 6. Test sellProductService with customer phone
+        const testUnregisteredPhone = "9999990001";
+        // 6a. Attempting to sell to unregistered phone must reject with CUSTOMER_NOT_FOUND
+        await assert.rejects(
+          async () => {
+            await sellProductService(specialCode, 1, 'test-admin-actor', {
+              customer_phone: testUnregisteredPhone,
+            });
+          },
+          { message: 'CUSTOMER_NOT_FOUND' },
+          "Selling with unregistered customer phone must be rejected"
+        );
+
+        // 6b. Register authorized customer account
+        const testCustomerPhone = "98888" + Date.now().toString().slice(-5);
+        const registeredCustomer = await createCustomerAccountModel({
+          full_name: "Test Authorized Buyer",
+          phone: testCustomerPhone,
+          email: `test_buyer_${Date.now()}@example.com`,
+          password: "Password@123",
+        });
+
+        let customerSaleOrderId: string | null = null;
+        try {
+          // 6c. Now sell product to registered customer
+          const customerSaleResult = await sellProductService(specialCode, 2, 'test-admin-actor', {
+            customer_phone: testCustomerPhone,
+            customer_name: "Test Authorized Buyer",
+          });
+
+          customerSaleOrderId = (customerSaleResult as any)?.order?.id;
+          assert.ok(customerSaleOrderId, "Order must be created for customer");
+          assert.equal(
+            (customerSaleResult as any)?.order?.user_id,
+            registeredCustomer.id,
+            "Order must be linked to the registered customer user ID"
+          );
+
+          // 6d. Verify the order appears in the customer's mobile app order list
+          const customerOrders = await OrderService.getUserOrders(registeredCustomer.id);
+          assert.ok(customerOrders.length > 0, "Customer must have at least 1 order");
+          const foundOrder = customerOrders.find((o) => o.id === customerSaleOrderId);
+          assert.ok(foundOrder, "Customer order list must contain the quick-sold order");
+          assert.equal(foundOrder.status, "completed");
+          assert.ok(foundOrder.items && foundOrder.items.length > 0, "Order must contain items");
+        } finally {
+          if (customerSaleOrderId) {
+            await db.collection("orders").doc(customerSaleOrderId).delete();
+            const itemsSnap = await db.collection("order_items").where("order_id", "==", customerSaleOrderId).get();
+            for (const d of itemsSnap.docs) await db.collection("order_items").doc(d.id).delete();
+            const revSnap = await db.collection("revenue_ledger").where("order_id", "==", customerSaleOrderId).get();
+            for (const d of revSnap.docs) await db.collection("revenue_ledger").doc(d.id).delete();
+          }
+          await db.collection("users").doc(registeredCustomer.id).delete();
+        }
       } finally {
         // Cleanup all test orders created during sellProductService
         if (soldProductOrderId) {

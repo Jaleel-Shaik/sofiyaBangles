@@ -17,9 +17,13 @@ import {
   Plus,
   RefreshCw,
   ShoppingBag,
+  UserCheck,
+  UserPlus,
+  Phone,
+  ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { api, type Product } from "@/src/lib/api";
+import { api, type Product, type User } from "@/src/lib/api";
 
 interface QuickSellModalProps {
   isOpen: boolean;
@@ -43,6 +47,24 @@ export function QuickSellModal({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [selling, setSelling] = useState(false);
+
+  // Customer verification & account creation state
+  const [checkingCustomer, setCheckingCustomer] = useState(false);
+  const [verifiedCustomer, setVerifiedCustomer] = useState<User | null>(null);
+  const [customerLookupStatus, setCustomerLookupStatus] = useState<"idle" | "found" | "not_found">("idle");
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustEmail, setNewCustEmail] = useState("");
+  const [newCustPassword, setNewCustPassword] = useState("Sofiya@1234");
+  const [creatingAccount, setCreatingAccount] = useState(false);
+
+  // Quick Restock state
+  const [isRestocking, setIsRestocking] = useState(false);
+  const [showCustomRestock, setShowCustomRestock] = useState(false);
+  const [customRestockQty, setCustomRestockQty] = useState("");
+
+
   const [completedSale, setCompletedSale] = useState<{
     productName: string;
     code: string;
@@ -50,6 +72,7 @@ export function QuickSellModal({
     total: number;
     remaining: number;
     phone?: string;
+    customerName?: string;
     orderNumber?: string;
   } | null>(null);
 
@@ -64,6 +87,9 @@ export function QuickSellModal({
       setQuantity(1);
       setCustomerName("");
       setCustomerPhone("");
+      setVerifiedCustomer(null);
+      setCustomerLookupStatus("idle");
+      setShowCreateAccountModal(false);
       setCompletedSale(null);
       setTimeout(() => inputRef.current?.focus(), 150);
 
@@ -76,13 +102,13 @@ export function QuickSellModal({
   // Keyboard shortcut listener for Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape" && isOpen && !showCreateAccountModal) {
         onClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, showCreateAccountModal]);
 
   const performLookup = async (lookupCode: string) => {
     const cleaned = lookupCode.trim().toUpperCase();
@@ -115,6 +141,116 @@ export function QuickSellModal({
     performLookup(code);
   };
 
+  const handleQuickRestock = async (additionalQty: number) => {
+    if (!product) return;
+    setIsRestocking(true);
+    try {
+      const newTotal = (product.quantity || 0) + additionalQty;
+      await api.admin.updateStock(product.id, newTotal);
+      setProduct((prev: any) => ({ ...prev, quantity: newTotal }));
+      setQuantity((q) => q + 1);
+      toast.success(`Inventory restocked! Total stock is now ${newTotal} units.`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update stock");
+    } finally {
+      setIsRestocking(false);
+    }
+  };
+
+  const handleCustomRestock = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!product) return;
+    const val = parseInt(customRestockQty, 10);
+    if (isNaN(val) || val < 0) {
+      toast.error("Please enter a valid stock number");
+      return;
+    }
+    setIsRestocking(true);
+    try {
+      await api.admin.updateStock(product.id, val);
+      setProduct((prev: any) => ({ ...prev, quantity: val }));
+      if (val > 0) {
+        setQuantity((q) => Math.min(val, Math.max(1, q)));
+      }
+      setShowCustomRestock(false);
+      setCustomRestockQty("");
+      toast.success(`Stock updated! Total available stock is now ${val} units.`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update stock");
+    } finally {
+      setIsRestocking(false);
+    }
+  };
+
+
+  const handleCheckCustomer = async (phoneToCheck?: string) => {
+    const raw = (phoneToCheck !== undefined ? phoneToCheck : customerPhone).trim();
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setVerifiedCustomer(null);
+      setCustomerLookupStatus("idle");
+      return;
+    }
+
+    setCheckingCustomer(true);
+    try {
+      const res = await api.admin.lookupCustomerByPhone(raw);
+      if (res?.found && res.user) {
+        setVerifiedCustomer(res.user);
+        setCustomerLookupStatus("found");
+        if (res.user.full_name) {
+          setCustomerName(res.user.full_name);
+        }
+      } else {
+        setVerifiedCustomer(null);
+        setCustomerLookupStatus("not_found");
+      }
+    } catch {
+      setVerifiedCustomer(null);
+      setCustomerLookupStatus("not_found");
+    } finally {
+      setCheckingCustomer(false);
+    }
+  };
+
+  const handleCreateCustomerAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustName.trim()) {
+      toast.error("Customer full name is required");
+      return;
+    }
+    const cleanPhone = newCustPhone.trim().replace(/\D/g, "");
+    if (cleanPhone.length < 10) {
+      toast.error("Valid 10-digit mobile number is required");
+      return;
+    }
+    if (!newCustEmail.trim() || !newCustEmail.includes("@")) {
+      toast.error("Valid email address is required");
+      return;
+    }
+
+    setCreatingAccount(true);
+    try {
+      const created = await api.admin.createCustomer({
+        full_name: newCustName.trim(),
+        phone: newCustPhone.trim(),
+        email: newCustEmail.trim(),
+        password: newCustPassword.trim() || undefined,
+      });
+
+      toast.success(`Account created and authorized for ${created.full_name}!`);
+      setVerifiedCustomer(created);
+      setCustomerLookupStatus("found");
+      setCustomerPhone(created.phone || newCustPhone.trim());
+      setCustomerName(created.full_name);
+      setShowCreateAccountModal(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to create customer account");
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
   const handleSell = async () => {
     if (!product) return;
 
@@ -128,14 +264,54 @@ export function QuickSellModal({
       return;
     }
 
+    // Require Customer Mobile Number to link order to user's mobile app orders list
+    if (!customerPhone.trim()) {
+      toast.error("Customer mobile number is required to link this order to their mobile app account.");
+      return;
+    }
+
+    // Strict Authentication: verify customer exists or show popup
+    let customerToUse = verifiedCustomer;
+    if (!customerToUse) {
+      setCheckingCustomer(true);
+      try {
+        const res = await api.admin.lookupCustomerByPhone(customerPhone.trim());
+        if (res?.found && res.user) {
+          customerToUse = res.user;
+          setVerifiedCustomer(res.user);
+          setCustomerLookupStatus("found");
+        } else {
+          setVerifiedCustomer(null);
+          setCustomerLookupStatus("not_found");
+          setNewCustPhone(customerPhone.trim());
+          setNewCustName(customerName.trim());
+          const digits = customerPhone.trim().replace(/\D/g, "").slice(-10);
+          setNewCustEmail(`customer_${digits}@sofiyabangles.com`);
+          setShowCreateAccountModal(true);
+          setCheckingCustomer(false);
+          return;
+        }
+      } catch {
+        setCustomerLookupStatus("not_found");
+        setNewCustPhone(customerPhone.trim());
+        setNewCustName(customerName.trim());
+        const digits = customerPhone.trim().replace(/\D/g, "").slice(-10);
+        setNewCustEmail(`customer_${digits}@sofiyabangles.com`);
+        setShowCreateAccountModal(true);
+        setCheckingCustomer(false);
+        return;
+      }
+      setCheckingCustomer(false);
+    }
+
     setSelling(true);
     try {
       const updated = await api.admin.sellProductByCode(
         product.unique_code || product.id,
         quantity,
         {
-          customer_name: customerName.trim() || undefined,
-          customer_phone: customerPhone.trim() || undefined,
+          customer_name: customerName.trim() || customerToUse?.full_name || undefined,
+          customer_phone: customerPhone.trim(),
         }
       );
 
@@ -151,6 +327,7 @@ export function QuickSellModal({
         total: totalAmount,
         remaining: remainingStock,
         phone: customerPhone.trim(),
+        customerName: customerName.trim() || customerToUse?.full_name,
         orderNumber,
       });
 
@@ -288,7 +465,7 @@ export function QuickSellModal({
                 <button
                   type="submit"
                   disabled={lookingUp || !code.trim()}
-                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-rose-500/25"
                 >
                   {lookingUp ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -382,24 +559,27 @@ export function QuickSellModal({
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-4 pt-1"
               >
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex gap-4">
+                <div className="p-4 rounded-2xl bg-white border border-rose-100 shadow-sm flex gap-4">
                   {/* Thumbnail */}
-                  <div className="w-20 h-20 rounded-xl bg-white border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                    {product.image_url ? (
-                      <img
-                        src={product.image_url}
-                        alt={product.product_name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Package className="w-8 h-8 text-slate-300" />
-                    )}
+                  <div className="w-20 h-20 rounded-xl bg-rose-50 border border-rose-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    {(() => {
+                      const imgUrl = product.image_url || (Array.isArray(product.images) && product.images.length > 0 ? (typeof product.images[0] === 'string' ? product.images[0] : product.images[0]?.image_url) : null);
+                      return imgUrl ? (
+                        <img
+                          src={imgUrl}
+                          alt={product.product_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="w-8 h-8 text-rose-300" />
+                      );
+                    })()}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-slate-900 text-white tracking-wider">
+                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-indigo-600 text-white tracking-wider shadow-xs">
                         {product.unique_code}
                       </span>
                       {product.quantity > 5 ? (
@@ -438,7 +618,7 @@ export function QuickSellModal({
                         Quantity to Sell
                       </span>
                       <span className="text-[11px] text-slate-400 font-medium">
-                        Remaining after sale: {Math.max(0, product.quantity - quantity)}
+                        Remaining after sale: {Math.max(0, (product.quantity || 0) - quantity)}
                       </span>
                     </div>
 
@@ -448,61 +628,246 @@ export function QuickSellModal({
                         onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                         disabled={quantity <= 1}
                         className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 flex items-center justify-center font-bold"
+                        title="Decrease quantity"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
                       <input
                         type="number"
                         min={1}
-                        max={product.quantity}
+                        max={product.quantity || 1}
                         value={quantity}
-                        onChange={(e) =>
-                          setQuantity(
-                            Math.max(
-                              1,
-                              Math.min(product.quantity || 1, Number(e.target.value) || 1)
-                            )
-                          )
-                        }
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (!val || val < 1) {
+                            setQuantity(1);
+                          } else if (val > (product.quantity || 0)) {
+                            setQuantity(product.quantity || 1);
+                            toast(
+                              `Only ${product.quantity} unit(s) in stock. Click [+5 Stock] below to restock inventory!`,
+                              { icon: "📦" }
+                            );
+                          } else {
+                            setQuantity(val);
+                          }
+                        }}
                         className="w-14 py-1 text-center font-bold text-slate-900 border border-slate-200 rounded-lg text-sm"
                       />
                       <button
                         type="button"
-                        onClick={() =>
-                          setQuantity((q) => Math.min(product.quantity, q + 1))
-                        }
-                        disabled={quantity >= product.quantity}
+                        onClick={() => {
+                          if (quantity >= (product.quantity || 0)) {
+                            toast(
+                              `Cannot increase further. Max available stock is ${product.quantity}. Use [+5 Stock] below to add inventory!`,
+                              { icon: "📦" }
+                            );
+                            return;
+                          }
+                          setQuantity((q) => Math.min(product.quantity || 1, q + 1));
+                        }}
+                        disabled={quantity >= (product.quantity || 0) && (product.quantity || 0) > 0}
                         className="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 flex items-center justify-center font-bold"
+                        title={quantity >= (product.quantity || 0) ? `Max stock (${product.quantity}) reached` : "Increase quantity"}
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-500">Grand Total:</span>
-                    <span className="text-base font-black text-slate-900">
+                  {/* Stock Limit Notice & Quick Restock Shortcut */}
+                  {(quantity >= (product.quantity || 0) || (product.quantity || 0) <= 2) && (
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                          <Package className="w-3.5 h-3.5 text-slate-400" />
+                          <span>
+                            {(product.quantity || 0) <= 0 ? (
+                              <strong className="text-rose-600">Out of Stock (0 units)</strong>
+                            ) : quantity >= (product.quantity || 0) ? (
+                              <span>
+                                Max stock reached (<strong>{product.quantity} left</strong>)
+                              </span>
+                            ) : (
+                              <span>
+                                Low stock (<strong>{product.quantity} left</strong>)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickRestock(5)}
+                            disabled={isRestocking}
+                            className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-white hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                          >
+                            {isRestocking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                            +5 Stock
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickRestock(10)}
+                            disabled={isRestocking}
+                            className="px-2.5 py-1 text-[11px] font-bold text-rose-600 bg-white hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors shadow-2xs"
+                          >
+                            +10 Stock
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomRestock(!showCustomRestock)}
+                            className="px-2 py-1 text-[11px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
+                          >
+                            Custom
+                          </button>
+                        </div>
+                      </div>
+
+                      {showCustomRestock && (
+                        <div className="pt-2 border-t border-slate-200 flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={0}
+                            placeholder="Set total stock..."
+                            value={customRestockQty}
+                            onChange={(e) => setCustomRestockQty(e.target.value)}
+                            className="flex-1 px-2.5 py-1 text-xs border border-slate-200 rounded-lg bg-white font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleCustomRestock()}
+                            disabled={isRestocking}
+                            className="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 disabled:opacity-50"
+                          >
+                            {isRestocking ? "Updating..." : "Set Stock"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="pt-3 border-t border-rose-100 bg-gradient-to-r from-rose-50 via-pink-50 to-amber-50/40 rounded-xl p-3 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-rose-900">Total Payable:</span>
+                    <span className="text-base font-black text-rose-600">
                       ₹{product.price * quantity}
                     </span>
                   </div>
                 </div>
 
-                {/* Optional Customer info for WhatsApp Bill */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <input
-                    type="text"
-                    placeholder="Customer Name (optional)"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-rose-500 text-xs font-medium"
-                  />
-                  <input
-                    type="tel"
-                    placeholder="WhatsApp No. (optional)"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-rose-500 text-xs font-medium"
-                  />
+                {/* Customer Authentication & Order Linking Section */}
+                <div className="p-4 rounded-2xl border border-rose-100 bg-rose-50/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-rose-600" />
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                        Customer Account (Mobile App Sync)
+                      </span>
+                    </div>
+                    {customerLookupStatus === "found" && verifiedCustomer ? (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <UserCheck className="w-3 h-3" /> Authorized Customer
+                      </span>
+                    ) : customerLookupStatus === "not_found" ? (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> Account Required
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Customer Mobile Number <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="tel"
+                          placeholder="e.g. 9876543210 (10 digits)"
+                          value={customerPhone}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomerPhone(val);
+                            if (val.replace(/\D/g, "").length >= 10) {
+                              handleCheckCustomer(val);
+                            } else {
+                              setVerifiedCustomer(null);
+                              setCustomerLookupStatus("idle");
+                            }
+                          }}
+                          onBlur={() => handleCheckCustomer()}
+                          className="w-full pl-9 pr-24 py-2 bg-white rounded-xl border border-rose-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-rose-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleCheckCustomer()}
+                          disabled={checkingCustomer || customerPhone.replace(/\D/g, "").length < 10}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-xs"
+                        >
+                          {checkingCustomer ? <Loader2 className="w-3 h-3 animate-spin" /> : "Verify"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Customer Verified Banner */}
+                    {customerLookupStatus === "found" && verifiedCustomer && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <div>
+                            <p className="font-bold text-xs">{verifiedCustomer.full_name}</p>
+                            <p className="text-[10px] text-emerald-600">
+                              {verifiedCustomer.email} • {verifiedCustomer.phone || customerPhone}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold bg-white px-2 py-0.5 rounded border border-emerald-200 text-emerald-700 shadow-2xs">
+                          Mobile App Linked
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Customer Not Found Warning & Popup Trigger */}
+                    {customerLookupStatus === "not_found" && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="font-bold">Unregistered Customer Account</p>
+                            <p className="text-[11px] text-amber-700 leading-snug">
+                              Only authenticated and authorized users can purchase products. No account was found for mobile number <strong>{customerPhone}</strong>.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewCustPhone(customerPhone.trim());
+                            setNewCustName(customerName.trim());
+                            const d = customerPhone.trim().replace(/\D/g, "").slice(-10);
+                            setNewCustEmail(`customer_${d}@sofiyabangles.com`);
+                            setShowCreateAccountModal(true);
+                          }}
+                          className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" /> Create Customer Account to Authorize Sale
+                        </button>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Customer Full Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Priya Sharma"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full p-2 bg-white rounded-xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
@@ -530,9 +895,13 @@ export function QuickSellModal({
                       </>
                     ) : product.quantity <= 0 ? (
                       "Cannot Sell (Out of Stock)"
+                    ) : customerLookupStatus === "not_found" ? (
+                      <>
+                        <UserPlus className="w-4 h-4" /> Account Required — Click to Create
+                      </>
                     ) : (
                       <>
-                        <ShoppingBag className="w-4 h-4" /> Confirm Sale & Deduct Stock
+                        <ShoppingBag className="w-4 h-4" /> Confirm Sale & Link Order
                       </>
                     )}
                   </button>
@@ -540,6 +909,114 @@ export function QuickSellModal({
               </motion.div>
             )}
           </div>
+
+          {/* Create Customer Account Popup Modal */}
+          <AnimatePresence>
+            {showCreateAccountModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden p-6 space-y-4"
+                >
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+                        <UserPlus className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Create & Authorize Customer Account</h3>
+                        <p className="text-[11px] text-slate-500">Required before selling so order appears in mobile app</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateAccountModal(false)}
+                      className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleCreateCustomerAccount} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Customer Full Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Priya Sharma"
+                        value={newCustName}
+                        onChange={(e) => setNewCustName(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Mobile Number <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="e.g. 9876543210"
+                        value={newCustPhone}
+                        onChange={(e) => setNewCustPhone(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Email Address <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g. priya@gmail.com"
+                        value={newCustEmail}
+                        onChange={(e) => setNewCustEmail(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Initial Password
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="Default: Sofiya@1234"
+                        value={newCustPassword}
+                        onChange={(e) => setNewCustPassword(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-500 focus:bg-white"
+                      />
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateAccountModal(false)}
+                        className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs font-bold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={creatingAccount}
+                        className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                      >
+                        {creatingAccount ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+                        Register & Authorize Customer
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </AnimatePresence>

@@ -21,6 +21,7 @@ import {
   deleteOrder,
   createReview,
   getProductReviews,
+  getAllReviewsForAdmin,
   verifyAdminLink,
 } from "../controllers/order.controller";
 
@@ -37,6 +38,7 @@ router.post("/verify-admin-link", requireRole("admin", "super_admin"), verifyAdm
 router.post("/", validate(createOrderSchema), createOrder);
 router.get("/", getUserOrders);
 router.get("/admin/all", requireRole("admin", "super_admin"), getAdminOrders);
+router.get("/admin/reviews", requireRole("admin", "super_admin"), getAllReviewsForAdmin);
 router.post("/reviews", validate(createReviewSchema), createReview);
 router.get("/:id", getOrderById);
 router.delete("/:id", requireRole("admin", "super_admin"), deleteOrder);

@@ -3,7 +3,6 @@ import { api } from "@/src/api";
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useSizeStore } from '@/src/store/sizeStore';
 import { useAuthStore } from '@/src/store/authStore';
 
 import ProductCard from '@/src/components/ProductCard';
@@ -19,7 +18,6 @@ export default function CategoryScreen() {
   const categoryName = (typeof name === 'string' ? name : Array.isArray(name) ? name[0] : '') || STRINGS.collections.title;
 
   const { token, user } = useAuthStore();
-  const { preferences, fetchPreferences } = useSizeStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,13 +50,6 @@ export default function CategoryScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (token && user?.role === 'user') {
-        try {
-          fetchPreferences();
-        } catch (e) {
-          console.warn("Failed to fetch preferences:", e);
-        }
-      }
       if (!categoryId) {
         setLoading(false);
         setProducts([]);
@@ -68,7 +59,7 @@ export default function CategoryScreen() {
       if (!searchQueryRef.current.trim()) {
         fetchInitialProducts();
       }
-    }, [categoryId, token, user?.role])
+    }, [categoryId])
   );
 
   // Dedicated search debouncing effect - runs independently of navigation listeners
@@ -108,17 +99,6 @@ export default function CategoryScreen() {
     }
   };
 
-  // Find user preference specific to this category
-  const categoryPref = useMemo(() => {
-    const safePrefs = Array.isArray(preferences) ? preferences : [];
-    return safePrefs.find((p) => p && p.category_id === categoryId && !p.is_custom);
-  }, [preferences, categoryId]);
-
-  const customCategoryPref = useMemo(() => {
-    const safePrefs = Array.isArray(preferences) ? preferences : [];
-    return safePrefs.find((p) => p && p.category_id === categoryId && p.is_custom);
-  }, [preferences, categoryId]);
-
   const availableSizes = useMemo(() => {
     const sizeSet = new Set<string>();
     const safeList = Array.isArray(products) ? products.filter(Boolean) : [];
@@ -136,20 +116,6 @@ export default function CategoryScreen() {
     const list = Array.isArray(products) ? products.filter(Boolean) : [];
     if (selectedSizeFilter === 'all') return list;
 
-    if (selectedSizeFilter === 'my_size') {
-      return list.filter((p) => {
-        if (!p) return false;
-        if (p.accepts_custom_size && customCategoryPref) return true;
-        if (categoryPref?.standard_size && p.has_variants && Array.isArray(p.variants)) {
-          return p.variants.some(
-            (v) => v && v.size === categoryPref.standard_size && (v.quantity || 0) > 0
-          );
-        }
-        if (!p.has_variants) return true;
-        return false;
-      });
-    }
-
     if (selectedSizeFilter === 'custom') {
       return list.filter((p) => p && p.accepts_custom_size);
     }
@@ -163,7 +129,7 @@ export default function CategoryScreen() {
       }
       return false;
     });
-  }, [products, selectedSizeFilter, categoryPref, customCategoryPref]);
+  }, [products, selectedSizeFilter]);
 
   return (
     <View className="flex-1 bg-background">
@@ -209,34 +175,6 @@ export default function CategoryScreen() {
                 {STRINGS.categoryProducts.allSizes}
               </Text>
             </TouchableOpacity>
-
-            {/* My Category Size */}
-            {categoryPref?.standard_size && (
-              <TouchableOpacity
-                onPress={() => setSelectedSizeFilter('my_size')}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={STRINGS.categoryProducts.mySize(categoryPref.standard_size)}
-                className={`mr-2.5 px-4 min-h-[44px] justify-center items-center rounded-full border flex-row shadow-xs ${
-                  selectedSizeFilter === 'my_size'
-                    ? 'bg-primary border-primary'
-                    : 'bg-rose-50 border-rose-200'
-                }`}
-              >
-                <AppIcon
-                  name="sparkles"
-                  size={13}
-                  color={selectedSizeFilter === 'my_size' ? 'white' : '#e11d48'}
-                />
-                <Text
-                  className={`text-label-sm font-semibold ml-1.5 ${
-                    selectedSizeFilter === 'my_size' ? 'text-white font-bold' : 'text-primary'
-                  }`}
-                >
-                  {STRINGS.categoryProducts.mySize(categoryPref.standard_size)}
-                </Text>
-              </TouchableOpacity>
-            )}
 
             {/* Product Sizes */}
             {(availableSizes || []).map((sz) => (
@@ -324,7 +262,7 @@ export default function CategoryScreen() {
               </Text>
               <Text className="text-text-secondary mt-2 text-center px-6 leading-5 text-body-sm">
                 {selectedSizeFilter !== 'all'
-                  ? STRINGS.categoryProducts.emptySizeDescription(selectedSizeFilter === 'my_size' ? (categoryPref?.standard_size || 'your size') : selectedSizeFilter)
+                  ? STRINGS.categoryProducts.emptySizeDescription(selectedSizeFilter)
                   : STRINGS.categoryProducts.emptyGeneralDescription(categoryName)}
               </Text>
               <TouchableOpacity

@@ -60,8 +60,21 @@ export const updateProductSchema = createProductSchema.partial().extend({
 
 export const updateStockSchema = z.object({
   quantity: zStringNumber
-    .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative")),
-});
+    .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative"))
+    .optional(),
+  variant_id: z.string().trim().optional(),
+  variants: z.array(
+    z.object({
+      id: z.string().trim(),
+      size: z.string().trim().optional(),
+      quantity: zStringNumber
+        .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative")),
+    })
+  ).optional(),
+}).refine(
+  (data) => data.quantity !== undefined || (data.variants && data.variants.length > 0),
+  { message: "Either quantity or variants must be provided" }
+);
 
 export const sellProductByCodeSchema = z.object({
   code: z.string().min(1, "Product special ID or code is required").trim(),
@@ -71,6 +84,8 @@ export const sellProductByCodeSchema = z.object({
   customer_name: z.string().trim().optional(),
   customer_phone: z.string().trim().optional(),
   notes: z.string().trim().optional(),
+  order_number: z.string().trim().optional(),
+  orderNumber: z.string().trim().optional(),
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;

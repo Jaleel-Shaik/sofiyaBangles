@@ -7,7 +7,6 @@ import * as modelTypesApi from './modelTypes';
 import * as ordersApi from './orders';
 import * as productsApi from './products';
 import * as settingsApi from './settings';
-import * as sizesApi from './sizes';
 
 export const api = {
   admin: adminApi,
@@ -19,7 +18,6 @@ export const api = {
   orders: ordersApi,
   products: productsApi,
   settings: settingsApi,
-  sizes: sizesApi,
 };
 
 export * from './endpoints';

@@ -18,7 +18,6 @@ import {
   PlusCircle,
   AlertTriangle,
   Users,
-  UserCheck,
   TrendingUp,
   Layers,
   DollarSign,
@@ -26,6 +25,7 @@ import {
   FileText,
   ClipboardList,
   Zap,
+  Star,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Image from "next/image";
@@ -54,19 +54,23 @@ export default function DashboardLayout({
   const isSuperAdmin = role === "super_admin" || role === "superadmin";
 
   const superAdminOnlyPaths = [
-    "/dashboard/admins",
     "/dashboard/activity",
     "/dashboard/revenue",
     "/dashboard/forms",
   ];
 
-  // Fetch notifications for super_admin
+  // Fetch notifications for all admin/super_admin users with periodic refresh
   useEffect(() => {
-    if (user?.role === "super_admin") {
-      api.superAdmin
-        .getNotifications()
-        .then((items) => setNotifications(items || []))
-        .catch(() => {});
+    if (user && (user.role === "admin" || user.role === "super_admin" || user.role !== "user")) {
+      const fetchNotifs = () => {
+        api.superAdmin
+          .getNotifications()
+          .then((items) => setNotifications(items || []))
+          .catch(() => {});
+      };
+      fetchNotifs();
+      const interval = setInterval(fetchNotifs, 15000);
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -79,6 +83,43 @@ export default function DashboardLayout({
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
     } catch {}
+  };
+
+  const handleNotificationClick = async (n: any) => {
+    if (!n.is_read) {
+      await handleMarkRead(n.id);
+    }
+    setNotifsOpen(false);
+
+    const type = (n.type || "").toUpperCase();
+    const title = (n.title || "").toLowerCase();
+
+    if (
+      type === "REVIEW" ||
+      type === "RATING" ||
+      type === "PRODUCT_REVIEW" ||
+      title.includes("review") ||
+      title.includes("rated")
+    ) {
+      const searchTarget = n.product_id || "";
+      router.push(`/dashboard/reviews${searchTarget ? `?search=${encodeURIComponent(searchTarget)}` : ""}`);
+    } else if (
+      type === "NEW_SALE" ||
+      type === "ORDER_STATUS" ||
+      type === "REFUND" ||
+      title.includes("sale") ||
+      title.includes("order")
+    ) {
+      const searchTarget = n.order_id || "";
+      router.push(`/dashboard/orders${searchTarget ? `?search=${encodeURIComponent(searchTarget)}` : ""}`);
+    } else if (type === "LOW_STOCK" || type === "OUT_OF_STOCK") {
+      const searchTarget = n.product_id || "";
+      router.push(`/dashboard/products${searchTarget ? `?search=${encodeURIComponent(searchTarget)}` : ""}`);
+    } else if (n.product_id) {
+      router.push(`/dashboard/products/${n.product_id}`);
+    } else {
+      router.push("/dashboard/reviews");
+    }
   };
 
   // Global shortcut: Alt + S opens Quick Sell
@@ -248,28 +289,41 @@ export default function DashboardLayout({
                             {STRINGS.notifications.empty}
                           </div>
                         ) : (
-                          notifications.slice(0, 10).map((n) => (
+                          notifications.slice(0, 15).map((n) => (
                             <div
                               key={n.id}
-                              className={`p-3 text-xs transition-colors ${
-                                n.is_read ? "bg-white opacity-70" : "bg-rose-50/40"
+                              onClick={() => handleNotificationClick(n)}
+                              className={`p-3 text-xs transition-colors cursor-pointer hover:bg-slate-100/80 border-b border-slate-100 last:border-0 ${
+                                n.is_read ? "bg-white opacity-75" : "bg-rose-50/60 font-medium"
                               }`}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                <p className="font-semibold text-slate-800 leading-tight">
-                                  {n.title}
-                                </p>
+                                <div className="flex items-center gap-1.5 font-bold text-slate-900 leading-tight">
+                                  {(n.type === "REVIEW" || n.type === "RATING") && (
+                                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                                  )}
+                                  <span>{n.title}</span>
+                                </div>
                                 {!n.is_read && (
                                   <button
-                                    onClick={() => handleMarkRead(n.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMarkRead(n.id);
+                                    }}
                                     title={STRINGS.notifications.markAsRead}
-                                    className="text-[#E8436E] hover:text-rose-700 p-1 min-h-[32px] min-w-[32px] flex items-center justify-center rounded-lg hover:bg-rose-50"
+                                    className="text-[#E8436E] hover:text-rose-700 p-1 min-h-[28px] min-w-[28px] flex items-center justify-center rounded-lg hover:bg-rose-100 shrink-0"
                                   >
                                     <CheckCheck className="w-3.5 h-3.5" />
                                   </button>
                                 )}
                               </div>
-                              <p className="text-[11px] text-slate-500 mt-1">{n.message}</p>
+                              <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{n.body || n.message}</p>
+                              <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
+                                <span>{n.created_at ? new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}</span>
+                                <span className="text-[#E8436E] font-bold hover:underline flex items-center gap-0.5">
+                                  View details &rarr;
+                                </span>
+                              </div>
                             </div>
                           ))
                         )}
@@ -392,11 +446,12 @@ function SidebarContent({
   const role = (user?.role || "").toLowerCase().trim();
   const isSuperAdmin = role === "super_admin" || role === "superadmin";
 
-  // Regular Store Admin Navigation (6 core store management links only)
+  // Regular Store Admin Navigation
   const adminNavLinks = [
     { label: STRINGS.navigation.overview, icon: LayoutDashboard, href: "/dashboard" },
     { label: STRINGS.navigation.productsCatalog, icon: Package, href: "/dashboard/products" },
     { label: STRINGS.navigation.ordersWhatsApp, icon: ShoppingBag, href: "/dashboard/orders" },
+    { label: STRINGS.navigation.reviewsRatings, icon: Star, href: "/dashboard/reviews" },
     { label: STRINGS.navigation.collectionsCategories, icon: Layers, href: "/dashboard/categories" },
     { label: STRINGS.navigation.modelTypes, icon: Layers, href: "/dashboard/model-types" },
     { label: STRINGS.navigation.storeSettings, icon: Settings, href: "/dashboard/settings" },
@@ -407,11 +462,11 @@ function SidebarContent({
     { label: STRINGS.navigation.overview, icon: LayoutDashboard, href: "/dashboard" },
     { label: STRINGS.navigation.productsCatalog, icon: Package, href: "/dashboard/products" },
     { label: STRINGS.navigation.ordersWhatsApp, icon: ShoppingBag, href: "/dashboard/orders" },
+    { label: STRINGS.navigation.reviewsRatings, icon: Star, href: "/dashboard/reviews" },
     { label: STRINGS.navigation.collectionsCategories, icon: Layers, href: "/dashboard/categories" },
     { label: STRINGS.navigation.modelTypes, icon: Layers, href: "/dashboard/model-types" },
     { label: STRINGS.navigation.operationsLog, icon: ClipboardList, href: "/dashboard/activity" },
     { label: STRINGS.navigation.revenueLedger, icon: TrendingUp, href: "/dashboard/revenue" },
-    { label: STRINGS.navigation.staffAdmins, icon: UserCheck, href: "/dashboard/admins" },
     { label: STRINGS.navigation.googleForms, icon: FileText, href: "/dashboard/forms" },
     { label: STRINGS.navigation.storeSettings, icon: Settings, href: "/dashboard/settings" },
   ];

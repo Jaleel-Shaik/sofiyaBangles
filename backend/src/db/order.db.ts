@@ -89,14 +89,58 @@ export const getOrderByOrderNumberDb = async (orderNumber: string): Promise<Orde
 
 /**
  * Pure Database Operation: Retrieve all orders for a user.
+ * Also searches by the customer's phone number to seamlessly claim/retrieve orders
+ * placed via WhatsApp or Unique ID Quick Sell.
  */
-export const getUserOrdersDb = async (userId: string): Promise<Order[]> => {
+export const getUserOrdersDb = async (userId: string, userPhone?: string | null): Promise<Order[]> => {
+  const ordersMap = new Map<string, Order>();
+
+  // 1. Fetch orders directly by user_id
   const snapshot = await db
     .collection("orders")
     .where("user_id", "==", userId)
     .get();
 
-  const orders = snapshot.docs.map((doc) => doc.data() as Order);
+  snapshot.docs.forEach((doc) => {
+    const data = doc.data() as Order;
+    ordersMap.set(data.id, data);
+  });
+
+  // 2. Fetch orders matching the customer's phone number if provided
+  if (userPhone && userPhone.trim()) {
+    const rawClean = userPhone.trim();
+    const digits = rawClean.replace(/\D/g, "");
+    const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+    const e164 = last10.length === 10 ? `91${last10}` : digits;
+    const plusE164 = `+${e164}`;
+
+    const candidates = Array.from(
+      new Set([rawClean, digits, last10, e164, plusE164, `+91${last10}`, `+91 ${last10}`])
+    ).filter(Boolean);
+
+    for (const cand of candidates) {
+      try {
+        const phoneSnap = await db
+          .collection("orders")
+          .where("customer_phone", "==", cand)
+          .get();
+
+        for (const doc of phoneSnap.docs) {
+          const data = doc.data() as Order;
+          // Claim order if not already claimed by this user
+          if (data.user_id !== userId) {
+            db.collection("orders").doc(doc.id).update({ user_id: userId, updated_at: new Date().toISOString() }).catch(() => {});
+            data.user_id = userId;
+          }
+          ordersMap.set(data.id, data);
+        }
+      } catch {
+        // Ignore single candidate lookup errors
+      }
+    }
+  }
+
+  const orders = Array.from(ordersMap.values());
   orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return orders;
 };
@@ -198,21 +242,72 @@ export const insertReviewDb = async (review: Review): Promise<Review> => {
 };
 
 /**
- * Pure Database Operation: Find completed order items for a user and product.
+ * Pure Database Operation: Retrieve all reviews for admin.
+ */
+export const getAllReviewsForAdminDb = async (): Promise<Review[]> => {
+  const snapshot = await db.collection("product_reviews").get();
+  const reviews = snapshot.docs.map((doc) => doc.data() as Review);
+  reviews.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return reviews;
+};
+
+/**
+ * Pure Database Operation: Mark an order item as reviewed.
+ */
+export const markOrderItemReviewedDb = async (
+  orderId: string | null | undefined,
+  productId: string,
+  reviewId: string
+): Promise<void> => {
+  let query: FirebaseFirestore.Query = db.collection("order_items").where("product_id", "==", productId);
+  if (orderId) {
+    query = query.where("order_id", "==", orderId);
+  }
+  const snapshot = await query.limit(1).get();
+  if (!snapshot.empty) {
+    await snapshot.docs[0].ref.update({
+      is_reviewed: true,
+      review_id: reviewId,
+      updated_at: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Pure Database Operation: Find purchased order items for a user and product.
+ * Permits rating for any non-cancelled order placed by the user.
  */
 export const findUserOrderItemsForProductDb = async (
   userId: string,
-  productId: string
+  productId: string,
+  orderId?: string | null
 ): Promise<OrderItem[]> => {
-  const ordersSnap = await db
-    .collection("orders")
-    .where("user_id", "==", userId)
-    .where("status", "==", "completed")
-    .get();
+  let ordersSnap: FirebaseFirestore.QuerySnapshot;
+  if (orderId) {
+    const singleOrderDoc = await db.collection("orders").doc(orderId).get();
+    if (!singleOrderDoc.exists) return [];
+    const data = singleOrderDoc.data();
+    if (data?.user_id !== userId || data?.status === "cancelled") return [];
+    ordersSnap = {
+      empty: false,
+      docs: [singleOrderDoc],
+    } as any;
+  } else {
+    ordersSnap = await db
+      .collection("orders")
+      .where("user_id", "==", userId)
+      .get();
+  }
 
   if (ordersSnap.empty) return [];
 
-  const completedOrderIds = ordersSnap.docs.map((d) => d.id);
+  // Valid orders are those not cancelled
+  const validOrderIds = ordersSnap.docs
+    .filter((d) => d.data().status !== "cancelled")
+    .map((d) => d.id);
+
+  if (validOrderIds.length === 0) return [];
+
   const itemsSnap = await db
     .collection("order_items")
     .where("product_id", "==", productId)
@@ -220,7 +315,7 @@ export const findUserOrderItemsForProductDb = async (
 
   return itemsSnap.docs
     .map((d) => d.data() as OrderItem)
-    .filter((i) => completedOrderIds.includes(i.order_id));
+    .filter((i) => validOrderIds.includes(i.order_id));
 };
 
 /**

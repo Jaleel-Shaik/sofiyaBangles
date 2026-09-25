@@ -49,8 +49,13 @@ export const createProduct = asyncHandler(async (req: AuthRequest, res: Response
 export const getProducts = asyncHandler(async (req: AuthRequest, res: Response) => {
   const page = getQuery(req, "page");
   const limit = getQuery(req, "limit");
-  const category_id = getQuery(req, "category_id");
-  const search = getQuery(req, "search");
+  const category_id = getQuery(req, "category_id") || getQuery(req, "categoryId");
+  const model_type_id = getQuery(req, "model_type_id") || getQuery(req, "modelTypeId");
+  const min_price = getQuery(req, "min_price") || getQuery(req, "minPrice");
+  const max_price = getQuery(req, "max_price") || getQuery(req, "maxPrice");
+  const in_stock = getQuery(req, "in_stock") || getQuery(req, "inStock");
+  const search = getQuery(req, "search") || getQuery(req, "q");
+  const sort = getQuery(req, "sort") || getQuery(req, "sortBy");
 
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 20;
@@ -59,7 +64,12 @@ export const getProducts = asyncHandler(async (req: AuthRequest, res: Response) 
     page: page ? pageNum : undefined,
     limit: limit ? limitNum : undefined,
     categoryId: category_id,
+    modelTypeId: model_type_id,
+    minPrice: min_price ? Number(min_price) : undefined,
+    maxPrice: max_price ? Number(max_price) : undefined,
+    inStock: in_stock === "true" || in_stock === "1" ? true : undefined,
     search: search,
+    sort: (sort === "rating" ? "rating" : "newest") as "newest" | "rating",
     userId: req.user?.userId,
   });
 
@@ -147,7 +157,7 @@ export const updateProduct = asyncHandler(async (req: AuthRequest, res: Response
 export const updateStock = asyncHandler(async (req: AuthRequest, res: Response) => {
   const id = getParam(req, "id");
   try {
-    const product = await updateStockService(id, req.body.quantity, req.user!.userId);
+    const product = await updateStockService(id, req.body, req.user!.userId);
     return sendSuccess(res, product, "Stock updated successfully.");
   } catch (err: any) {
     if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError("Product not found.");
@@ -183,6 +193,11 @@ export const sellProduct = asyncHandler(async (req: AuthRequest, res: Response) 
   } catch (err: any) {
     if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError("Product not found.");
     if (err.message === "INSUFFICIENT_STOCK") throw new BadRequestError("Insufficient stock.");
+    if (err.message === "CUSTOMER_NOT_FOUND") {
+      throw new NotFoundError(
+        "Customer account not found for this mobile number. Only authenticated and authorized registered customers can purchase products. Please create a customer account first."
+      );
+    }
     throw err;
   }
 });
@@ -200,6 +215,11 @@ export const sellProductByCode = asyncHandler(async (req: AuthRequest, res: Resp
   } catch (err: any) {
     if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError(`Product '${code}' not found.`);
     if (err.message === "INSUFFICIENT_STOCK") throw new BadRequestError("Insufficient stock.");
+    if (err.message === "CUSTOMER_NOT_FOUND") {
+      throw new NotFoundError(
+        "Customer account not found for this mobile number. Only authenticated and authorized registered customers can purchase products. Please create a customer account first."
+      );
+    }
     throw err;
   }
 });

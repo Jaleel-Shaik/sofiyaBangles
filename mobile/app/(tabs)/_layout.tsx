@@ -107,13 +107,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="size-preferences"
-        options={{
-          href: null,
-          title: 'My Sizes',
-        }}
-      />
     </Tabs>
   );
 }

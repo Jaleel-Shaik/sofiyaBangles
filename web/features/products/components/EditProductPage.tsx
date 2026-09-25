@@ -97,40 +97,6 @@ export default function EditProductPage() {
   const filteredCategories = categories;
   const currentCategory = useMemo(() => categories.find(c => c.id === form.category_id), [categories, form.category_id]);
 
-  useEffect(() => {
-    if (!currentCategory) {
-      setHasVariants(false);
-      setVariants([]);
-      setAcceptsCustomSize(false);
-      return;
-    }
-    
-    // Only update variants if category_id has actually changed from initial load
-    if (form.category_id !== initialCategoryIdRef.current) {
-      if (currentCategory.size_type === "standard" || currentCategory.size_type === "both") {
-        setHasVariants(true);
-        if (currentCategory.standard_sizes) {
-          setVariants(currentCategory.standard_sizes.map(sz => ({
-            id: `v-${sz.replace(/\s+/g, "_")}`,
-            size: sz,
-            price: form.price || "0",
-            quantity: form.quantity || "0",
-          })));
-        }
-      } else {
-        setHasVariants(false);
-        setVariants([]);
-      }
-      
-      if (currentCategory.size_type === "custom" || currentCategory.size_type === "both") {
-        setAcceptsCustomSize(true);
-        setCustomSizePrice(form.price);
-      } else {
-        setAcceptsCustomSize(false);
-      }
-    }
-  }, [form.category_id, currentCategory, form.price]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
@@ -142,10 +108,6 @@ export default function EditProductPage() {
     if (!selectedModelType) newErrors.model_type_id = "Model Type is required";
     if (!form.category_id) newErrors.category_id = "Category is required";
     if (existingImages.length === 0 && newImageFiles.length === 0) newErrors.images = "Please select at least one image";
-
-    if (hasVariants && variants.length === 0) {
-      newErrors.variants = "Please add at least one size variant or disable sizes";
-    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -165,26 +127,14 @@ export default function EditProductPage() {
       formData.append("category_id", form.category_id);
       if (selectedModelType) formData.append("model_type_id", selectedModelType);
       
-      const totalQuantity = hasVariants 
-        ? variants.reduce((sum, v) => sum + (parseInt(v.quantity) || 0), 0)
-        : (parseInt(form.quantity) || 0);
+      const totalQuantity = parseInt(form.quantity) || 0;
 
       formData.append("quantity", String(totalQuantity));
       formData.append("status", form.status);
       formData.append("is_active", form.status === "active" || form.status === "out_of_stock" ? "true" : "false");
       if (form.unique_code) formData.append("unique_code", form.unique_code);
-      formData.append("has_variants", String(hasVariants));
-      formData.append("accepts_custom_size", String(acceptsCustomSize));
-      
-      if (hasVariants && variants.length > 0) {
-        formData.append("variants", JSON.stringify(variants.map(v => ({
-          id: v.id, size: v.size, price: parseFloat(v.price) || parseFloat(form.price) || 0, quantity: parseInt(v.quantity) || 0,
-        }))));
-      }
-      
-      if (acceptsCustomSize) {
-        formData.append("custom_size_price", String(parseFloat(customSizePrice) || parseFloat(form.price)));
-      }
+      formData.append("has_variants", "false");
+      formData.append("accepts_custom_size", "false");
       
       if (existingImages.length > 0) formData.append("existing_images", JSON.stringify(existingImages));
       newImageFiles.forEach(file => formData.append("images", file));
@@ -223,7 +173,7 @@ export default function EditProductPage() {
             {STRINGS.products.editProduct}
           </h1>
           <p className="text-xs font-semibold text-slate-400 mt-0.5">
-            Update product details, sizing models, and catalog inventory
+            Update product details and catalog inventory
           </p>
         </div>
       </div>
@@ -258,23 +208,6 @@ export default function EditProductPage() {
           setForm={setForm}
           errors={errors}
           setErrors={setErrors}
-        />
-
-        <ProductVariants
-          form={form}
-          setForm={setForm}
-          hasVariants={hasVariants}
-          setHasVariants={setHasVariants}
-          variants={variants}
-          setVariants={setVariants}
-          currentCategory={currentCategory}
-          customSizeName={customSizeName}
-          setCustomSizeName={setCustomSizeName}
-          acceptsCustomSize={acceptsCustomSize}
-          setAcceptsCustomSize={setAcceptsCustomSize}
-          customSizePrice={customSizePrice}
-          setCustomSizePrice={setCustomSizePrice}
-          errors={errors}
         />
 
         <div className="flex justify-end gap-3 pt-2">

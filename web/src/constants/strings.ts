@@ -49,6 +49,7 @@ export const STRINGS = {
     overview: 'Overview',
     productsCatalog: 'Products Catalog',
     ordersWhatsApp: 'Orders & WhatsApp',
+    reviewsRatings: 'Reviews & Ratings',
     collectionsCategories: 'Collections',
     modelTypes: 'Model Types',
     operationsLog: 'Product Operations Log',

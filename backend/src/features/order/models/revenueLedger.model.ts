@@ -244,11 +244,20 @@ export const getRevenueLedgerModel = async (options: {
   const enrichedItems = await Promise.all(
     paginatedItems.map(async (item) => {
       let product_name: string | undefined = undefined;
+      let unique_code: string | undefined = undefined;
+      let order_number: string | undefined = undefined;
       let sale_rate: number | undefined = undefined;
       let quantity: number = 1;
       let admin_name: string | undefined = undefined;
 
       try {
+        if (item.order_id) {
+          const oDoc = await db.collection("orders").doc(item.order_id).get();
+          if (oDoc.exists) {
+            order_number = oDoc.data()?.order_number;
+          }
+        }
+
         if (item.order_item_id) {
           const oiDoc = await db.collection("order_items").doc(item.order_item_id).get();
           if (oiDoc.exists) {
@@ -259,11 +268,12 @@ export const getRevenueLedgerModel = async (options: {
           }
         }
 
-        if (!product_name && item.product_id) {
+        if (item.product_id) {
           const pDoc = await db.collection("products").doc(item.product_id).get();
           if (pDoc.exists) {
             const pData = pDoc.data();
-            product_name = pData?.product_name;
+            if (!product_name) product_name = pData?.product_name;
+            unique_code = pData?.unique_code;
             if (sale_rate === undefined) {
               sale_rate = pData?.price;
             }
@@ -287,6 +297,8 @@ export const getRevenueLedgerModel = async (options: {
       return {
         ...item,
         product_name: product_name || "Bangle Product",
+        unique_code: unique_code || undefined,
+        order_number: order_number || undefined,
         sale_rate: sale_rate ?? item.gross_amount,
         quantity: quantity || 1,
         admin_name: admin_name || "Store Admin",

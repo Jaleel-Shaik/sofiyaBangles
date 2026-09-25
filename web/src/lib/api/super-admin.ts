@@ -36,7 +36,7 @@ export const superAdminApi = {
   getProductAnalyticsDetail: (id: string) =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.PRODUCT_ANALYTICS_BY_ID(id)).then((r) => extractData<ProductAnalyticsDetail>(r)),
 
-  getRevenueLedger: (params?: { page?: number; limit?: number; fromDate?: string; toDate?: string; transactionType?: string; adminId?: string }) =>
+  getRevenueLedger: (params?: { page?: number; limit?: number; fromDate?: string; toDate?: string; month?: number; year?: number; transactionType?: string; adminId?: string }) =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.REVENUE, { params }).then((r) => ({
       items: extractData<RevenueLedgerItem[]>(r),
       total: r.data?.pagination?.total || 0,

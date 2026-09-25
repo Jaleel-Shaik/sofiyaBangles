@@ -180,8 +180,10 @@ export class WhatsAppService {
       }
     }
 
-    // Client-assisted fallback (Generates safe deep-link directly from server-verified data)
-    const encodedMessage = encodeURIComponent(rawMessage);
+    // Client-assisted fallback: Customer opens WhatsApp directly on their device to send order details.
+    // Order ID and admin action links are strictly for admin/super-admin perspective and are excluded here.
+    const customerMessage = this.buildCustomerPurchaseMessage(params);
+    const encodedMessage = encodeURIComponent(customerMessage);
     const whatsappUrl = `https://wa.me/${shopRecipient}?text=${encodedMessage}`;
 
     return {
@@ -192,8 +194,54 @@ export class WhatsAppService {
       adminPortalUrl,
       mobileAppUrl,
       recipientPhoneMasked: maskedShopPhone,
-      messagePreviewMasked: rawMessage.replace(params.customerPhone, maskedCustomerPhone),
+      messagePreviewMasked: customerMessage.replace(params.customerPhone, maskedCustomerPhone),
     };
+  }
+
+  /**
+   * Constructs customer-facing purchase enquiry message for WhatsApp.
+   * Excludes internal order numbers and admin fulfill links (strictly for admin/super-admin perspective).
+   */
+  static buildCustomerPurchaseMessage(params: WhatsAppPurchaseNotificationParams): string {
+    const lines: string[] = [
+      "🛍️ *NEW PRODUCT PURCHASE ENQUIRY*",
+      "",
+      `*Date:* ${formatISTReadable(params.orderTimestamp)}`,
+      "",
+      "👤 *Customer Details:*",
+      `• *Name:* ${params.customerName}`,
+      `• *Mobile Number:* ${params.customerPhone}`,
+      "",
+      "📦 *Product Details:*",
+      `• *Product Name:* ${params.productName}`,
+      `• *Product Code:* ${params.productUniqueId}`,
+      `• *Category:* ${params.productCategory}`,
+      `• *Unit Price:* ₹${params.productPrice}`,
+      `• *Quantity:* ${params.quantity}`,
+      `• *Total Amount:* ₹${params.subtotal}`,
+    ];
+
+    if (params.size) {
+      lines.push(`• *Size:* ${params.size}`);
+    }
+
+    if (params.customMeasurements && Object.keys(params.customMeasurements).length > 0) {
+      lines.push("");
+      lines.push("📏 *Custom Measurements:*");
+      Object.entries(params.customMeasurements).forEach(([k, v]) => {
+        lines.push(`  - ${k}: ${v}`);
+      });
+    }
+
+    if (params.notes) {
+      lines.push("");
+      lines.push(`📝 *Customer Notes:* ${params.notes}`);
+    }
+
+    lines.push("");
+    lines.push("✨ *Hello Sofiya Bangles!* Please confirm my order and availability.");
+
+    return lines.join("\n");
   }
 
   /**

@@ -139,7 +139,7 @@ export function AuthenticatedImage({
     );
   }
 
-  if (error === "not_found" || !blobUrl) {
+  if (error === "not_found" || error === "error" || !blobUrl) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-300">
         {fallbackIcon || <ImageOff className="w-6 h-6 text-slate-300" />}

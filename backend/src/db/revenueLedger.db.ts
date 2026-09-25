@@ -150,6 +150,8 @@ export const queryRevenueLedgerDb = async (options?: {
   limit?: number;
   fromDate?: string;
   toDate?: string;
+  month?: number;
+  year?: number;
   transactionType?: RevenueTransactionType;
   adminId?: string;
 }): Promise<{ items: RevenueLedgerItem[]; total: number }> => {
@@ -172,6 +174,20 @@ export const queryRevenueLedgerDb = async (options?: {
   if (options?.toDate) {
     const toTime = new Date(options.toDate).getTime();
     items = items.filter((i) => new Date(i.created_at).getTime() <= toTime);
+  }
+  if (options?.year) {
+    const targetYear = Number(options.year);
+    items = items.filter((i) => {
+      const date = new Date(i.created_at);
+      return date.getFullYear() === targetYear;
+    });
+  }
+  if (options?.month) {
+    const targetMonth = Number(options.month); // 1-12
+    items = items.filter((i) => {
+      const date = new Date(i.created_at);
+      return date.getMonth() + 1 === targetMonth;
+    });
   }
 
   items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());

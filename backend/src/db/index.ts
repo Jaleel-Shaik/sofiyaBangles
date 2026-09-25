@@ -8,7 +8,6 @@ export * from "./revenueLedger.db";
 export * from "./superAdmin.db";
 export * from "./cart.db";
 export * from "./notification.db";
-export * from "./sizePreference.db";
 export * from "./settings.db";
 export * from "./user.db";
 export * from "./auth.db";

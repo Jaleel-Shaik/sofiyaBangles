@@ -25,6 +25,7 @@ export const API_ENDPOINTS = {
     LOOKUP_CODE: (code: string) => `/products/lookup/${encodeURIComponent(code)}`,
     SELL: (id: string) => `/products/${id}/sell`,
     SELL_BY_CODE: '/products/sell-by-code',
+    UPDATE_STOCK: (id: string) => `/products/${id}/stock`,
   },
   CATEGORIES: {
     BASE: '/categories',
@@ -44,14 +45,12 @@ export const API_ENDPOINTS = {
   USERS: {
     BASE: '/users',
     BY_ID: (id: string) => `/users/${id}`,
+    LOOKUP: (phone: string) => `/users/lookup?phone=${encodeURIComponent(phone)}`,
+    CUSTOMERS: '/users/customers',
   },
   FAVORITES: {
     BASE: '/favorites',
     BY_ID: (productId: string) => `/favorites/${productId}`,
-  },
-  SIZE_PREFERENCES: {
-    BASE: '/size-preferences',
-    BY_ID: (id: string) => `/size-preferences/${id}`,
   },
   NOTIFICATIONS: {
     BASE: '/notifications',
