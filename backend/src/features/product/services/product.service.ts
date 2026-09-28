@@ -21,12 +21,12 @@ import {
 } from "../../../db/product.db";
 import { getCategoryByIdDb, getCategoriesDb } from "../../../db/category.db";
 import { getModelTypeByIdDb } from "../../../db/modelType.db";
-import { isFavoritedDb } from "../../../db/favorite.db";
+import { isFavoritedDb, getProductFavoritesDb } from "../../../db/favorite.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
 import { insertOrderWithItemsDb, getOrderByOrderNumberDb, updateOrderDocDb, getOrderItemsDb } from "../../../db/order.db";
-import { insertNotificationDb } from "../../../db/notification.db";
+import { insertNotificationDb, batchInsertBroadcastNotificationsDb } from "../../../db/notification.db";
 import { createRevenueAllocationModel } from "../../order/models/revenueLedger.model";
-import { Order, OrderItem } from "../../../shared/types";
+import { Order, OrderItem, Notification } from "../../../shared/types";
 import { v4 as uuidv4 } from "uuid";
 import { Product, ProductImage, ProductVariant } from "../../../models/product.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.validation";
@@ -163,6 +163,17 @@ export const createProductService = async (
     record_id: product.id,
     new_data: { product_name: product.product_name, price: product.price, created_by_role: actorRole || 'admin' },
   });
+
+  // Broadcast new arrival notification when added with stock
+  if (product.quantity > 0) {
+    batchInsertBroadcastNotificationsDb({
+      title: `New Arrival: ${product.product_name} ✨`,
+      body: `Check out our latest arrival "${product.product_name}" available now for ₹${product.price}!`,
+      type: "new_arrival",
+      product_id: product.id,
+      sent_by: actorId,
+    }).catch((err) => console.error("New arrival notification error (non-fatal):", err));
+  }
 
   return product;
 };
@@ -370,6 +381,71 @@ const cleanupCloudinaryImages = async (imageUrls: string[]) => {
 };
 
 /**
+ * Service: Notify users when a product's stock is increased or back in stock.
+ */
+export const notifyStockIncreaseService = async (
+  product: Product,
+  oldQty: number,
+  newQty: number,
+  actorId: string,
+) => {
+  if (newQty <= oldQty && !(oldQty <= 0 && newQty > 0)) {
+    return;
+  }
+
+  const isBackInStock = oldQty <= 0 && newQty > 0;
+  const now = new Date().toISOString();
+
+  const title = isBackInStock
+    ? `Back in Stock: ${product.product_name} ✨`
+    : `Stock Increased: ${product.product_name} 📦`;
+
+  const body = isBackInStock
+    ? `Great news! "${product.product_name}" is now back in stock with ${newQty} item(s) available. Tap to view and shop before it sells out!`
+    : `Fresh stock added! "${product.product_name}" now has ${newQty} item(s) available. Check it out!`;
+
+  try {
+    // 1. Broadcast notification to all active users & save global broadcast record
+    await batchInsertBroadcastNotificationsDb({
+      title,
+      body,
+      type: "stock_update",
+      product_id: product.id,
+      sent_by: actorId,
+    });
+
+    // 2. Also send dedicated notification to users who favorited this product
+    const favorites = await getProductFavoritesDb(product.id);
+    if (favorites.length > 0) {
+      const favNotifs: Notification[] = favorites.map((fav) => ({
+        id: uuidv4(),
+        title: `Wishlist Alert: ${product.product_name} is Back! ✨`,
+        body: `An item on your wishlist "${product.product_name}" has just been restocked (${newQty} available). Tap to order now!`,
+        type: "stock_update",
+        product_id: product.id,
+        sent_by: actorId,
+        user_id: fav.user_id,
+        is_read: false,
+        created_at: now,
+      }));
+      await batchInsertBroadcastNotificationsDb(favNotifs);
+    }
+
+    // 3. Audit log
+    await insertAuditLogDb({
+      actor_id: actorId,
+      action: isBackInStock ? "PRODUCT_BACK_IN_STOCK_NOTIFIED" : "PRODUCT_STOCK_INCREASED_NOTIFIED",
+      table_name: "products",
+      record_id: product.id,
+      old_data: { quantity: oldQty },
+      new_data: { quantity: newQty, notified: true },
+    });
+  } catch (err) {
+    console.error("notifyStockIncreaseService error (non-fatal):", err);
+  }
+};
+
+/**
  * Service: Update product details, relations, and manage Cloudinary image lifecycles.
  */
 export const updateProductService = async (
@@ -383,6 +459,7 @@ export const updateProductService = async (
     throw new Error("PRODUCT_NOT_FOUND");
   }
   const actualId = existing.id;
+  const oldQuantity = Number(existing.quantity) || 0;
 
   const targetCategoryId = input.category_id || existing.category_id;
   const targetModelTypeId = input.model_type_id || existing.model_type_id;
@@ -470,6 +547,23 @@ export const updateProductService = async (
     }
   }
 
+  const variantTotal = formattedVariants && formattedVariants.length > 0
+    ? formattedVariants.reduce((s, v) => s + (Number(v.quantity) || 0), 0)
+    : undefined;
+
+  const newTotalQuantity = productFields.quantity !== undefined
+    ? Number(productFields.quantity)
+    : (variantTotal !== undefined ? variantTotal : oldQuantity);
+
+  // Synchronize product active status when quantity is updated from 0 to positive
+  if (newTotalQuantity > 0 && (existing.status === "out_of_stock" || oldQuantity === 0)) {
+    productFields.status = "active";
+    productFields.is_active = true;
+  } else if (newTotalQuantity === 0 && (productFields.status === undefined || productFields.status === "active")) {
+    productFields.status = "out_of_stock";
+    productFields.is_active = false;
+  }
+
   const product = await updateProductWithRelationsDb(actualId, {
     ...productFields,
     updated_by: actorId,
@@ -498,6 +592,12 @@ export const updateProductService = async (
     old_data: { product_name: existing.product_name, price: existing.price },
     new_data: { product_name: product.product_name, price: product.price },
   });
+
+  // Check if stock increased or back in stock
+  if (newTotalQuantity > oldQuantity || (oldQuantity <= 0 && newTotalQuantity > 0)) {
+    notifyStockIncreaseService(product, oldQuantity, newTotalQuantity, actorId)
+      .catch((err) => console.error("Stock increase notification error (non-fatal):", err));
+  }
 
   return product;
 };
@@ -634,7 +734,15 @@ export const updateStockService = async (
     new_data: { quantity: newTotalQuantity, status: newStatus },
   });
 
-  return await lookupProductByCodeOrIdService(existing.id, actorId);
+  const updatedProduct = await lookupProductByCodeOrIdService(existing.id, actorId);
+
+  // Send stock increase / back in stock notification
+  if (newTotalQuantity > oldQuantity || (oldQuantity <= 0 && newTotalQuantity > 0)) {
+    notifyStockIncreaseService(updatedProduct, oldQuantity, newTotalQuantity, actorId)
+      .catch((err) => console.error("Stock update notification error (non-fatal):", err));
+  }
+
+  return updatedProduct;
 };
 
 /**

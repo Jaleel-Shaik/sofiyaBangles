@@ -398,7 +398,7 @@ export default function AddProductScreen() {
                                 <Ionicons name="folder-outline" size={20} color="#94a3b8" />
                               </View>
                             )}
-                          </div>
+                          </View>
                           <View className="flex-1">
                             <Text className={`text-base font-bold ${isSelected ? 'text-primary' : 'text-text-primary'}`}>{cat.category_name}</Text>
                           </View>

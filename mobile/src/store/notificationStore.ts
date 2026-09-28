@@ -47,18 +47,51 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
       const storedRead = await AsyncStorage.getItem('read_notifications');
       const parsedRead: string[] = storedRead ? JSON.parse(storedRead) : [];
 
-      const newArrivalsRes = await api.products.getNewArrivals(7, 1, 20);
+      let backendNotifs: AppNotification[] = [];
+
+      try {
+        const notifRes = await api.notifications.getNotifications(1, 50);
+        const incoming = Array.isArray(notifRes?.notifications) ? notifRes.notifications : [];
+        backendNotifs = incoming.map((n) => {
+          let icon = 'notifications-outline';
+          if (n.type === 'stock_update' || n.type === 'back_in_stock') {
+            icon = 'cube-outline';
+          } else if (n.type === 'new_arrival') {
+            icon = 'sparkles-outline';
+          } else if (n.type && n.type.toLowerCase().includes('order')) {
+            icon = 'bag-handle-outline';
+          }
+
+          const isLocallyRead = parsedRead.includes(n.id);
+          return {
+            id: n.id,
+            title: n.title,
+            desc: n.body || '',
+            time: getRelativeTime(n.created_at),
+            icon,
+            isRead: n.is_read || isLocallyRead,
+            productId: n.product_id || undefined,
+          };
+        });
+      } catch (err) {
+        console.warn('Could not fetch backend notifications:', err);
+      }
+
+      // New arrivals as supplemental discovery notifications
+      const newArrivalsRes = await api.products.getNewArrivals(7, 1, 10).catch(() => ({ products: [] }));
       const incomingProducts = Array.isArray(newArrivalsRes?.products) ? newArrivalsRes.products : [];
       
-      const dynamicNotifs: AppNotification[] = incomingProducts.map((p: Product) => ({
-        id: p.id,
-        title: 'New Product Added! ✨',
-        desc: `${p.product_name || 'Item'} has just been added to our collection for ₹${p.price || 0}. Tap to view!`,
-        time: getRelativeTime(p.created_at),
-        icon: 'sparkles-outline',
-        isRead: parsedRead.includes(p.id),
-        productId: p.id
-      }));
+      const productNotifs: AppNotification[] = incomingProducts
+        .filter((p: Product) => !backendNotifs.some((bn) => bn.productId === p.id))
+        .map((p: Product) => ({
+          id: `arrival-${p.id}`,
+          title: 'New Product Added! ✨',
+          desc: `${p.product_name || 'Item'} has just been added to our collection for ₹${p.price || 0}. Tap to view!`,
+          time: getRelativeTime(p.created_at),
+          icon: 'sparkles-outline',
+          isRead: parsedRead.includes(`arrival-${p.id}`),
+          productId: p.id
+        }));
 
       const staticNotifs: AppNotification[] = [
         { 
@@ -71,7 +104,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
         }
       ];
 
-      const allNotifs = [...dynamicNotifs, ...staticNotifs];
+      const allNotifs = [...backendNotifs, ...productNotifs, ...staticNotifs];
       const filteredNotifs = allNotifs.filter(n => n && !parsedDeleted.includes(n.id));
 
       const unreadCount = filteredNotifs.filter(n => !n.isRead).length;
@@ -102,6 +135,11 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
       if (!parsedRead.includes(id)) {
         parsedRead.push(id);
         await AsyncStorage.setItem('read_notifications', JSON.stringify(parsedRead));
+      }
+
+      // Sync read state with backend if it's a backend notification
+      if (!id.startsWith('static-') && !id.startsWith('arrival-')) {
+        api.notifications.markNotificationRead(id).catch(() => {});
       }
     } catch (error) {
       console.error('Failed to save read notification', error);

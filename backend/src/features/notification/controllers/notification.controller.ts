@@ -18,8 +18,10 @@ export const getNotifications = asyncHandler(async (req: AuthRequest, res: Respo
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 20;
 
+  const userId = req.user?.userId || null;
+
   const result = await getUserNotificationsService(
-    req.user!.userId,
+    userId,
     page ? pageNum : undefined,
     limit ? limitNum : undefined
   );
@@ -56,6 +58,7 @@ export const broadcastNotification = asyncHandler(async (req: AuthRequest, res: 
 });
 
 export const getUnreadCount = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const count = await getUnreadCountService(req.user!.userId);
+  const userId = req.user?.userId || null;
+  const count = await getUnreadCountService(userId);
   return sendSuccess(res, { count });
 });

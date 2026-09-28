@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateReviewStats, deleteProductModel, restoreProductModel } from './product.model';
-import { createProductService, lookupProductByCodeOrIdService, sellProductService } from '../services/product.service';
+import { createProductService, lookupProductByCodeOrIdService, sellProductService, notifyStockIncreaseService } from '../services/product.service';
 import { createProductSchema } from '../validations/product.validation';
 import { db } from '../../../shared/config/firebase';
 import { getProductByCodeOrIdDb } from '../../../db/product.db';
@@ -328,6 +328,42 @@ test('Product Model Setup and Lifecycle', async (t) => {
       await db.collection("products").doc(testProdId).delete();
       await db.collection("categories").doc(testCatId).delete();
       await db.collection("model_types").doc(testMtId).delete();
+    }
+  });
+
+  await t.test('Stock increase from 0 triggers back in stock notification', async () => {
+    try {
+      await db.collection("notifications").limit(1).get();
+    } catch (err: any) {
+      if (err.code === 16 || err.message?.includes("UNAUTHENTICATED")) {
+        console.warn("⚠️ Skipping live Firestore notification test: Mock/unauthenticated credentials.");
+        return;
+      }
+      throw err;
+    }
+
+    const testProd: any = {
+      id: "test-prod-" + Date.now(),
+      product_name: "Diamond Bangles",
+      price: 250,
+      quantity: 0,
+      status: "out_of_stock",
+    };
+
+    const notifSnapBefore = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.equal(notifSnapBefore.empty, true);
+
+    await notifyStockIncreaseService(testProd, 0, 15, "admin-tester");
+
+    const notifSnapAfter = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.equal(notifSnapAfter.empty, false, "Notification should be created for product restock");
+    const notif = notifSnapAfter.docs[0].data();
+    assert.ok(notif.title.includes("Back in Stock") || notif.title.includes("Stock Increased"));
+    assert.equal(notif.type, "stock_update");
+
+    // Cleanup
+    for (const d of notifSnapAfter.docs) {
+      await db.collection("notifications").doc(d.id).delete();
     }
   });
 });

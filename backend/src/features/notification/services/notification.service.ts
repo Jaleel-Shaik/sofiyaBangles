@@ -30,7 +30,7 @@ export const broadcastNotificationService = async (
 };
 
 export const getUserNotificationsService = async (
-  userId: string,
+  userId?: string | null,
   page?: number,
   limit?: number,
 ) => {
@@ -48,6 +48,7 @@ export const markNotificationReadService = async (
   return notification;
 };
 
-export const getUnreadCountService = async (userId: string) => {
+export const getUnreadCountService = async (userId?: string | null) => {
   return countUnreadNotificationsDb(userId);
 };
+

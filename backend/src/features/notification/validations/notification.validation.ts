@@ -11,7 +11,7 @@ export const broadcastNotificationSchema = z.object({
     .max(1000, "Body must be under 1000 characters")
     .optional(),
   type: z
-    .enum(["new_arrival", "announcement", "offer", "general"])
+    .enum(["new_arrival", "announcement", "offer", "general", "stock_update"])
     .default("announcement"),
   product_id: z.string().uuid("Invalid product ID").optional().nullable(),
 });
