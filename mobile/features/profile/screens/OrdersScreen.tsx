@@ -10,8 +10,8 @@ import {
   Image,
   AppState,
 } from "react-native";
-import { useState, useCallback, useEffect } from "react";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrderStore } from "@/src/store/orderStore";
@@ -19,6 +19,7 @@ import { useOrderStore } from "@/src/store/orderStore";
 export default function OrdersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { highlightOrder, search } = useLocalSearchParams<{ highlightOrder?: string; search?: string }>();
   const { orders, loading, fetchOrders } = useOrderStore();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -90,7 +91,26 @@ export default function OrdersScreen() {
     );
   }
 
-  const safeOrders = Array.isArray(orders) ? orders : [];
+  const rawTarget = (highlightOrder || search || "").trim().toLowerCase();
+  const cleanTarget = rawTarget.replace(/^#/, "");
+
+  const sortedOrders = useMemo(() => {
+    if (!Array.isArray(orders)) return [];
+    if (!cleanTarget) return orders;
+
+    return [...orders].sort((a, b) => {
+      const aMatches =
+        a.order_number?.toLowerCase().replace(/^#/, "") === cleanTarget ||
+        a.id?.toLowerCase() === cleanTarget;
+      const bMatches =
+        b.order_number?.toLowerCase().replace(/^#/, "") === cleanTarget ||
+        b.id?.toLowerCase() === cleanTarget;
+
+      if (aMatches && !bMatches) return -1;
+      if (!aMatches && bMatches) return 1;
+      return 0;
+    });
+  }, [orders, cleanTarget]);
 
   return (
     <View className="flex-1 bg-background">
@@ -126,7 +146,7 @@ export default function OrdersScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#e11d48"]} />
         }
       >
-        {safeOrders.length === 0 ? (
+        {sortedOrders.length === 0 ? (
           <View className="items-center justify-center pt-20">
             <View className="w-20 h-20 bg-primary/10 rounded-full items-center justify-center mb-4">
               <Ionicons name="bag-outline" size={36} color="#e11d48" />
@@ -144,16 +164,30 @@ export default function OrdersScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          safeOrders.flatMap((order) => (order?.items || []).map((item) => {
+          sortedOrders.flatMap((order) => (order?.items || []).map((item) => {
             const isCompleted = order.status === "completed";
             const isPending = order.status === "pending";
             const isCancelled = order.status === "cancelled";
+            const isTargetOrder = !!cleanTarget && (
+              order.order_number?.toLowerCase().replace(/^#/, "") === cleanTarget ||
+              order.id?.toLowerCase() === cleanTarget
+            );
 
             return (
               <View
                 key={item.id}
-                className="bg-surface rounded-2xl mb-4 border border-divider overflow-hidden shadow-xs"
+                className={`bg-surface rounded-2xl mb-4 overflow-hidden shadow-xs ${
+                  isTargetOrder ? "border-2 border-primary bg-rose-50/20" : "border border-divider"
+                }`}
               >
+                {isTargetOrder && (
+                  <View className="bg-primary px-3.5 py-1.5 flex-row items-center justify-between">
+                    <Text className="text-[11px] font-black text-white uppercase tracking-wider">
+                      Selected Order: {order.order_number}
+                    </Text>
+                    <Text className="text-[10px] font-bold text-white/90">Notification Target</Text>
+                  </View>
+                )}
                 <TouchableOpacity
                   onPress={() => openOrderProduct(item)}
                   activeOpacity={0.7}

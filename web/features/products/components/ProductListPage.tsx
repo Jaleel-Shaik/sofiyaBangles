@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Plus, Package, Zap, LayoutGrid, List, Eye, ArrowUpRight, Tag } from "lucide-react";
 import Link from "next/link";
@@ -21,6 +22,7 @@ import {
 import { STRINGS } from "@/src/constants/strings";
 
 export default function ProductsPage() {
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,17 +55,36 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchData();
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const cat = params.get("category");
-      if (cat) {
-        setCategoryFilter(cat);
-      }
-      const searchQueryParam = params.get("search") || params.get("code") || params.get("q");
-      if (searchQueryParam) {
-        setSearch(searchQueryParam);
-      }
+  }, []);
+
+  // Synchronize URL search params reactively
+  useEffect(() => {
+    const cat = searchParams?.get("category");
+    if (cat) {
+      setCategoryFilter(cat);
     }
+    const searchQueryParam =
+      searchParams?.get("search") ||
+      searchParams?.get("code") ||
+      searchParams?.get("productId") ||
+      searchParams?.get("product_id") ||
+      searchParams?.get("id") ||
+      searchParams?.get("q");
+    if (searchQueryParam) {
+      setSearch(searchQueryParam);
+    }
+  }, [searchParams]);
+
+  // Listen for open-product-notification event from notifications dropdown
+  useEffect(() => {
+    const handleProductNotif = (e: any) => {
+      const target = e?.detail?.searchTarget || e?.detail?.code || e?.detail?.productId;
+      if (target) {
+        setSearch(target);
+      }
+    };
+    window.addEventListener("open-product-notification", handleProductNotif);
+    return () => window.removeEventListener("open-product-notification", handleProductNotif);
   }, []);
 
   const confirmDeleteProduct = async () => {
@@ -87,6 +108,7 @@ export default function ProductsPage() {
       !lower ||
       p.product_name.toLowerCase().includes(lower) ||
       (p.unique_code && p.unique_code.toLowerCase().includes(lower)) ||
+      (p.id && (p.id.toLowerCase() === lower || p.id.toLowerCase().includes(lower))) ||
       (p.description && p.description.toLowerCase().includes(lower));
     const matchesCategory = !categoryFilter || p.category_id === categoryFilter;
     return matchesSearch && matchesCategory;

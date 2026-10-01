@@ -55,7 +55,10 @@ export const createProductSchema = z.object({
 });
 
 export const updateProductSchema = createProductSchema.partial().extend({
-  existing_images: z.union([z.string(), z.array(z.string())]).optional(),
+  quantity: zStringNumber
+    .pipe(z.number().int("Quantity must be a whole number").min(0, "Quantity cannot be negative"))
+    .optional(),
+  existing_images: z.union([z.string(), z.array(z.any())]).optional(),
 });
 
 export const updateStockSchema = z.object({

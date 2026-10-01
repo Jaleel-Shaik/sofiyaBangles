@@ -505,6 +505,10 @@ export interface Notification {
   user_id: string | null;
   is_read: boolean;
   created_at: string;
+  image_url?: string | null;
+  order_id?: string | null;
+  order_number?: string | null;
+  link_url?: string | null;
 }
 
 export interface AuditLog {

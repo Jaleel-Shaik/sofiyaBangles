@@ -2,6 +2,7 @@ import {
   queryUsersDb,
   getUserByIdDb,
   updateUserRoleDb,
+  deleteUserAccountDb,
 } from "../../../db/user.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
 
@@ -52,4 +53,30 @@ export const updateUserRoleService = async (
   });
 
   return updated;
+};
+
+export const deleteUserAccountService = async (userId: string, actorId: string) => {
+  const existing = await getUserByIdDb(userId);
+  if (!existing) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  if (existing.role === "super_admin") {
+    const allSuperAdmins = await queryUsersDb({ role: "super_admin" });
+    if (allSuperAdmins.total <= 1) {
+      throw new Error("CANNOT_DELETE_LAST_SUPER_ADMIN");
+    }
+  }
+
+  await deleteUserAccountDb(userId);
+
+  await insertAuditLogDb({
+    actor_id: actorId,
+    action: "USER_ACCOUNT_DELETED",
+    table_name: existing.role === "admin" || existing.role === "super_admin" ? "admins" : "users",
+    record_id: userId,
+    old_data: { full_name: existing.full_name, email: existing.email, role: existing.role },
+  });
+
+  return { success: true, message: "Account deleted permanently." };
 };

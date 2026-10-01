@@ -93,7 +93,18 @@ export default function ProductDetailPage() {
       const prod = await api.admin.getProductById(id);
       setProduct(prod);
     } catch {
-      toast.error("Failed to load product");
+      // Fallback: Check if id matches unique_code across products
+      try {
+        const res = await api.admin.getAdminProducts(1, 100);
+        const match = res.products?.find(
+          (p) => p.unique_code?.toLowerCase() === id.toLowerCase() || p.id === id
+        );
+        if (match) {
+          setProduct(match);
+          return;
+        }
+      } catch {}
+      toast.error("Product not found or has been archived");
     } finally {
       setLoading(false);
     }
@@ -330,8 +341,24 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="text-center py-24 text-slate-400 font-medium">
-        Product not found
+      <div className="max-w-md mx-auto text-center py-20 space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-rose-50 text-[#E8436E] flex items-center justify-center mx-auto shadow-2xs">
+          <Package className="w-8 h-8" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Product Not Found</h3>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            This product may have been archived, removed, or has a different reference code. You can browse all active bangles in the catalog.
+          </p>
+        </div>
+        <div className="pt-2">
+          <Link
+            href="/dashboard/products"
+            className="inline-flex items-center gap-2 bg-[#E8436E] hover:bg-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm shadow-rose-500/20"
+          >
+            Browse Products Inventory &rarr;
+          </Link>
+        </div>
       </div>
     );
   }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ShoppingBag,
   Search,
@@ -69,26 +70,80 @@ export default function OrdersManagementPage() {
         limit: 20,
         search: targetSearch || undefined,
       });
-      setOrders(res.orders || []);
+      const items = res.orders || [];
+      setOrders(items);
       setTotal(res.total || 0);
+      return items;
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Failed to load orders");
+      return [];
     } finally {
       setLoading(false);
     }
   };
 
+  const searchParams = useSearchParams();
+  const urlSearchTarget = searchParams?.get("search") || searchParams?.get("orderNumber") || searchParams?.get("id") || "";
+  const urlOrderId = searchParams?.get("id") || undefined;
+  const urlAction = searchParams?.get("action");
+
+  // Inspect order target: searches orders, auto-opens the matching order drawer
+  const inspectOrderTarget = useCallback(async (targetQuery: string, targetId?: string) => {
+    const cleanQuery = (targetQuery || targetId || "").replace(/^#/, "").trim();
+    if (!cleanQuery) return;
+    setSearch(cleanQuery);
+    setPage(1);
+
+    // 1. Direct fetch: immediately retrieve full order details by ID or Order Number
+    try {
+      const directOrder = await api.superAdmin.getOrderById(targetId || cleanQuery);
+      if (directOrder && directOrder.id) {
+        setSelectedOrder(directOrder);
+        fetchOrders(1, cleanQuery);
+        return;
+      }
+    } catch {}
+
+    // 2. Fallback search across list
+    const items = await fetchOrders(1, cleanQuery);
+    if (items && items.length > 0) {
+      const match = items.find(
+        (o) =>
+          (cleanQuery && o.order_number?.toLowerCase().replace(/^#/, "") === cleanQuery.toLowerCase()) ||
+          (targetId && o.id === targetId) ||
+          o.id === cleanQuery
+      );
+      setSelectedOrder(match || items[0]);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchOrders(page, search);
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("action") === "new-sale") {
-        openNewSaleModal();
-        // Clean up URL parameter cleanly so page refresh doesn't reopen modal
+    if (urlSearchTarget) {
+      inspectOrderTarget(urlSearchTarget, urlOrderId);
+    } else {
+      fetchOrders(page, search);
+    }
+
+    if (urlAction === "new-sale") {
+      openNewSaleModal();
+      if (typeof window !== "undefined") {
         window.history.replaceState({}, "", window.location.pathname);
       }
     }
-  }, [page]);
+  }, [page, urlSearchTarget, urlOrderId, urlAction, inspectOrderTarget]);
+
+  // Listen to open-order-notification event from notification center dropdown
+  useEffect(() => {
+    const handleNotificationOpen = (e: any) => {
+      const orderNumber = e?.detail?.orderNumber;
+      const orderId = e?.detail?.orderId;
+      if (orderNumber || orderId) {
+        inspectOrderTarget(orderNumber || orderId, orderId);
+      }
+    };
+    window.addEventListener("open-order-notification", handleNotificationOpen);
+    return () => window.removeEventListener("open-order-notification", handleNotificationOpen);
+  }, [inspectOrderTarget]);
 
   // Real-time synchronization: reload orders whenever a product is sold anywhere in admin
   useEffect(() => {

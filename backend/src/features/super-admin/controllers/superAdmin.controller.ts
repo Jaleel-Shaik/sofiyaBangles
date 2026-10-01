@@ -164,6 +164,31 @@ export const markNotificationRead = asyncHandler(async (req: AuthRequest, res: R
 });
 
 /**
+ * Mark All Notifications Read Handler
+ */
+export const markAllNotificationsRead = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const count = await SuperAdminService.markAllNotificationsRead(req.user?.userId);
+  return sendSuccess(res, { count }, { message: "All notifications marked as read." });
+});
+
+/**
+ * Clear All Notifications Handler
+ */
+export const clearAllNotifications = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const count = await SuperAdminService.clearAllNotifications(req.user?.userId);
+  return sendSuccess(res, { count }, { message: "All notifications cleared." });
+});
+
+/**
+ * Delete Single Notification Handler
+ */
+export const deleteNotification = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
+  await SuperAdminService.deleteNotification(id, req.user?.userId);
+  return sendSuccess(res, null, { message: "Notification deleted." });
+});
+
+/**
  * Commission Settings Get & Update Handlers
  */
 export const getCommissionSettings = asyncHandler(async (_req: AuthRequest, res: Response) => {

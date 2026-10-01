@@ -104,3 +104,42 @@ export const updateUserRoleDb = async (
   const { password_hash, ...safeData } = updatedData;
   return safeData;
 };
+
+/**
+ * Pure Database Operation: Permanently delete user account and cascade related user-specific records.
+ */
+export const deleteUserAccountDb = async (userId: string): Promise<boolean> => {
+  const batch = db.batch();
+  let found = false;
+
+  // 1. Delete user identity from users or admins
+  for (const coll of ["users", "admins"]) {
+    const docRef = db.collection(coll).doc(userId);
+    const doc = await docRef.get();
+    if (doc.exists) {
+      batch.delete(docRef);
+      found = true;
+    }
+  }
+
+  // 2. Cascade delete favorites
+  const favsSnap = await db.collection("favorites").where("user_id", "==", userId).get();
+  favsSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  // 3. Cascade delete cart items
+  const cartSnap = await db.collection("cart_items").where("user_id", "==", userId).get();
+  cartSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  // 4. Cascade delete sessions / refresh tokens
+  const sessionsSnap = await db.collection("sessions").where("user_id", "==", userId).get();
+  sessionsSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  // 5. Cascade delete user-specific notifications
+  const notifsSnap = await db.collection("notifications").where("user_id", "==", userId).get();
+  notifsSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  if (found) {
+    await batch.commit();
+  }
+  return found;
+};

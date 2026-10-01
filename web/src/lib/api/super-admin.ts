@@ -54,6 +54,15 @@ export const superAdminApi = {
   markNotificationRead: (id: string) =>
     apiClient.patch(API_ENDPOINTS.SUPER_ADMIN.MARK_NOTIFICATION_READ(id)).then((r) => r.data),
 
+  markAllNotificationsRead: () =>
+    apiClient.patch(API_ENDPOINTS.SUPER_ADMIN.MARK_ALL_NOTIFICATIONS_READ).then((r) => r.data),
+
+  clearAllNotifications: () =>
+    apiClient.delete(API_ENDPOINTS.SUPER_ADMIN.CLEAR_ALL_NOTIFICATIONS).then((r) => r.data),
+
+  deleteNotification: (id: string) =>
+    apiClient.delete(API_ENDPOINTS.SUPER_ADMIN.DELETE_NOTIFICATION(id)).then((r) => r.data),
+
   getCommissionSettings: () =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.COMMISSION).then((r) => extractData<CommissionSettings>(r)),
 
@@ -86,6 +95,9 @@ export const superAdminApi = {
       total: r.data?.pagination?.total || 0,
       totalPages: r.data?.pagination?.totalPages || 1,
     })),
+
+  getOrderById: (id: string) =>
+    apiClient.get(API_ENDPOINTS.ORDERS.BY_ID(id)).then((r) => r.data?.data as AdminOrder),
 
   createOrder: (data: {
     items: Array<{ productId: string; variantId?: string | null; quantity: number }>;

@@ -11,15 +11,14 @@ export interface StockDeductionItem {
 }
 
 /**
- * Pure Database Operation: Atomically save an order, its items, and deduct variant/product stocks.
+ * Pure Database Operation: Atomically save an order, its items, and deduct variant/product stocks
+ * inside a database transaction to prevent concurrency race conditions and negative inventory.
  */
 export const insertOrderWithItemsDb = async (
   order: Order,
   items: OrderItem[],
   stockDeductions: StockDeductionItem[]
 ): Promise<Order> => {
-  const batch = db.batch();
-
   const sanitizeDoc = (obj: any) => {
     const clean: any = {};
     Object.keys(obj).forEach((k) => {
@@ -28,48 +27,79 @@ export const insertOrderWithItemsDb = async (
     return clean;
   };
 
-  // 1. Order document
-  batch.set(db.collection("orders").doc(order.id), sanitizeDoc(order));
+  await db.runTransaction(async (transaction) => {
+    // 1. Transactional Reads: Verify all stock availability before committing writes
+    const readDocs: Array<{
+      ref: FirebaseFirestore.DocumentReference;
+      currentQty: number;
+      deductQty: number;
+      id: string;
+      isVariant: boolean;
+    }> = [];
 
-  // 2. Order items documents
-  items.forEach((item) => {
-    batch.set(db.collection("order_items").doc(item.id), sanitizeDoc(item));
-  });
+    for (const deduction of stockDeductions) {
+      const isVariant = deduction.type === "variant" || deduction.variantId !== undefined;
+      const targetId = deduction.id || (isVariant ? deduction.variantId : deduction.productId);
 
-  // 3. Stock deductions
-  const now = new Date().toISOString();
-  for (const deduction of stockDeductions) {
-    const isVariant = deduction.type === "variant" || deduction.variantId !== undefined;
-    const targetId = deduction.id || (isVariant ? deduction.variantId : deduction.productId);
+      if (targetId) {
+        const ref = isVariant
+          ? db.collection("product_variants").doc(targetId)
+          : db.collection("products").doc(targetId);
 
-    if (targetId) {
-      if (isVariant) {
-        const vRef = db.collection("product_variants").doc(targetId);
-        batch.update(vRef, {
-          quantity: FieldValue.increment(-deduction.quantity),
-          updated_at: now,
-        });
-      } else {
-        const pRef = db.collection("products").doc(targetId);
-        batch.update(pRef, {
-          quantity: FieldValue.increment(-deduction.quantity),
-          updated_at: now,
+        const snap = await transaction.get(ref);
+        if (!snap.exists) {
+          throw new Error(`ITEM_NOT_FOUND: Record ${targetId} was not found.`);
+        }
+        const currentQty = Number(snap.data()?.quantity) || 0;
+        if (currentQty < deduction.quantity) {
+          throw new Error(
+            `INSUFFICIENT_STOCK: Item only has ${currentQty} units available, cannot fulfill ${deduction.quantity}.`
+          );
+        }
+
+        readDocs.push({
+          ref,
+          currentQty,
+          deductQty: deduction.quantity,
+          id: targetId,
+          isVariant,
         });
       }
     }
-  }
 
-  await batch.commit();
+    // 2. Transactional Writes: Deduct stock and commit order + items
+    const now = new Date().toISOString();
+    for (const docInfo of readDocs) {
+      transaction.update(docInfo.ref, {
+        quantity: docInfo.currentQty - docInfo.deductQty,
+        updated_at: now,
+      });
+    }
+
+    // 3. Set order document
+    transaction.set(db.collection("orders").doc(order.id), sanitizeDoc(order));
+
+    // 4. Set order items documents
+    items.forEach((item) => {
+      transaction.set(db.collection("order_items").doc(item.id), sanitizeDoc(item));
+    });
+  });
+
   return order;
 };
 
+
 /**
- * Pure Database Operation: Retrieve order by ID.
+ * Pure Database Operation: Retrieve order by ID or Order Number.
  */
 export const getOrderByIdDb = async (id: string): Promise<Order | null> => {
-  const doc = await db.collection("orders").doc(id).get();
-  if (!doc.exists) return null;
-  return doc.data() as Order;
+  if (!id) return null;
+  const cleanId = id.trim();
+  const doc = await db.collection("orders").doc(cleanId).get();
+  if (doc.exists) return doc.data() as Order;
+
+  // Fallback: Check if the string passed is an order_number (e.g. ORD-123456 or #ORD-123456)
+  return await getOrderByOrderNumberDb(cleanId);
 };
 
 /**
@@ -77,14 +107,27 @@ export const getOrderByIdDb = async (id: string): Promise<Order | null> => {
  */
 export const getOrderByOrderNumberDb = async (orderNumber: string): Promise<Order | null> => {
   if (!orderNumber) return null;
-  const snapshot = await db
+  const clean = orderNumber.replace(/^#/, "").trim();
+
+  // Try exact match with stripped hash
+  let snapshot = await db
     .collection("orders")
-    .where("order_number", "==", orderNumber.trim())
+    .where("order_number", "==", clean)
     .limit(1)
     .get();
 
-  if (snapshot.empty) return null;
-  return snapshot.docs[0].data() as Order;
+  if (!snapshot.empty) return snapshot.docs[0].data() as Order;
+
+  // Try match with leading hash
+  snapshot = await db
+    .collection("orders")
+    .where("order_number", "==", `#${clean}`)
+    .limit(1)
+    .get();
+
+  if (!snapshot.empty) return snapshot.docs[0].data() as Order;
+
+  return null;
 };
 
 /**
@@ -167,10 +210,15 @@ export const getAllAdminOrdersDb = async (options?: {
   let orders = snapshot.docs.map((doc) => doc.data() as Order);
 
   if (options?.search) {
-    const s = options.search.toLowerCase();
+    const s = options.search.toLowerCase().trim();
+    const cleanSearch = s.replace(/^#/, "");
     orders = orders.filter(
       (o) =>
-        (o.order_number && o.order_number.toLowerCase().includes(s)) ||
+        (o.id && (o.id.toLowerCase() === s || o.id.toLowerCase().includes(s))) ||
+        (o.order_number && (
+          o.order_number.toLowerCase().includes(s) ||
+          o.order_number.toLowerCase().replace(/^#/, "").includes(cleanSearch)
+        )) ||
         (o.customer_name && o.customer_name.toLowerCase().includes(s)) ||
         (o.customer_phone && o.customer_phone.toLowerCase().includes(s)) ||
         (o.shipping_address_snapshot?.name &&

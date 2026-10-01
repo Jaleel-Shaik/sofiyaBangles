@@ -45,25 +45,78 @@ export interface Product {
   updated_at?: string;
 }
 
-const sanitizeProduct = (p: any): Product => {
-  let image_url = typeof p?.image_url === 'string' ? p.image_url.trim() : '';
-  const images = Array.isArray(p?.images) ? p.images : (image_url ? [image_url] : []);
-  if (!image_url && images.length > 0) {
-    const first = images[0];
-    if (typeof first === 'string') image_url = first.trim();
-    else if (first && typeof first.image_url === 'string') image_url = first.image_url.trim();
-    else if (first && typeof first.url === 'string') image_url = first.url.trim();
+export const unwrapCleanImageUrl = (raw: unknown): string => {
+  if (!raw) return '';
+  if (typeof raw !== 'string') {
+    if (typeof raw === 'object' && raw !== null && 'image_url' in raw) {
+      return unwrapCleanImageUrl((raw as any).image_url);
+    }
+    return '';
   }
+  let s = raw.trim();
+  while (
+    (s.startsWith('[') && s.endsWith(']')) ||
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    if (s.startsWith('[') && s.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          s = typeof parsed[0] === 'string' ? parsed[0].trim() : String(parsed[0]);
+          continue;
+        }
+      } catch {
+        s = s.slice(1, -1).trim();
+      }
+    } else {
+      s = s.slice(1, -1).trim();
+    }
+  }
+  return s.replace(/^[\\"'`]+|[\\"'`]+$/g, '').trim();
+};
+
+const sanitizeProduct = (p: any): Product => {
+  const cleanCover = unwrapCleanImageUrl(p?.image_url);
+  const rawImages = Array.isArray(p?.images) ? p.images : (cleanCover ? [cleanCover] : []);
+  const images: string[] = [];
+
+  for (const item of rawImages) {
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((x) => {
+              const u = unwrapCleanImageUrl(x);
+              if (u) images.push(u);
+            });
+            continue;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      const u = unwrapCleanImageUrl(trimmed);
+      if (u) images.push(u);
+    } else if (item && typeof item === 'object') {
+      const u = unwrapCleanImageUrl(item?.image_url || item?.url);
+      if (u) images.push(u);
+    }
+  }
+
+  const finalCover = cleanCover || (images.length > 0 ? images[0] : '');
 
   return {
     ...p,
     id: String(p?.id || ''),
-    unique_code: p?.unique_code || '',
+    unique_code: (p?.unique_code || '').replace(/^#+/, '').trim().toUpperCase(),
     product_name: p?.product_name || 'Bangle',
     description: p?.description || '',
     price: typeof p?.price === 'number' ? p.price : Number(p?.price) || 0,
-    image_url,
-    images,
+    image_url: finalCover,
+    images: images.length > 0 ? images : (finalCover ? [finalCover] : []),
     category_id: p?.category_id || '',
     category_name: p?.category_name || '',
     quantity: typeof p?.quantity === 'number' ? p.quantity : Number(p?.quantity) || 0,

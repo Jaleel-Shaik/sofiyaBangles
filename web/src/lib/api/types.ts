@@ -375,11 +375,17 @@ export interface AdminActivityItem {
 export interface AdminNotification {
   id: string;
   title: string;
-  message: string;
+  message?: string;
+  body?: string | null;
   type: string;
   is_read: boolean;
   link?: string;
   created_at: string;
+  product_id?: string | null;
+  image_url?: string | null;
+  order_id?: string | null;
+  order_number?: string | null;
+  unique_code?: string | null;
 }
 
 export interface ProductAnalyticsItem {

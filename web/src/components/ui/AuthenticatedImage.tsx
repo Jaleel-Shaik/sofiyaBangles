@@ -14,13 +14,44 @@ export interface AuthenticatedImageProps {
 }
 
 /**
+ * Robustly sanitizes an image URL, unwrapping stringified JSON arrays or escaped quotes if present.
+ */
+function sanitizeImageUrl(val?: string | null): string | null {
+  if (!val || typeof val !== "string") return null;
+  let s = val.trim();
+  while (
+    (s.startsWith("[") && s.endsWith("]")) ||
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    if (s.startsWith("[") && s.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          s = typeof parsed[0] === "string" ? parsed[0].trim() : String(parsed[0]);
+          continue;
+        }
+      } catch {
+        s = s.slice(1, -1).trim();
+      }
+    } else {
+      s = s.slice(1, -1).trim();
+    }
+  }
+  s = s.replace(/^[\\"'`]+|[\\"'`]+$/g, "").trim();
+  return s || null;
+}
+
+/**
  * AuthenticatedImage component for Admin Portal.
  *
  * Security Features:
- * 1. Attaches Admin JWT Bearer token to protected image asset requests.
- * 2. Manages transient Object URL blob lifecycle and automatic revocation.
- * 3. Handles 401/403 authorization failures with a secure locked state indicator.
- * 4. Supports direct image URLs with automatic authenticated fallback.
+ * 1. Attaches Admin JWT Bearer token to protected API image requests (/secure-image).
+ * 2. Unwraps any legacy stringified JSON array formats automatically.
+ * 3. Direct CDN URLs (Cloudinary, Unsplash) load directly without sending Authorization headers to prevent CORS preflight failures.
+ * 4. Manages transient Object URL blob lifecycle and automatic revocation for protected images.
+ * 5. Handles 401/403 authorization failures with a secure locked state indicator.
+ * 6. Smooth fallback to secure backend proxy or ImageOff placeholder.
  */
 export function AuthenticatedImage({
   src,
@@ -38,9 +69,12 @@ export function AuthenticatedImage({
   useEffect(() => {
     let isMounted = true;
 
-    // Resolve target image URL (either secure API route or given src)
-    let targetUrl = src;
-    if (productId && !targetUrl) {
+    // 1. Sanitize the provided src
+    const cleanSrc = sanitizeImageUrl(src);
+
+    // 2. Resolve target image URL (either direct cleanSrc or secure API route)
+    let targetUrl = cleanSrc;
+    if (!targetUrl && productId) {
       targetUrl = `${API_URL}/products/${productId}/secure-image/${imageIndex}`;
     }
 
@@ -57,6 +91,17 @@ export function AuthenticatedImage({
       return;
     }
 
+    // Direct external CDN URLs (Cloudinary, Unsplash, standard external images)
+    // Do NOT send local Bearer token to external CDNs to avoid CORS preflight rejection!
+    const isProtectedApiRoute = targetUrl.includes("/secure-image") || (Boolean(API_URL) && targetUrl.startsWith(API_URL));
+
+    if (!isProtectedApiRoute) {
+      setBlobUrl(targetUrl);
+      setLoading(false);
+      return;
+    }
+
+    // For protected API endpoints, fetch with Bearer Authorization token
     const fetchAuthenticatedImage = async () => {
       setLoading(true);
       setError(null);
@@ -69,7 +114,7 @@ export function AuthenticatedImage({
           headers["Authorization"] = `Bearer ${token}`;
         }
 
-        const res = await fetch(targetUrl, {
+        const res = await fetch(targetUrl!, {
           method: "GET",
           headers,
         });
@@ -83,8 +128,8 @@ export function AuthenticatedImage({
         }
 
         if (!res.ok) {
-          // If remote image fails with CORS/error, try direct image tag fallback
           if (isMounted) {
+            // Direct fallback to targetUrl
             setBlobUrl(targetUrl);
             setLoading(false);
           }
@@ -93,7 +138,6 @@ export function AuthenticatedImage({
 
         const blob = await res.blob();
         if (isMounted) {
-          // Revoke previous blob URL to avoid memory leak
           if (previousBlobRef.current && previousBlobRef.current.startsWith("blob:")) {
             URL.revokeObjectURL(previousBlobRef.current);
           }
@@ -104,7 +148,6 @@ export function AuthenticatedImage({
           setLoading(false);
         }
       } catch (err) {
-        // Network or CORS error on authenticated fetch: fallback to regular URL load
         if (isMounted) {
           setBlobUrl(targetUrl);
           setLoading(false);
@@ -121,6 +164,15 @@ export function AuthenticatedImage({
       }
     };
   }, [src, productId, imageIndex]);
+
+  const handleImgError = () => {
+    // If a direct URL fails, attempt fallback to secure image route if not already tried
+    if (productId && blobUrl && !blobUrl.includes("/secure-image")) {
+      setBlobUrl(`${API_URL}/products/${productId}/secure-image/${imageIndex}`);
+      return;
+    }
+    setError("error");
+  };
 
   if (loading) {
     return (
@@ -152,9 +204,7 @@ export function AuthenticatedImage({
       src={blobUrl}
       alt={alt}
       className={className}
-      onError={() => {
-        setError("error");
-      }}
+      onError={handleImgError}
     />
   );
 }

@@ -63,7 +63,16 @@ export const getProductByIdDb = async (id: string): Promise<Product | null> => {
  */
 export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product | null> => {
   if (!codeOrId || typeof codeOrId !== "string") return null;
-  const trimmed = codeOrId.trim();
+
+  let decoded = codeOrId;
+  try {
+    decoded = decodeURIComponent(codeOrId);
+  } catch {
+    decoded = codeOrId;
+  }
+
+  const trimmed = decoded.trim();
+  const unhashed = trimmed.replace(/^#+/, "").trim();
 
   // 1. Try finding by Firestore doc ID directly
   const doc = await db.collection("products").doc(trimmed).get();
@@ -71,24 +80,46 @@ export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product 
     return { ...doc.data(), id: doc.id } as Product;
   }
 
-  // 2. Query by unique_code (uppercased)
-  const codeUpper = trimmed.toUpperCase();
-  const snap = await db
+  if (unhashed && unhashed !== trimmed) {
+    const docUnhashed = await db.collection("products").doc(unhashed).get();
+    if (docUnhashed.exists) {
+      return { ...docUnhashed.data(), id: docUnhashed.id } as Product;
+    }
+  }
+
+  // 2. Query by unique_code (uppercased without #)
+  const unhashedUpper = unhashed.toUpperCase();
+  const snapUnhashed = await db
     .collection("products")
-    .where("unique_code", "==", codeUpper)
+    .where("unique_code", "==", unhashedUpper)
     .limit(1)
     .get();
 
-  if (!snap.empty) {
-    const matchedDoc = snap.docs[0];
+  if (!snapUnhashed.empty) {
+    const matchedDoc = snapUnhashed.docs[0];
     return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
   }
 
-  // 3. Fallback: query without uppercase transformation
-  if (trimmed !== codeUpper) {
+  // 3. Query by unique_code (uppercased raw)
+  const codeUpper = trimmed.toUpperCase();
+  if (codeUpper !== unhashedUpper) {
+    const snap = await db
+      .collection("products")
+      .where("unique_code", "==", codeUpper)
+      .limit(1)
+      .get();
+
+    if (!snap.empty) {
+      const matchedDoc = snap.docs[0];
+      return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
+    }
+  }
+
+  // 4. Fallback: query without uppercase transformation
+  if (unhashed !== unhashedUpper) {
     const snapRaw = await db
       .collection("products")
-      .where("unique_code", "==", trimmed)
+      .where("unique_code", "==", unhashed)
       .limit(1)
       .get();
     if (!snapRaw.empty) {
@@ -97,7 +128,7 @@ export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product 
     }
   }
 
-  // 4. Fallback: Query by internal 'id' field
+  // 5. Fallback: Query by internal 'id' field
   const snapById = await db
     .collection("products")
     .where("id", "==", trimmed)
@@ -108,17 +139,14 @@ export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product 
     return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
   }
 
-  // 5. Fallback: Query without leading '#' if present (e.g. #SIL-101)
-  const unhashed = trimmed.replace(/^#/, "").trim();
-  if (unhashed && unhashed !== trimmed) {
-    const unhashedUpper = unhashed.toUpperCase();
-    const snapUnhashed = await db
+  if (unhashed !== trimmed) {
+    const snapByIdUnhashed = await db
       .collection("products")
-      .where("unique_code", "==", unhashedUpper)
+      .where("id", "==", unhashed)
       .limit(1)
       .get();
-    if (!snapUnhashed.empty) {
-      const matchedDoc = snapUnhashed.docs[0];
+    if (!snapByIdUnhashed.empty) {
+      const matchedDoc = snapByIdUnhashed.docs[0];
       return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
     }
   }

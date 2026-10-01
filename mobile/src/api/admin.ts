@@ -106,13 +106,18 @@ export const updateProduct = async (id: string, productData: Partial<CreateProdu
       }
     });
     if (imageUris && imageUris.length > 0) {
-      imageUris.forEach((uri, index) => {
+      imageUris.forEach((rawItem, index) => {
+        const uri = typeof rawItem === 'string' ? rawItem.trim() : ((rawItem as any)?.image_url || (rawItem as any)?.uri || '');
+        if (!uri) return;
+
         if (!uri.startsWith('http')) {
-          const extension = uri.split('.').pop() || 'jpg';
+          const cleanUri = uri.split('?')[0];
+          const extension = cleanUri.split('.').pop()?.toLowerCase() || 'jpg';
+          const mimeType = extension === 'png' ? 'image/png' : (extension === 'webp' ? 'image/webp' : 'image/jpeg');
           formData.append('images', {
             uri,
-            type: `image/${extension === 'jpg' ? 'jpeg' : extension}`,
-            name: `image_${index}.${extension}`,
+            type: mimeType,
+            name: `image_${Date.now()}_${index}.${extension}`,
           } as unknown as Blob);
         } else {
           formData.append('existing_images', uri);

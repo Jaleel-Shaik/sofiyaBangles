@@ -64,6 +64,51 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to permanently delete your account? This action cannot be undone and will delete your profile, saved favorites, and order associations.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Permanently",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Final Confirmation",
+              "Are you completely sure? You will lose access to your account immediately.",
+              [
+                { text: "Keep Account", style: "cancel" },
+                {
+                  text: "Yes, Delete",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      setIsDeleting(true);
+                      await api.auth.deleteAccount();
+                      await logout();
+                      Alert.alert("Account Deleted", "Your account has been deleted successfully.");
+                    } catch (error: any) {
+                      const msg =
+                        error?.response?.data?.error?.message ||
+                        error?.message ||
+                        "Failed to delete account. Please try again.";
+                      Alert.alert("Error", msg);
+                    } finally {
+                      setIsDeleting(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
   const menuItems = [
     { icon: "person-outline", title: "Personal Info", route: "/profile/personal-info" },
     { icon: "location-outline", title: "My Addresses", route: "/profile/addresses" },
@@ -152,10 +197,21 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           onPress={handleLogout}
-          className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex-row justify-center items-center mb-6"
+          className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex-row justify-center items-center mb-3"
         >
           <Ionicons name="log-out-outline" size={20} color="#e11d48" />
           <Text className="text-primary font-bold text-base ml-2">Logout</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleDeleteAccount}
+          disabled={isDeleting}
+          className="border border-red-200 bg-red-50/50 rounded-2xl p-4 flex-row justify-center items-center mb-6"
+        >
+          <Ionicons name="trash-outline" size={18} color="#ef4444" />
+          <Text className="text-red-500 font-semibold text-sm ml-2">
+            {isDeleting ? "Deleting Account..." : "Delete Account"}
+          </Text>
         </TouchableOpacity>
       </View>
 

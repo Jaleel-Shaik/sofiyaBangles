@@ -64,7 +64,12 @@ export default function AdminReviewsPage() {
     fetchReviews();
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
-      const searchParam = urlParams.get("search");
+      const searchParam =
+        urlParams.get("search") ||
+        urlParams.get("productId") ||
+        urlParams.get("product_id") ||
+        urlParams.get("code") ||
+        urlParams.get("id");
       if (searchParam) {
         setSearchQuery(searchParam);
       }

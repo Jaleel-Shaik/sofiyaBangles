@@ -47,6 +47,7 @@ export const API_ENDPOINTS = {
     BY_ID: (id: string) => `/users/${id}`,
     LOOKUP: (phone: string) => `/users/lookup?phone=${encodeURIComponent(phone)}`,
     CUSTOMERS: '/users/customers',
+    DELETE_ME: '/users/me',
   },
   FAVORITES: {
     BASE: '/favorites',
@@ -57,6 +58,9 @@ export const API_ENDPOINTS = {
     BROADCAST: '/notifications/broadcast',
     UNREAD_COUNT: '/notifications/unread-count',
     MARK_READ: (id: string) => `/notifications/${id}/read`,
+    MARK_ALL_READ: '/notifications/read-all',
+    CLEAR_ALL: '/notifications/clear-all',
+    BY_ID: (id: string) => `/notifications/${id}`,
   },
   ORDERS: {
     BASE: '/orders',

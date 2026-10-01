@@ -7,6 +7,7 @@ import {
   getAllUsersService,
   getUserByIdService,
   updateUserRoleService,
+  deleteUserAccountService,
 } from "../services/user.service";
 import { NotFoundError, BadRequestError } from "../../../core/errors/app.error";
 import {
@@ -108,5 +109,33 @@ export const createCustomerAccount = asyncHandler(async (req: AuthRequest, res: 
     message: "Customer account created and authorized successfully.",
     statusCode: 201,
   });
+});
+
+export const deleteSelfAccount = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId;
+  try {
+    const result = await deleteUserAccountService(userId, userId);
+    return sendSuccess(res, result, "Your account has been deleted successfully.");
+  } catch (err: any) {
+    if (err.message === "USER_NOT_FOUND") throw new NotFoundError("User account not found.");
+    if (err.message === "CANNOT_DELETE_LAST_SUPER_ADMIN") {
+      throw new BadRequestError("Cannot delete the only remaining SuperAdmin account.");
+    }
+    throw err;
+  }
+});
+
+export const deleteUser = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
+  try {
+    const result = await deleteUserAccountService(id, req.user!.userId);
+    return sendSuccess(res, result, "User account deleted successfully.");
+  } catch (err: any) {
+    if (err.message === "USER_NOT_FOUND") throw new NotFoundError("User account not found.");
+    if (err.message === "CANNOT_DELETE_LAST_SUPER_ADMIN") {
+      throw new BadRequestError("Cannot delete the only remaining SuperAdmin account.");
+    }
+    throw err;
+  }
 });
 

@@ -486,6 +486,8 @@ export class OrderService {
       body: `Order ${order.order_number} for ₹${order.total_amount} was completed successfully.`,
       type: "NEW_SALE",
       product_id: null,
+      order_id: order.id,
+      order_number: order.order_number,
       sent_by: actorId,
       user_id: null,
       is_read: false,
@@ -616,6 +618,8 @@ export class OrderService {
       user_id: order.user_id,
       is_read: false,
       created_at: now,
+      order_id: order.id,
+      order_number: order.order_number,
     });
 
     await insertAuditLogDb({

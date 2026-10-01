@@ -49,6 +49,31 @@ export default function EditProductPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const initialCategoryIdRef = useRef("");
 
+  const sanitizeUrl = (val: unknown): string => {
+    if (!val) return "";
+    let s = typeof val === "string" ? val.trim() : (typeof val === "object" && val !== null && "image_url" in val ? String((val as any).image_url).trim() : "");
+    while (
+      (s.startsWith("[") && s.endsWith("]")) ||
+      (s.startsWith('"') && s.endsWith('"')) ||
+      (s.startsWith("'") && s.endsWith("'"))
+    ) {
+      if (s.startsWith("[") && s.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(s);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            s = typeof parsed[0] === "string" ? parsed[0].trim() : String(parsed[0]);
+            continue;
+          }
+        } catch {
+          s = s.slice(1, -1).trim();
+        }
+      } else {
+        s = s.slice(1, -1).trim();
+      }
+    }
+    return s.replace(/^[\\"'`]+|[\\"'`]+$/g, "").trim();
+  };
+
   useEffect(() => {
     Promise.all([api.admin.getProductById(id), api.admin.getModelTypes()])
       .then(([product, mts]) => {
@@ -61,12 +86,14 @@ export default function EditProductPage() {
             price: String(product.price || ""),
             quantity: String(product.quantity || "0"),
             category_id: product.category_id || "",
-            unique_code: product.unique_code || "",
+            unique_code: (product.unique_code || "").replace(/^#+/, "").trim().toUpperCase(),
             status: product.status || (product.is_active !== false ? "active" : "draft"),
           });
           setSelectedModelType(product.model_type_id || "");
-          if (product.images?.length) setExistingImages(product.images.map((img) => typeof img === 'string' ? img : img.image_url));
-          else if (product.image_url) setExistingImages([product.image_url]);
+          const rawImgs = product.images?.length
+            ? product.images.map(sanitizeUrl).filter(Boolean)
+            : (product.image_url ? [sanitizeUrl(product.image_url)].filter(Boolean) : []);
+          setExistingImages(rawImgs);
           if (product.variants?.length) {
             setHasVariants(true);
             setVariants(product.variants.map((v, idx) => ({
@@ -132,15 +159,20 @@ export default function EditProductPage() {
       formData.append("quantity", String(totalQuantity));
       formData.append("status", form.status);
       formData.append("is_active", form.status === "active" || form.status === "out_of_stock" ? "true" : "false");
-      if (form.unique_code) formData.append("unique_code", form.unique_code);
+      if (form.unique_code) {
+        formData.append("unique_code", form.unique_code.replace(/^#+/, "").trim().toUpperCase());
+      }
       formData.append("has_variants", "false");
       formData.append("accepts_custom_size", "false");
       
-      if (existingImages.length > 0) formData.append("existing_images", JSON.stringify(existingImages));
+      const cleanExisting = existingImages.map(sanitizeUrl).filter((url) => Boolean(url && url.startsWith("http")));
+      if (cleanExisting.length > 0) {
+        formData.append("existing_images", JSON.stringify(cleanExisting));
+      }
       newImageFiles.forEach(file => formData.append("images", file));
       
       await api.admin.updateProductDirect(id, formData);
-      toast.success("Product updated");
+      toast.success("Product updated successfully");
       router.push("/dashboard/products");
     } catch (e: any) {
       toast.error(e.message || "Failed to update product");

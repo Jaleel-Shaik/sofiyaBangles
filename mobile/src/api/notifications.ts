@@ -11,6 +11,10 @@ export interface BackendNotification {
   user_id: string | null;
   is_read: boolean;
   created_at: string;
+  image_url?: string | null;
+  order_id?: string | null;
+  order_number?: string | null;
+  link_url?: string | null;
 }
 
 /**
@@ -58,3 +62,37 @@ export const markNotificationRead = async (id: string): Promise<void> => {
     console.warn(`Error marking notification ${id} as read:`, error);
   }
 };
+
+/**
+ * Mark all notifications as read for current user.
+ */
+export const markAllNotificationsRead = async (): Promise<void> => {
+  try {
+    await apiClient.patch(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
+  } catch (error) {
+    console.warn('Error marking all notifications as read:', error);
+  }
+};
+
+/**
+ * Delete / dismiss a single notification.
+ */
+export const deleteNotification = async (id: string): Promise<void> => {
+  try {
+    await apiClient.delete(API_ENDPOINTS.NOTIFICATIONS.BY_ID(id));
+  } catch (error) {
+    console.warn(`Error deleting notification ${id}:`, error);
+  }
+};
+
+/**
+ * Clear all notifications for current user.
+ */
+export const clearAllNotifications = async (): Promise<void> => {
+  try {
+    await apiClient.delete(API_ENDPOINTS.NOTIFICATIONS.CLEAR_ALL);
+  } catch (error) {
+    console.warn('Error clearing all notifications:', error);
+  }
+};
+

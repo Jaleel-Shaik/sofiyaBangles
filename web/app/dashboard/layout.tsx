@@ -21,7 +21,6 @@ import {
   TrendingUp,
   Layers,
   DollarSign,
-  CheckCheck,
   FileText,
   ClipboardList,
   Zap,
@@ -31,8 +30,8 @@ import toast from "react-hot-toast";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { api } from "@/src/lib/api";
 import { QuickSellModal } from "@/features/products/components/QuickSellModal";
+import { NotificationCenter } from "@/features/dashboard/components/NotificationCenter";
 import { STRINGS } from "@/src/constants/strings";
 
 export default function DashboardLayout({
@@ -45,9 +44,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notifsOpen, setNotifsOpen] = useState(false);
   const [quickSellOpen, setQuickSellOpen] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const role = (user?.role || "").toLowerCase().trim();
@@ -58,69 +55,6 @@ export default function DashboardLayout({
     "/dashboard/revenue",
     "/dashboard/forms",
   ];
-
-  // Fetch notifications for all admin/super_admin users with periodic refresh
-  useEffect(() => {
-    if (user && (user.role === "admin" || user.role === "super_admin" || user.role !== "user")) {
-      const fetchNotifs = () => {
-        api.superAdmin
-          .getNotifications()
-          .then((items) => setNotifications(items || []))
-          .catch(() => {});
-      };
-      fetchNotifs();
-      const interval = setInterval(fetchNotifs, 15000);
-      return () => clearInterval(interval);
-    }
-  }, [user]);
-
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-
-  const handleMarkRead = async (id: string) => {
-    try {
-      await api.superAdmin.markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-      );
-    } catch {}
-  };
-
-  const handleNotificationClick = async (n: any) => {
-    if (!n.is_read) {
-      await handleMarkRead(n.id);
-    }
-    setNotifsOpen(false);
-
-    const type = (n.type || "").toUpperCase();
-    const title = (n.title || "").toLowerCase();
-
-    if (
-      type === "REVIEW" ||
-      type === "RATING" ||
-      type === "PRODUCT_REVIEW" ||
-      title.includes("review") ||
-      title.includes("rated")
-    ) {
-      const searchTarget = n.product_id || "";
-      router.push(`/dashboard/reviews${searchTarget ? `?search=${encodeURIComponent(searchTarget)}` : ""}`);
-    } else if (
-      type === "NEW_SALE" ||
-      type === "ORDER_STATUS" ||
-      type === "REFUND" ||
-      title.includes("sale") ||
-      title.includes("order")
-    ) {
-      const searchTarget = n.order_id || "";
-      router.push(`/dashboard/orders${searchTarget ? `?search=${encodeURIComponent(searchTarget)}` : ""}`);
-    } else if (type === "LOW_STOCK" || type === "OUT_OF_STOCK") {
-      const searchTarget = n.product_id || "";
-      router.push(`/dashboard/products${searchTarget ? `?search=${encodeURIComponent(searchTarget)}` : ""}`);
-    } else if (n.product_id) {
-      router.push(`/dashboard/products/${n.product_id}`);
-    } else {
-      router.push("/dashboard/reviews");
-    }
-  };
 
   // Global shortcut: Alt + S opens Quick Sell
   useEffect(() => {
@@ -248,90 +182,8 @@ export default function DashboardLayout({
                 <span className="hidden sm:inline">{STRINGS.common.quickSell}</span>
               </button>
 
-              {/* Notification bell */}
-              <div className="relative">
-                <button
-                  onClick={() => setNotifsOpen(!notifsOpen)}
-                  aria-label={STRINGS.notifications.title}
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-[#F5F5F5] hover:bg-[#E5E5E5] transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-[#525252]" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#E8436E] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {/* Notifications Dropdown */}
-                <AnimatePresence>
-                  {notifsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 5 }}
-                      className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200 py-3 z-50 overflow-hidden"
-                    >
-                      <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                          <Bell className="w-4 h-4 text-[#E8436E]" /> {STRINGS.notifications.title}
-                        </h3>
-                        {unreadCount > 0 && (
-                          <span className="text-[10px] bg-rose-50 text-[#E8436E] font-bold px-2 py-0.5 rounded-full">
-                            {STRINGS.notifications.newBadge(unreadCount)}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                        {notifications.length === 0 ? (
-                          <div className="p-6 text-center text-xs text-slate-400">
-                            {STRINGS.notifications.empty}
-                          </div>
-                        ) : (
-                          notifications.slice(0, 15).map((n) => (
-                            <div
-                              key={n.id}
-                              onClick={() => handleNotificationClick(n)}
-                              className={`p-3 text-xs transition-colors cursor-pointer hover:bg-slate-100/80 border-b border-slate-100 last:border-0 ${
-                                n.is_read ? "bg-white opacity-75" : "bg-rose-50/60 font-medium"
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-1.5 font-bold text-slate-900 leading-tight">
-                                  {(n.type === "REVIEW" || n.type === "RATING") && (
-                                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
-                                  )}
-                                  <span>{n.title}</span>
-                                </div>
-                                {!n.is_read && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleMarkRead(n.id);
-                                    }}
-                                    title={STRINGS.notifications.markAsRead}
-                                    className="text-[#E8436E] hover:text-rose-700 p-1 min-h-[28px] min-w-[28px] flex items-center justify-center rounded-lg hover:bg-rose-100 shrink-0"
-                                  >
-                                    <CheckCheck className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{n.body || n.message}</p>
-                              <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
-                                <span>{n.created_at ? new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}</span>
-                                <span className="text-[#E8436E] font-bold hover:underline flex items-center gap-0.5">
-                                  View details &rarr;
-                                </span>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              {/* Notification Center */}
+              <NotificationCenter userRole={user?.role} />
 
               {/* Profile dropdown */}
               <div className="relative">

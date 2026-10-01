@@ -48,6 +48,79 @@ interface VariantInput {
 }
 
 /**
+ * Robustly unwraps any image URL, parsing nested JSON string arrays or escaped quotes if present.
+ */
+export function unwrapCleanImageUrl(raw: unknown): string {
+  if (!raw) return "";
+  if (typeof raw !== "string") {
+    if (typeof raw === "object" && raw !== null && "image_url" in raw) {
+      return unwrapCleanImageUrl((raw as any).image_url);
+    }
+    return "";
+  }
+  let s = raw.trim();
+  while (
+    (s.startsWith("[") && s.endsWith("]")) ||
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    if (s.startsWith("[") && s.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          s = typeof parsed[0] === "string" ? parsed[0].trim() : String(parsed[0]);
+          continue;
+        }
+      } catch {
+        s = s.slice(1, -1).trim();
+      }
+    } else {
+      s = s.slice(1, -1).trim();
+    }
+  }
+  s = s.replace(/^[\\"'`]+|[\\"'`]+$/g, "").trim();
+  return s;
+}
+
+/**
+ * Extracts a flat array of clean, valid HTTP/HTTPS/data image URLs from any combination of
+ * string, stringified JSON array, array of strings, or array of objects.
+ */
+export function extractCleanImageUrls(input: unknown): string[] {
+  if (!input) return [];
+  const list = Array.isArray(input) ? input : [input];
+  const urls: string[] = [];
+
+  for (const item of list) {
+    if (typeof item === "string") {
+      const trimmed = item.trim();
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            urls.push(...extractCleanImageUrls(parsed));
+            continue;
+          }
+        } catch {
+          // ignore error
+        }
+      }
+      const clean = unwrapCleanImageUrl(trimmed);
+      if (clean && (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:") || clean.startsWith("blob:"))) {
+        urls.push(clean);
+      }
+    } else if (item && typeof item === "object") {
+      if ("image_url" in item) {
+        urls.push(...extractCleanImageUrls((item as any).image_url));
+      } else if ("url" in item) {
+        urls.push(...extractCleanImageUrls((item as any).url));
+      }
+    }
+  }
+  return urls;
+}
+
+/**
  * Service: Create a new product with relations (variants, images)
  */
 export const createProductService = async (
@@ -75,8 +148,8 @@ export const createProductService = async (
 
   let allImageUrls: string[] = [];
   
-  if (input.images && Array.isArray(input.images)) {
-    allImageUrls.push(...(input.images as (string | ImageInput)[]).map((img) => typeof img === 'string' ? img : (img.image_url || '')).filter(Boolean));
+  if (input.images) {
+    allImageUrls.push(...extractCleanImageUrls(input.images));
   }
 
   if (files && files.length > 0) {
@@ -84,7 +157,7 @@ export const createProductService = async (
     allImageUrls.push(...uploadedUrls);
   }
 
-  let generatedCode = input.unique_code ? input.unique_code.trim().toUpperCase() : undefined;
+  let generatedCode = input.unique_code ? input.unique_code.replace(/^#+/, "").trim().toUpperCase() : undefined;
   if (!generatedCode) {
     generatedCode = await generateNextProductSequenceDb(input.model_type_id, mtDoc.name || "PRD");
   }
@@ -93,13 +166,15 @@ export const createProductService = async (
   const status = input.status || (input.is_active !== false ? "active" : "draft");
   const is_active = status === "active" || status === "out_of_stock";
 
+  const cleanCover = allImageUrls.length > 0 ? allImageUrls[0] : null;
+
   const productData: Product = {
     id: newId,
     unique_code: generatedCode || `PRD-${Date.now().toString().slice(-4)}`,
     product_name: input.product_name,
     description: input.description || null,
     price: input.price,
-    image_url: allImageUrls.length > 0 ? allImageUrls[0] : null,
+    image_url: cleanCover,
     category_id: input.category_id,
     model_type_id: input.model_type_id,
     quantity: input.quantity || 0,
@@ -171,6 +246,7 @@ export const createProductService = async (
       body: `Check out our latest arrival "${product.product_name}" available now for ₹${product.price}!`,
       type: "new_arrival",
       product_id: product.id,
+      image_url: product.image_url || null,
       sent_by: actorId,
     }).catch((err) => console.error("New arrival notification error (non-fatal):", err));
   }
@@ -208,9 +284,11 @@ export const getProductsService = async (options: {
       const category_name = p.category_id ? categoryMap.get(p.category_id) : undefined;
       const is_favorited = options.userId ? await isFavoritedDb(options.userId, p.id) : false;
       const variants = await getVariantsByProductDb(p.id);
-      const images = await getImagesByProductDb(p.id);
+      const rawImages = await getImagesByProductDb(p.id);
+      const images = rawImages.map((img) => ({ ...img, image_url: unwrapCleanImageUrl(img.image_url) }));
+      const cleanCover = unwrapCleanImageUrl(p.image_url);
 
-      return { ...p, category_name, is_favorited, variants, images };
+      return { ...p, image_url: cleanCover, category_name, is_favorited, variants, images };
     })
   );
 
@@ -296,8 +374,10 @@ export const getAdminProductsService = async (options: {
   const productsWithDetails = await Promise.all(
     products.map(async (p) => {
       const variants = await getVariantsByProductDb(p.id);
-      const images = await getImagesByProductDb(p.id);
-      return { ...p, variants, images };
+      const rawImages = await getImagesByProductDb(p.id);
+      const images = rawImages.map((img) => ({ ...img, image_url: unwrapCleanImageUrl(img.image_url) }));
+      const cleanCover = unwrapCleanImageUrl(p.image_url);
+      return { ...p, image_url: cleanCover, variants, images };
     })
   );
 
@@ -329,10 +409,13 @@ export const getProductByIdService = async (id: string, userId?: string): Promis
 
   const is_favorited = userId ? await isFavoritedDb(userId, actualId) : false;
   const variants = await getVariantsByProductDb(actualId);
-  const images = await getImagesByProductDb(actualId);
+  const rawImages = await getImagesByProductDb(actualId);
+  const images = rawImages.map((img) => ({ ...img, image_url: unwrapCleanImageUrl(img.image_url) }));
+  const cleanCover = unwrapCleanImageUrl(product.image_url);
 
   return {
     ...product,
+    image_url: cleanCover,
     category_name,
     model_type_id: model_type_id || "",
     is_favorited,
@@ -405,31 +488,15 @@ export const notifyStockIncreaseService = async (
     : `Fresh stock added! "${product.product_name}" now has ${newQty} item(s) available. Check it out!`;
 
   try {
-    // 1. Broadcast notification to all active users & save global broadcast record
+    // 1. Broadcast single clean notification to all active users
     await batchInsertBroadcastNotificationsDb({
       title,
       body,
       type: "stock_update",
       product_id: product.id,
+      image_url: product.image_url || null,
       sent_by: actorId,
     });
-
-    // 2. Also send dedicated notification to users who favorited this product
-    const favorites = await getProductFavoritesDb(product.id);
-    if (favorites.length > 0) {
-      const favNotifs: Notification[] = favorites.map((fav) => ({
-        id: uuidv4(),
-        title: `Wishlist Alert: ${product.product_name} is Back! ✨`,
-        body: `An item on your wishlist "${product.product_name}" has just been restocked (${newQty} available). Tap to order now!`,
-        type: "stock_update",
-        product_id: product.id,
-        sent_by: actorId,
-        user_id: fav.user_id,
-        is_read: false,
-        created_at: now,
-      }));
-      await batchInsertBroadcastNotificationsDb(favNotifs);
-    }
 
     // 3. Audit log
     await insertAuditLogDb({
@@ -480,33 +547,23 @@ export const updateProductService = async (
   }
 
   const existingImagesList = await getImagesByProductDb(actualId);
-  const existingImagesUrls: string[] = existingImagesList.map((img) => img.image_url);
+  const existingImagesUrls: string[] = existingImagesList
+    .map((img) => unwrapCleanImageUrl(img.image_url))
+    .filter(Boolean);
 
-  const existingImages: string[] = input.existing_images !== undefined
-    ? (Array.isArray(input.existing_images)
-        ? input.existing_images.filter(Boolean)
-        : input.existing_images
-          ? [input.existing_images]
-          : [])
-    : existingImagesUrls;
+  // Parse and unwrap existing_images robustly
+  let cleanExisting: string[] = [];
+  if (input.existing_images !== undefined) {
+    cleanExisting = extractCleanImageUrls(input.existing_images);
+  } else {
+    cleanExisting = extractCleanImageUrls(existingImagesUrls);
+  }
 
-  const mergedImages = imageUrls && imageUrls.length > 0
-    ? [...existingImages, ...imageUrls]
-    : existingImages;
+  const mergedImages: string[] = imageUrls && imageUrls.length > 0
+    ? [...cleanExisting, ...imageUrls]
+    : (cleanExisting.length > 0 ? cleanExisting : existingImagesUrls);
 
   const { existing_images, ...restInput } = input;
-  
-  const formattedImages: ProductImage[] = mergedImages.map((url, idx) => ({
-    id: uuidv4(),
-    product_id: actualId,
-    image_url: url,
-    public_id: null,
-    alt_text: null,
-    display_order: idx,
-    is_primary: idx === 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }));
 
   const updateData: Record<string, unknown> = { ...restInput, updated_at: new Date().toISOString() };
   if (restInput.status) {
@@ -521,11 +578,33 @@ export const updateProductService = async (
 
   const { variants, images, image_url, ...productFields } = updateData;
 
-  if (mergedImages.length > 0) {
-    productFields.image_url = mergedImages[0];
-  } else if (image_url !== undefined) {
-    productFields.image_url = image_url;
+  // Format unique_code cleanly (strip #, uppercase, trim)
+  if (productFields.unique_code) {
+    productFields.unique_code = String(productFields.unique_code).replace(/^#+/, "").trim().toUpperCase();
   }
+
+  // Set clean cover image_url on product document
+  if (mergedImages.length > 0) {
+    productFields.image_url = unwrapCleanImageUrl(mergedImages[0]);
+  } else if (image_url) {
+    const cleanCover = unwrapCleanImageUrl(image_url);
+    if (cleanCover && cleanCover.startsWith("http")) {
+      productFields.image_url = cleanCover;
+    }
+  }
+
+  // Format images for product_images sub-collection
+  const formattedImages: ProductImage[] = mergedImages.map((url, idx) => ({
+    id: uuidv4(),
+    product_id: actualId,
+    image_url: unwrapCleanImageUrl(url),
+    public_id: null,
+    alt_text: null,
+    display_order: idx,
+    is_primary: idx === 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
 
   let formattedVariants: ProductVariant[] | undefined = undefined;
   if (variants !== undefined) {
@@ -552,8 +631,11 @@ export const updateProductService = async (
     : undefined;
 
   const newTotalQuantity = productFields.quantity !== undefined
-    ? Number(productFields.quantity)
+    ? Math.max(0, Math.floor(Number(productFields.quantity) || 0))
     : (variantTotal !== undefined ? variantTotal : oldQuantity);
+
+  // CRITICAL: Explicitly set productFields.quantity to newTotalQuantity so it updates in Firestore
+  productFields.quantity = newTotalQuantity;
 
   // Synchronize product active status when quantity is updated from 0 to positive
   if (newTotalQuantity > 0 && (existing.status === "out_of_stock" || oldQuantity === 0)) {
@@ -564,10 +646,45 @@ export const updateProductService = async (
     productFields.is_active = false;
   }
 
-  const product = await updateProductWithRelationsDb(actualId, {
-    ...productFields,
-    updated_by: actorId,
-  }, formattedVariants, images !== undefined ? formattedImages : undefined);
+  // If product already has variants in DB and caller didn't supply formattedVariants,
+  // synchronize existing variants so customer end sees updated in-stock variant quantities!
+  if (formattedVariants === undefined) {
+    const existingVariants = await getVariantsByProductDb(actualId);
+    if (existingVariants.length > 0) {
+      if (existingVariants.length === 1) {
+        await updateVariantDocDb(existingVariants[0].id, {
+          quantity: newTotalQuantity,
+          status: newTotalQuantity > 0 ? "active" : "out_of_stock",
+        });
+      } else {
+        const count = existingVariants.length;
+        const perVariant = Math.floor(newTotalQuantity / count);
+        let remainder = newTotalQuantity % count;
+        const updates: Array<{ id: string; quantity: number; status?: 'active' | 'out_of_stock' }> = [];
+        for (let i = 0; i < count; i++) {
+          const v = existingVariants[i];
+          const q = perVariant + (remainder > 0 ? 1 : 0);
+          if (remainder > 0) remainder--;
+          updates.push({
+            id: v.id,
+            quantity: q,
+            status: q > 0 ? "active" : "out_of_stock",
+          });
+        }
+        await updateVariantsBatchDb(updates);
+      }
+    }
+  }
+
+  const product = await updateProductWithRelationsDb(
+    actualId,
+    {
+      ...productFields,
+      updated_by: actorId,
+    },
+    formattedVariants,
+    formattedImages.length > 0 ? formattedImages : undefined
+  );
 
   if (!product) {
     throw new Error("PRODUCT_NOT_FOUND");
@@ -863,6 +980,8 @@ export const sellProductService = async (
         body: `Order ${existingOrder.order_number} for ₹${existingOrder.total_amount} was completed successfully.`,
         type: "NEW_SALE",
         product_id: existing.id,
+        order_id: existingOrder.id,
+        order_number: existingOrder.order_number,
         sent_by: actorId,
         user_id: null,
         is_read: false,
@@ -877,6 +996,8 @@ export const sellProductService = async (
           body: `Your order for "${existing.product_name}" has been marked as bought and confirmed.`,
           type: "ORDER_STATUS_UPDATE",
           product_id: existing.id,
+          order_id: existingOrder.id,
+          order_number: existingOrder.order_number,
           sent_by: actorId,
           user_id: existingOrder.user_id,
           is_read: false,

@@ -11,6 +11,7 @@ import { useAuthStore } from "@/src/store/authStore";
 import { getDashboardHref } from "@/src/utils/navigation";
 import { startAppStateListener, stopAppStateListener } from "@/src/api/client";
 import NetworkErrorModal from "@/src/components/NetworkErrorModal";
+import InAppNotificationBanner from "@/src/components/InAppNotificationBanner";
 import "../global.css";
 
 /**
@@ -106,6 +107,7 @@ export default function RootLayout() {
         </View>
       )}
       <NetworkErrorModal />
+      <InAppNotificationBanner />
     </View>
   );
 }

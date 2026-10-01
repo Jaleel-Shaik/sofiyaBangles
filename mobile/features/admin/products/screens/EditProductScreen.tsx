@@ -12,7 +12,7 @@ import Button from '@/src/components/Button';
 import { getModelTypes, ModelType } from '@/src/api/modelTypes';
 import { STRINGS } from '@/src/constants/strings';
 
-import { getProductById } from '@/src/api/products';
+import { getProductById, unwrapCleanImageUrl } from '@/src/api/products';
 
 export default function EditProductScreen() {
   const router = useRouter();
@@ -59,13 +59,17 @@ export default function EditProductScreen() {
             setPrice(productData.price ? productData.price.toString() : '');
             setDescription(productData.description || '');
             setQuantity(productData.quantity ? productData.quantity.toString() : '0');
-            setUniqueCode(productData.unique_code || '');
+            setUniqueCode((productData.unique_code || '').replace(/^#+/, '').trim().toUpperCase());
             setIsActive(productData.is_active !== false);
             
             setSelectedModelType(productData.model_type_id || '');
             setSelectedCategory(productData.category_id || '');
             
-            setImageUrls(productData.images || (productData.image_url ? [productData.image_url] : []));
+            const rawImages = productData.images || (productData.image_url ? [productData.image_url] : []);
+            const cleanImageUrls: string[] = (Array.isArray(rawImages) ? rawImages : [rawImages])
+              .map((img: any) => unwrapCleanImageUrl(typeof img === 'string' ? img : (img?.image_url || img?.url || '')))
+              .filter((url: string) => Boolean(url && url.length > 0));
+            setImageUrls(cleanImageUrls);
             
             if (Array.isArray(productData.variants) && productData.variants.length > 0) {
               setVariants(productData.variants.map((v: any, idx: number) => ({
@@ -204,8 +208,9 @@ export default function EditProductScreen() {
         categoryName: catName,
         model_type_id: selectedModelType,
         quantity: totalQuantity,
-        unique_code: uniqueCode,
-        is_active: isActive,
+        status: totalQuantity > 0 ? (isActive ? "active" : "draft") : "out_of_stock",
+        unique_code: uniqueCode ? uniqueCode.replace(/^#+/, '').trim().toUpperCase() : undefined,
+        is_active: isActive && totalQuantity > 0,
         has_variants: false,
         variants: '[]',
         accepts_custom_size: false,
