@@ -59,36 +59,21 @@ export const batchInsertBroadcastNotificationsDb = async (
     } catch {}
   }
 
-  // 1. Debounce / Deduplicate: Check if an identical notification was created within the last 15 seconds
+  // 1. Debounce / Deduplicate: Clean up any previous notification doc for this product so a fresh notification event is published
   if (data.product_id) {
     const existingSnap = await db
       .collection("notifications")
       .where("product_id", "==", data.product_id)
-      .where("type", "==", data.type || "stock_update")
-      .limit(1)
       .get();
 
     if (!existingSnap.empty) {
-      const doc = existingSnap.docs[0];
-      const existingData = doc.data();
-      const existingTime = new Date(existingData.created_at).getTime();
-      // If updated within last 15 seconds, update existing instead of creating duplicate
-      if (Date.now() - existingTime < 15000) {
-        await doc.ref.update({
-          title: data.title,
-          body: data.body || null,
-          image_url: resolvedImageUrl || existingData.image_url || null,
-          is_read: false,
-          created_at: now,
-          read_by: [],
-          dismissed_by: [],
-        });
-        return 1;
-      }
+      const batch = db.batch();
+      existingSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
     }
   }
 
-  // 2. Create single global broadcast notification record (user_id: null)
+  // 2. Create single global broadcast notification record (user_id: null) for guest users and future accounts
   const globalId = uuidv4();
   const globalNotification = {
     id: globalId,
@@ -107,22 +92,79 @@ export const batchInsertBroadcastNotificationsDb = async (
     dismissed_by: [] as string[],
     created_at: now,
   };
-  await db.collection("notifications").doc(globalId).set(globalNotification);
 
-  // Return count of active users who will receive this broadcast
+  // 3. Fetch all active users from users collection and generate user-specific notification records
   const usersSnapshot = await db.collection("users").get();
-  const activeUserCount = usersSnapshot.docs.filter((doc) => doc.data()?.is_active !== false).length;
-  return Math.max(1, activeUserCount);
+  const activeUserDocs = usersSnapshot.docs.filter((doc) => {
+    const userData = doc.data();
+    return userData?.is_active !== false;
+  });
+
+  const recordsToInsert: any[] = [globalNotification];
+  activeUserDocs.forEach((uDoc) => {
+    recordsToInsert.push({
+      id: uuidv4(),
+      title: data.title,
+      body: data.body || null,
+      type: data.type || "announcement",
+      product_id: data.product_id || null,
+      image_url: resolvedImageUrl,
+      order_id: data.order_id || null,
+      order_number: data.order_number || null,
+      link_url: data.link_url || null,
+      sent_by: data.sent_by,
+      user_id: uDoc.id,
+      is_read: false,
+      created_at: now,
+    });
+  });
+
+  // Batch insert all records in safe chunks (max 400 docs per commit)
+  const chunkSize = 400;
+  for (let i = 0; i < recordsToInsert.length; i += chunkSize) {
+    const chunk = recordsToInsert.slice(i, i + chunkSize);
+    const batch = db.batch();
+    chunk.forEach((notif) => {
+      batch.set(db.collection("notifications").doc(notif.id), notif);
+    });
+    await batch.commit();
+  }
+
+  return recordsToInsert.length;
 };
 
 /**
  * Deterministic notification deduplication key.
+ * Guarantees that each product, order, or distinct message appears exactly once in the feed.
  */
 export const getNotificationDedupeKey = (n: Notification): string => {
-  if (n.product_id) {
-    return `${n.type || "stock"}:${n.product_id}`;
+  const prodId =
+    n.product_id ||
+    (n.link_url ? n.link_url.match(/\/products\/([a-zA-Z0-9_-]+)/)?.[1] : null);
+  if (prodId) {
+    return `product:${prodId}`;
   }
-  return `${n.type || "msg"}:${(n.title || "").trim().toLowerCase()}:${(n.body || "").trim().toLowerCase()}`;
+
+  const orderRef =
+    n.order_id ||
+    n.order_number ||
+    (n.title + " " + (n.body || "")).match(/ORD-[\w\d-]+/i)?.[0];
+  if (orderRef) {
+    return `order:${orderRef.toUpperCase()}`;
+  }
+
+  const cleanTitle = (n.title || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ");
+  const cleanBody = (n.body || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ");
+
+  return cleanTitle ? `msg:${cleanTitle}:${cleanBody}` : `id:${n.id}`;
 };
 
 /**
@@ -139,8 +181,20 @@ export const queryUserNotificationsDb = async (
 
   let rawNotifications: any[] = [];
 
-  // Internal admin types that customers should never receive in their regular feed
-  const ADMIN_INTERNAL_TYPES = new Set(["NEW_SALE", "REFUND", "AUDIT_ALERT", "LOW_STOCK"]);
+  // Internal admin and review types that customers should never receive in their regular feed
+  const ADMIN_INTERNAL_TYPES = new Set([
+    "NEW_SALE",
+    "REFUND",
+    "AUDIT_ALERT",
+    "REVIEW",
+    "RATING",
+    "PRODUCT_REVIEW",
+    "SECURITY_ALERT",
+    "SYSTEM_SECURITY",
+    "ROLE_CHANGE",
+    "2FA_RESET",
+    "SYSTEM",
+  ]);
 
   if (userId) {
     const [userSnap, broadcastSnap] = await Promise.all([
@@ -148,12 +202,20 @@ export const queryUserNotificationsDb = async (
       db.collection("notifications").where("user_id", "==", null).get(),
     ]);
 
-    const userNotifs = userSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+    const userNotifs = userSnap.docs
+      .map((doc) => ({ ...doc.data(), id: doc.id }))
+      .filter((n: any) => {
+        if (ADMIN_INTERNAL_TYPES.has(n.type)) return false;
+        if (Array.isArray(n.dismissed_by) && n.dismissed_by.includes(userId)) return false;
+        return true;
+      });
+
     const broadcastNotifs = broadcastSnap.docs
       .map((doc) => ({ ...doc.data(), id: doc.id }))
       .filter((n: any) => {
         // Exclude admin-internal types for regular user query
         if (ADMIN_INTERNAL_TYPES.has(n.type)) return false;
+        if (n.user_id === "all_admins" || n.user_id === "all_superadmins") return false;
         // Exclude notifications this user dismissed/cleared
         if (Array.isArray(n.dismissed_by) && n.dismissed_by.includes(userId)) return false;
         return true;
@@ -353,20 +415,13 @@ export const clearAllUserNotificationsDb = async (userId: string): Promise<numbe
       const data = doc.data() as any;
       const targetUserId = data.user_id;
 
-      // If notification belongs directly to this user or admin broadcast
-      if (
-        !targetUserId ||
-        targetUserId === null ||
-        targetUserId === userId ||
-        targetUserId === "all_superadmins" ||
-        targetUserId === "all_admins" ||
-        targetUserId === "all"
-      ) {
+      // If notification belongs directly to this user, delete it completely
+      if (targetUserId === userId) {
         batch.delete(doc.ref);
         count++;
-      } else {
-        // Mark as dismissed for this user
-        if (!data.dismissed_by || !data.dismissed_by.includes(userId)) {
+      } else if (!targetUserId || targetUserId === null) {
+        // For global broadcast notification, NEVER delete the document! Only append userId to dismissed_by
+        if (!Array.isArray(data.dismissed_by) || !data.dismissed_by.includes(userId)) {
           batch.update(doc.ref, { dismissed_by: FieldValue.arrayUnion(userId) });
           count++;
         }

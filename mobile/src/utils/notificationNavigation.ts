@@ -14,6 +14,13 @@ export const navigateFromNotification = (
   const title = (notif.title || "").toLowerCase();
   const desc = (notif.desc || "").toLowerCase();
 
+  // 1. Resolve explicit Product ID if present
+  const resolvedProductId =
+    notif.productId ||
+    notif.linkUrl?.match(/\/products\/([a-zA-Z0-9_-]+)/)?.[1] ||
+    notif.linkUrl?.match(/product-detail\/([a-zA-Z0-9_-]+)/)?.[1];
+
+  // 2. Resolve explicit Order Reference (e.g., ORD-123456)
   const extractedOrderNo = (
     notif.orderNumber ||
     notif.orderId ||
@@ -22,17 +29,13 @@ export const navigateFromNotification = (
     ""
   ).replace(/^#/, "");
 
-  // 1. Order-related notification
-  if (
+  // Priority A: If this is an explicit order update with an order number or orderId (and not a product notification)
+  const isExplicitOrderType =
     type === "ORDER_STATUS" ||
     type === "ORDER_STATUS_UPDATE" ||
-    type === "NEW_SALE" ||
-    type === "REFUND" ||
-    extractedOrderNo ||
-    title.includes("order") ||
-    title.includes("bought") ||
-    title.includes("refund")
-  ) {
+    type === "REFUND";
+
+  if ((extractedOrderNo || isExplicitOrderType) && !resolvedProductId) {
     if (userRole === "admin") {
       router.push({
         pathname: "/orders",
@@ -41,48 +44,33 @@ export const navigateFromNotification = (
     } else {
       router.push({
         pathname: "/orders",
-        params: { highlightOrder: extractedOrderNo || notif.orderId || "", search: extractedOrderNo || notif.orderId || "" },
+        params: {
+          highlightOrder: extractedOrderNo || notif.orderId || "",
+          search: extractedOrderNo || notif.orderId || "",
+        },
       } as any);
     }
     return;
   }
 
-  // 2. Product-specific notification (Restock, New Arrival, Price Drop, etc.)
-  if (notif.productId) {
+  // Priority B: Product Navigation (Customer -> /products/[id], Admin -> /product-detail/[id])
+  // Tapping restock, new arrivals, price drops, or product announcements opens product details immediately so users can buy!
+  if (resolvedProductId) {
     if (userRole === "admin") {
       router.push({
         pathname: "/(admin)/(tabs)/product-detail/[id]",
-        params: { id: notif.productId },
+        params: { id: resolvedProductId },
       } as any);
     } else {
       router.push({
         pathname: "/products/[id]",
-        params: { id: notif.productId },
+        params: { id: resolvedProductId },
       } as any);
     }
     return;
   }
 
-  // 3. Reviews & Ratings
-  if (
-    type === "REVIEW" ||
-    type === "RATING" ||
-    type === "PRODUCT_REVIEW" ||
-    title.includes("review") ||
-    title.includes("rating")
-  ) {
-    if (userRole === "admin") {
-      router.push("/(admin)/reviews" as any);
-    } else if (notif.productId) {
-      router.push({
-        pathname: "/products/[id]",
-        params: { id: notif.productId },
-      } as any);
-    }
-    return;
-  }
-
-  // 4. New Arrivals collection
+  // 3. New Arrivals collection
   if (
     type === "NEW_ARRIVAL" ||
     title.includes("new arrival") ||

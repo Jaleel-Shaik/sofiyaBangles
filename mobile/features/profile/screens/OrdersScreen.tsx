@@ -157,10 +157,10 @@ export default function OrdersScreen() {
             </Text>
             <TouchableOpacity
               onPress={() => router.push("/(tabs)/home" as any)}
-              className="bg-[#111827] px-6 py-3.5 rounded-2xl min-h-[44px] items-center justify-center"
+              className="bg-primary px-6 py-3.5 rounded-full min-h-[44px] items-center justify-center shadow-xs active:opacity-90"
               accessibilityRole="button"
             >
-              <Text className="text-white font-bold text-sm">Browse Products</Text>
+              <Text className="text-white font-bold text-label-md">Browse Products</Text>
             </TouchableOpacity>
           </View>
         ) : (

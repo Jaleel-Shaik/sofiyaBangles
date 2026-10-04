@@ -60,11 +60,12 @@ export const getCategoryProducts = asyncHandler(async (req: AuthRequest, res: Re
 });
 
 export const createCategory = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const actorId = req.user?.userId || (req.user as any)?.id || "admin";
   try {
     const category = await createCategoryService(
       { ...req.body },
       req.file as Express.Multer.File | undefined,
-      req.user!.userId
+      actorId
     );
     return sendSuccess(res, category, { message: "Category created successfully.", statusCode: 201 });
   } catch (err: any) {
@@ -74,18 +75,22 @@ export const createCategory = asyncHandler(async (req: AuthRequest, res: Respons
     if (err.message === "CATEGORY_ALREADY_EXISTS") {
       throw new ConflictError("A category with this name already exists.", "CATEGORY_ALREADY_EXISTS");
     }
+    if (err.message?.includes("Category name") || err.message?.includes("Size type")) {
+      throw new BadRequestError(err.message);
+    }
     throw err;
   }
 });
 
 export const updateCategory = asyncHandler(async (req: AuthRequest, res: Response) => {
   const id = getParam(req, "id");
+  const actorId = req.user?.userId || (req.user as any)?.id || "admin";
   try {
     const category = await updateCategoryService(
       id,
       { ...req.body },
       req.file as Express.Multer.File | undefined,
-      req.user!.userId
+      actorId
     );
     return sendSuccess(res, category, "Category updated successfully.");
   } catch (err: any) {
@@ -96,14 +101,18 @@ export const updateCategory = asyncHandler(async (req: AuthRequest, res: Respons
     if (err.message === "CATEGORY_ALREADY_EXISTS") {
       throw new ConflictError("A category with this name already exists.", "CATEGORY_ALREADY_EXISTS");
     }
+    if (err.message?.includes("Category name") || err.message?.includes("Size type")) {
+      throw new BadRequestError(err.message);
+    }
     throw err;
   }
 });
 
 export const deleteCategory = asyncHandler(async (req: AuthRequest, res: Response) => {
   const id = getParam(req, "id");
+  const actorId = req.user?.userId || (req.user as any)?.id || "admin";
   try {
-    await deleteCategoryService(id, req.user!.userId);
+    await deleteCategoryService(id, actorId);
     return sendSuccess(res, null, "Category deleted successfully.");
   } catch (err: any) {
     if (err.message === "CATEGORY_NOT_FOUND") throw new NotFoundError("Category not found.");

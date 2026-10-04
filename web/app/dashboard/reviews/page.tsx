@@ -645,7 +645,7 @@ export default function AdminReviewsPage() {
                         Customer Review Feedback
                       </p>
                       <p className="text-slate-800 font-semibold leading-relaxed text-xs italic">
-                        "{review.comment}"
+                        &ldquo;{review.comment}&rdquo;
                       </p>
                     </div>
                   ) : null}

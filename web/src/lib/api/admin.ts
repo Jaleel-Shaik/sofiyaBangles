@@ -111,37 +111,65 @@ export const adminApi = {
     const res = await apiClient.get(API_ENDPOINTS.CATEGORIES.BASE, { params: { model_type_id: modelTypeId } });
     return res.data.data as Category[];
   },
-  createCategory: async (data: { category_name: string; model_type_id: string; image?: string; standard_sizes?: string[] }) => {
+  createCategory: async (data: { category_name: string; model_type_id: string; image?: string | File | Blob | null; standard_sizes?: string[] }) => {
     const formData = new FormData();
     formData.append('category_name', data.category_name);
     formData.append('model_type_id', data.model_type_id);
     if (data.image) {
-      const blob = await fetch(data.image).then(r => r.blob());
-      formData.append('image', blob, 'category.jpg');
+      if (typeof File !== 'undefined' && data.image instanceof File) {
+        formData.append('image', data.image, data.image.name);
+      } else if (typeof Blob !== 'undefined' && data.image instanceof Blob) {
+        formData.append('image', data.image, 'category.jpg');
+      } else if (typeof data.image === 'string') {
+        if (data.image.startsWith('data:') || data.image.startsWith('blob:')) {
+          try {
+            const blob = await fetch(data.image).then(r => r.blob());
+            formData.append('image', blob, 'category.jpg');
+          } catch {
+            // Ignore fetch error on string
+          }
+        } else if (data.image.startsWith('http')) {
+          formData.append('image_url', data.image);
+        }
+      }
     }
-    if (data.standard_sizes) {
-       formData.append('size_type', 'standard');
-       formData.append('standard_sizes', JSON.stringify(data.standard_sizes));
+    if (data.standard_sizes && data.standard_sizes.length > 0) {
+      formData.append('size_type', 'standard');
+      formData.append('standard_sizes', JSON.stringify(data.standard_sizes));
     } else {
-       formData.append('size_type', 'none');
+      formData.append('size_type', 'none');
     }
     return apiClient.post(API_ENDPOINTS.CATEGORIES.BASE, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }).then(r => r.data.data);
   },
-  updateCategory: async (id: string, data: { category_name?: string; model_type_id?: string; image?: string; standard_sizes?: string[] }) => {
+  updateCategory: async (id: string, data: { category_name?: string; model_type_id?: string; image?: string | File | Blob | null; standard_sizes?: string[] }) => {
     const formData = new FormData();
     if (data.category_name) formData.append('category_name', data.category_name);
     if (data.model_type_id) formData.append('model_type_id', data.model_type_id);
     if (data.image) {
-      const blob = await fetch(data.image).then(r => r.blob());
-      formData.append('image', blob, 'category.jpg');
+      if (typeof File !== 'undefined' && data.image instanceof File) {
+        formData.append('image', data.image, data.image.name);
+      } else if (typeof Blob !== 'undefined' && data.image instanceof Blob) {
+        formData.append('image', data.image, 'category.jpg');
+      } else if (typeof data.image === 'string') {
+        if (data.image.startsWith('data:') || data.image.startsWith('blob:')) {
+          try {
+            const blob = await fetch(data.image).then(r => r.blob());
+            formData.append('image', blob, 'category.jpg');
+          } catch {
+            // Ignore fetch error
+          }
+        } else if (data.image.startsWith('http')) {
+          formData.append('image_url', data.image);
+        }
+      }
     }
-    if (data.standard_sizes) {
-       formData.append('size_type', 'standard');
-       formData.append('standard_sizes', JSON.stringify(data.standard_sizes));
+    if (data.standard_sizes && data.standard_sizes.length > 0) {
+      formData.append('size_type', 'standard');
+      formData.append('standard_sizes', JSON.stringify(data.standard_sizes));
     } else if (data.standard_sizes !== undefined) {
-       formData.append('size_type', 'none');
+      formData.append('size_type', 'none');
     }
     return apiClient.put(API_ENDPOINTS.CATEGORIES.BY_ID(id), formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

@@ -752,7 +752,7 @@ export class OrderService {
       console.error("Non-fatal: failed to update product review stats:", err);
     }
 
-    // 4. Create in-app notification for Admin / SuperAdmin
+    // 4. Create in-app notification targeted to Admin / SuperAdmin
     try {
       const notifId = uuidv4();
       const userName = userProfile?.profile?.full_name || customerName?.trim() || "Customer";
@@ -766,7 +766,7 @@ export class OrderService {
         type: "REVIEW",
         product_id: productId,
         sent_by: userId,
-        user_id: null, // Broadcast notification visible to all admin dashboard users
+        user_id: "all_admins",
         is_read: false,
         created_at: now,
       });

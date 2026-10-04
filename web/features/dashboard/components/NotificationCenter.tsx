@@ -20,19 +20,40 @@ import {
   Tag,
   DollarSign,
   ArrowUpRight,
+  Crown,
+  ShieldAlert,
+  ShieldCheck,
+  Shield,
+  Layers,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api, type AdminNotification } from "@/src/lib/api";
 import { AuthenticatedImage } from "@/src/components/ui";
 
-type NotificationCategoryTab = "all" | "unread";
+type NotificationCategoryTab = "all" | "unread" | "orders" | "stock" | "reviews" | "security";
 
-export function getNotificationCategory(n: AdminNotification): "orders" | "stock" | "reviews" | "system" {
+export function getNotificationCategory(n: AdminNotification): "orders" | "stock" | "reviews" | "security" | "system" {
   const type = (n.type || "").toUpperCase();
   const title = (n.title || "").toLowerCase();
   const body = (n.body || n.message || "").toLowerCase();
 
-  // Orders
+  // Security & Audit (Super-Admin exclusive category)
+  if (
+    type === "AUDIT_ALERT" ||
+    type === "SECURITY_ALERT" ||
+    type === "SYSTEM_SECURITY" ||
+    type === "ROLE_CHANGE" ||
+    type === "2FA_RESET" ||
+    title.includes("security") ||
+    title.includes("audit") ||
+    body.includes("audit log") ||
+    body.includes("2fa") ||
+    body.includes("permission")
+  ) {
+    return "security";
+  }
+
+  // Orders & Sales
   if (
     type === "NEW_SALE" ||
     type === "ORDER" ||
@@ -68,7 +89,7 @@ export function getNotificationCategory(n: AdminNotification): "orders" | "stock
     return "stock";
   }
 
-  // Reviews
+  // Reviews & Feedback
   if (
     type === "REVIEW" ||
     type === "RATING" ||
@@ -222,10 +243,27 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
   // Category counts
   const unreadCount = useMemo(() => notifications.filter((n) => !n.is_read).length, [notifications]);
 
+  // Tab counts with role-aware metrics
+  const tabCounts = useMemo(() => {
+    return {
+      all: notifications.length,
+      unread: notifications.filter((n) => !n.is_read).length,
+      orders: notifications.filter((n) => getNotificationCategory(n) === "orders").length,
+      stock: notifications.filter((n) => getNotificationCategory(n) === "stock").length,
+      reviews: notifications.filter((n) => getNotificationCategory(n) === "reviews").length,
+      security: notifications.filter((n) => getNotificationCategory(n) === "security").length,
+    };
+  }, [notifications]);
+
   // Filtered notifications
   const filteredNotifications = useMemo(() => {
     return notifications.filter((n) => {
+      const cat = getNotificationCategory(n);
       if (activeTab === "unread") return !n.is_read;
+      if (activeTab === "orders") return cat === "orders";
+      if (activeTab === "stock") return cat === "stock";
+      if (activeTab === "reviews") return cat === "reviews";
+      if (activeTab === "security") return cat === "security";
       return true;
     });
   }, [notifications, activeTab]);
@@ -307,6 +345,11 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
       .replace(/^New Arrival:\s*/i, "")
       .replace(/✨/g, "")
       .trim();
+
+    if (cat === "security") {
+      router.push("/dashboard/super-admin/audit-logs");
+      return;
+    }
 
     if (cat === "orders" || extractedOrderNo) {
       const searchTarget = extractedOrderNo || n.order_id || "";
@@ -391,12 +434,22 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
             {/* Header */}
             <div className="p-4 pb-3 border-b border-slate-100 flex items-center justify-between gap-2 bg-gradient-to-b from-white to-slate-50/50">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-[#E8436E] shadow-2xs">
-                  <Bell className="w-4 h-4" />
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-2xs ${
+                    userRole === "super_admin"
+                      ? "bg-amber-50 border border-amber-200 text-amber-600"
+                      : "bg-rose-50 border border-rose-100 text-[#E8436E]"
+                  }`}
+                >
+                  {userRole === "super_admin" ? (
+                    <Crown className="w-4 h-4" />
+                  ) : (
+                    <Bell className="w-4 h-4" />
+                  )}
                 </div>
                 <div>
                   <h3 className="font-black text-sm text-slate-900 tracking-tight flex items-center gap-2">
-                    Notifications
+                    {userRole === "super_admin" ? "Super Admin Command" : "Store Notifications"}
                     {unreadCount > 0 ? (
                       <span className="text-[10px] bg-rose-500 text-white font-black px-2 py-0.5 rounded-full shadow-2xs">
                         {unreadCount} new
@@ -407,6 +460,11 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
                       </span>
                     )}
                   </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {userRole === "super_admin"
+                      ? "Executive oversight: Security, audit logs, sales & inventory"
+                      : "Live store orders, stock warnings & customer feedback"}
+                  </p>
                 </div>
               </div>
 
@@ -449,30 +507,44 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
             </div>
 
             {/* Filter Tabs */}
-            <div className="px-3 pt-2.5 pb-2 border-b border-slate-100 flex items-center gap-1.5 bg-white">
+            <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-1.5 bg-white overflow-x-auto no-scrollbar scroll-smooth">
               {(
                 [
-                  { id: "all", label: "All", count: notifications.length },
-                  { id: "unread", label: "Unread", count: unreadCount },
-                ] as const
+                  { id: "all" as const, label: "All", count: tabCounts.all },
+                  { id: "unread" as const, label: "Unread", count: tabCounts.unread },
+                  { id: "orders" as const, label: "Orders & Sales", count: tabCounts.orders },
+                  { id: "stock" as const, label: "Stock Alerts", count: tabCounts.stock },
+                  { id: "reviews" as const, label: "Reviews", count: tabCounts.reviews },
+                  ...(userRole === "super_admin"
+                    ? [{ id: "security" as const, label: "Security & Audit", count: tabCounts.security }]
+                    : []),
+                ]
               ).map((tab) => {
                 const isActive = activeTab === tab.id;
+                const isSecurity = tab.id === "security";
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                       isActive
-                        ? "bg-[#E8436E] text-white shadow-xs"
+                        ? isSecurity
+                          ? "bg-red-600 text-white shadow-xs"
+                          : "bg-[#E8436E] text-white shadow-xs"
+                        : isSecurity
+                        ? "text-red-700 bg-red-50/80 hover:bg-red-100/80"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                     }`}
                   >
+                    {isSecurity && <ShieldAlert className="w-3 h-3 text-red-300" />}
                     <span>{tab.label}</span>
                     {tab.count > 0 && (
                       <span
                         className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
                           isActive
                             ? "bg-white/20 text-white"
+                            : isSecurity
+                            ? "bg-red-200/80 text-red-900"
                             : tab.id === "unread"
                             ? "bg-rose-100 text-[#E8436E]"
                             : "bg-slate-100 text-slate-600"
@@ -494,10 +566,18 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
                     <Inbox className="w-6 h-6 stroke-[1.5]" />
                   </div>
                   <h4 className="text-sm font-bold text-slate-700">No notifications found</h4>
-                  <p className="text-xs text-slate-400 mt-1 max-w-[260px] mx-auto">
+                  <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">
                     {activeTab === "unread"
                       ? "Great job! All your notifications have been reviewed."
-                      : "You will be alerted here when new orders, restocks, or customer feedback arrive."}
+                      : activeTab === "security"
+                      ? "No security incidents, role modifications, or audit alerts recorded."
+                      : activeTab === "orders"
+                      ? "No new online orders or walk-in sales in this view."
+                      : activeTab === "stock"
+                      ? "All inventory levels are healthy with no stock alerts."
+                      : activeTab === "reviews"
+                      ? "No new customer reviews or ratings pending."
+                      : "You will be alerted here when new activity arrives."}
                   </p>
                 </div>
               ) : (
@@ -511,13 +591,21 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
                       onClick={() => handleNotificationClick(n)}
                       className={`p-3.5 transition-all cursor-pointer relative group flex items-start gap-3 ${
                         isUnread
-                          ? "bg-rose-50/40 hover:bg-rose-50/70"
+                          ? cat === "security"
+                            ? "bg-red-50/40 hover:bg-red-50/70"
+                            : "bg-rose-50/40 hover:bg-rose-50/70"
                           : "bg-white hover:bg-slate-50/80"
                       }`}
                     >
                       {/* Unread Glowing Dot */}
                       {isUnread && (
-                        <span className="absolute left-1.5 top-5 w-1.5 h-1.5 rounded-full bg-[#E8436E] ring-4 ring-rose-100" />
+                        <span
+                          className={`absolute left-1.5 top-5 w-1.5 h-1.5 rounded-full ring-4 ${
+                            cat === "security"
+                              ? "bg-red-600 ring-red-100"
+                              : "bg-[#E8436E] ring-rose-100"
+                          }`}
+                        />
                       )}
 
                       {/* Visual Thumbnail or Rich Icon */}
@@ -529,6 +617,10 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
                             alt={n.title || "Notification"}
                             className="w-full h-full object-cover"
                           />
+                        ) : cat === "security" ? (
+                          <div className="w-full h-full bg-gradient-to-br from-red-600 to-rose-800 flex items-center justify-center text-white shadow-2xs">
+                            <ShieldAlert className="w-5 h-5 text-white" />
+                          </div>
                         ) : cat === "orders" ? (
                           <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white">
                             <ShoppingBag className="w-5 h-5" />
@@ -555,7 +647,9 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
                             {/* Category Pill */}
                             <span
                               className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
-                                cat === "orders"
+                                cat === "security"
+                                  ? "bg-red-50 text-red-700 border border-red-200"
+                                  : cat === "orders"
                                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                   : cat === "stock"
                                   ? n.type?.toLowerCase().includes("arrival") || n.title?.toLowerCase().includes("arrival")
@@ -566,7 +660,9 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
                                   : "bg-slate-50 text-slate-700 border border-slate-200"
                               }`}
                             >
-                              {cat === "orders"
+                              {cat === "security"
+                                ? "SECURITY AUDIT"
+                                : cat === "orders"
                                 ? "SALE"
                                 : cat === "stock"
                                 ? n.type?.toLowerCase().includes("arrival") || n.title?.toLowerCase().includes("arrival")
@@ -615,8 +711,12 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
 
                         {/* Action Footer */}
                         <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100/60">
-                          <span className="text-[10px] font-bold text-[#E8436E] flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                            Inspect details &rarr;
+                          <span
+                            className={`text-[10px] font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform ${
+                              cat === "security" ? "text-red-600" : "text-[#E8436E]"
+                            }`}
+                          >
+                            {cat === "security" ? "Inspect Audit Log →" : "Inspect details →"}
                           </span>
 
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -683,6 +783,22 @@ export function NotificationCenter({ userRole }: NotificationCenterProps) {
                 >
                   Reviews
                 </button>
+                {userRole === "super_admin" && (
+                  <>
+                    <span className="text-slate-300">&bull;</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsOpen(false);
+                        router.push("/dashboard/super-admin/audit-logs");
+                      }}
+                      className="hover:text-red-600 text-red-700 transition-colors flex items-center gap-1"
+                    >
+                      <ShieldAlert className="w-3 h-3 text-red-500" />
+                      Audit Logs
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

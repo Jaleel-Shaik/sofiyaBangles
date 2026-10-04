@@ -150,7 +150,10 @@ export const getAdminActivity = asyncHandler(async (req: AuthRequest, res: Respo
  * SuperAdmin Notifications Handler
  */
 export const getNotifications = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const notifications = await SuperAdminService.getNotifications(req.user!.userId);
+  const notifications = await SuperAdminService.getNotifications(
+    req.user?.userId,
+    req.user?.role
+  );
   return sendSuccess(res, notifications);
 });
 

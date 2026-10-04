@@ -122,5 +122,10 @@ if (!admin.apps.length) {
 }
 
 export const db = admin.firestore();
+try {
+  db.settings({ ignoreUndefinedProperties: true });
+} catch (e: any) {
+  console.warn("⚠️ Unable to set firestore settings:", e.message);
+}
 export const auth = admin.auth();
 

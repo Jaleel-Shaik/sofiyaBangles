@@ -192,7 +192,7 @@ export const sellProductByCode = async (
 
 export const updateProductStock = async (
   id: string,
-  payload: number | { quantity?: number; variant_id?: string; variants?: Array<{ id: string; size?: string; quantity: number }> }
+  payload: number | { quantity?: number; variant_id?: string; variants?: { id: string; size?: string; quantity: number }[] }
 ) => {
   try {
     const data = typeof payload === 'number' ? { quantity: payload } : payload;
@@ -367,3 +367,64 @@ export const createCustomer = async (data: { full_name: string; phone: string; e
     throw new Error(message);
   }
 };
+
+export interface AdminNotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body?: string;
+  message?: string;
+  is_read: boolean;
+  created_at: string;
+  product_id?: string | null;
+  order_id?: string | null;
+  order_number?: string | null;
+  unique_code?: string | null;
+  image_url?: string | null;
+  priority?: string;
+  category?: string;
+}
+
+export const getAdminNotifications = async (): Promise<AdminNotificationItem[]> => {
+  try {
+    const res = await apiClient.get(API_ENDPOINTS.ADMIN_NOTIFICATIONS.BASE);
+    const raw = res.data?.data;
+    return Array.isArray(raw) ? raw : [];
+  } catch (error) {
+    console.warn("Failed to fetch admin notifications:", error);
+    return [];
+  }
+};
+
+export const markAdminNotificationRead = async (id: string): Promise<void> => {
+  try {
+    await apiClient.patch(API_ENDPOINTS.ADMIN_NOTIFICATIONS.MARK_READ(id));
+  } catch (error) {
+    console.warn("Failed to mark admin notification read:", error);
+  }
+};
+
+export const markAllAdminNotificationsRead = async (): Promise<void> => {
+  try {
+    await apiClient.patch(API_ENDPOINTS.ADMIN_NOTIFICATIONS.MARK_ALL_READ);
+  } catch (error) {
+    console.warn("Failed to mark all admin notifications read:", error);
+  }
+};
+
+export const clearAllAdminNotifications = async (): Promise<void> => {
+  try {
+    await apiClient.delete(API_ENDPOINTS.ADMIN_NOTIFICATIONS.CLEAR_ALL);
+  } catch (error) {
+    console.warn("Failed to clear all admin notifications:", error);
+  }
+};
+
+export const deleteAdminNotification = async (id: string): Promise<void> => {
+  try {
+    await apiClient.delete(API_ENDPOINTS.ADMIN_NOTIFICATIONS.BY_ID(id));
+  } catch (error) {
+    console.warn("Failed to delete admin notification:", error);
+  }
+};
+

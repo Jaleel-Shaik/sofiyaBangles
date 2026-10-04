@@ -70,8 +70,14 @@ export default function AddProductPage() {
   const currentCategory = useMemo(() => categories.find(c => c.id === form.category_id), [categories, form.category_id]);
 
   useEffect(() => {
-    setForm(f => ({ ...f, category_id: "" }));
-  }, [selectedModelType]);
+    // Only reset category if it doesn't belong to the newly selected model type
+    if (form.category_id && categories.length > 0) {
+      const match = categories.find(c => c.id === form.category_id);
+      if (match && match.model_type_id !== selectedModelType) {
+        setForm(f => ({ ...f, category_id: "" }));
+      }
+    }
+  }, [selectedModelType, categories, form.category_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +87,7 @@ export default function AddProductPage() {
     if (!form.product_name.trim()) newErrors.product_name = "Product name is required";
     if (!form.price) newErrors.price = "Price is required";
     else if (parseFloat(form.price) <= 0) newErrors.price = "Price must be a positive number";
-    if (!selectedModelType) newErrors.model_type_id = "Model Type is required";
+    if (!selectedModelType && !currentCategory?.model_type_id) newErrors.model_type_id = "Model Type is required";
     if (!form.category_id) newErrors.category_id = "Category is required";
     if (imageFiles.length === 0) newErrors.images = "Please select at least one image";
 
@@ -101,7 +107,9 @@ export default function AddProductPage() {
       formData.append("price", String(parseFloat(form.price)));
       formData.append("description", form.description);
       formData.append("category_id", form.category_id);
-      if (selectedModelType) formData.append("model_type_id", selectedModelType);
+      const finalModelTypeId = selectedModelType || currentCategory?.model_type_id || "";
+      if (finalModelTypeId) formData.append("model_type_id", finalModelTypeId);
+      if (currentCategory?.category_name) formData.append("categoryName", currentCategory.category_name);
       
       const totalQuantity = parseInt(form.quantity) || 0;
 

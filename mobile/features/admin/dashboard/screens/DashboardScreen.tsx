@@ -7,6 +7,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback } from 'react';
 
 import { useAuthStore } from '@/src/store/authStore';
+import { useAdminNotificationStore } from '@/src/store/adminNotificationStore';
 import { getCachedApiBaseUrl } from '@/src/api/config';
 import { STRINGS } from '@/src/constants/strings';
 
@@ -14,6 +15,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const { unreadCount: adminUnreadCount, fetchNotifications: fetchAdminNotifs } = useAdminNotificationStore();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,13 +62,15 @@ export default function AdminDashboard() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
-    }, [])
+      fetchAdminNotifs();
+    }, [fetchAdminNotifs])
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
-  }, []);
+    fetchAdminNotifs();
+  }, [fetchAdminNotifs]);
 
   const StatCard = ({
     title,
@@ -132,6 +136,21 @@ export default function AdminDashboard() {
               </Text>
             </View>
             <View className="flex-row items-center">
+              {/* Admin Notifications Bell */}
+              <TouchableOpacity
+                onPress={() => router.push('/(admin)/notifications' as any)}
+                className="w-10 h-10 rounded-full bg-surface border border-divider items-center justify-center mr-2 shadow-xs relative"
+                accessibilityLabel="Store Operations Alerts"
+              >
+                <Ionicons name="notifications-outline" size={20} color="#e11d48" />
+                {adminUnreadCount > 0 && (
+                  <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-600 rounded-full items-center justify-center border-2 border-white shadow-xs">
+                    <Text className="text-white text-[9px] font-black">
+                      {adminUnreadCount > 99 ? '99+' : adminUnreadCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push('/(admin)/(tabs)/products' as any)}
                 className="w-10 h-10 rounded-full bg-surface border border-divider items-center justify-center mr-2 shadow-xs"

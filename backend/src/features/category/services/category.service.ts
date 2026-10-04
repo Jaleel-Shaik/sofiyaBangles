@@ -1,3 +1,4 @@
+import "multer";
 import { v4 as uuidv4 } from "uuid";
 import {
   getCategoriesDb,
@@ -62,12 +63,12 @@ export const createCategoryService = async (
   const newCategory: Category = {
     id: uuidv4(),
     category_name: input.category_name.trim(),
-    image_url: imageUrl ?? null,
-    model_type_id: input.model_type_id,
+    image_url: imageUrl ?? input.image_url ?? null,
+    model_type_id: input.model_type_id || "general",
     display_order: input.display_order ?? 0,
-    size_type: input.size_type,
-    standard_sizes: input.standard_sizes,
-    custom_measurement_fields: input.custom_measurement_fields,
+    size_type: input.size_type || "none",
+    standard_sizes: input.standard_sizes ?? [],
+    custom_measurement_fields: input.custom_measurement_fields ?? [],
     is_active: true,
     created_at: now,
     updated_at: now,
@@ -78,7 +79,7 @@ export const createCategoryService = async (
 
   // 7. Audit log persistence via DB layer
   await insertAuditLogDb({
-    actor_id: actorId,
+    actor_id: actorId || "admin",
     action: "CATEGORY_CREATED",
     table_name: "categories",
     record_id: newCategory.id,
@@ -137,7 +138,7 @@ export const updateCategoryService = async (
 
   // 6. Audit logging via DB layer
   await insertAuditLogDb({
-    actor_id: actorId,
+    actor_id: actorId || "admin",
     action: "CATEGORY_UPDATED",
     table_name: "categories",
     record_id: id,
@@ -172,7 +173,7 @@ export const deleteCategoryService = async (id: string, actorId: string): Promis
   await deleteCategoryDb(id);
 
   await insertAuditLogDb({
-    actor_id: actorId,
+    actor_id: actorId || "admin",
     action: "CATEGORY_DELETED",
     table_name: "categories",
     record_id: id,

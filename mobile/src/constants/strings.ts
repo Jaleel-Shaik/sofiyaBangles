@@ -124,6 +124,10 @@ export const STRINGS = {
       `There are currently no products available in ${size}. Try selecting All Sizes.`,
     emptyGeneralDescription: (name: string) =>
       `We're currently restocking our ${name} collection. Check back soon!`,
+    emptySearchTitle: 'No Matching Bangles',
+    emptySearchDescription: (query: string) =>
+      `We couldn't find any products matching "${query}". Try a different keyword.`,
+    clearSearch: 'Clear Search',
     viewAllSizes: 'View All Sizes',
     exploreOtherStyles: 'Explore Other Styles',
   },

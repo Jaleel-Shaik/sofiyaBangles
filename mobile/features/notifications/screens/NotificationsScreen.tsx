@@ -1,3 +1,4 @@
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,22 +9,24 @@ import {
   RefreshControl,
   Image,
 } from 'react-native';
-import React, { useState, useCallback, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useNotificationStore, AppNotification } from '@/src/store/notificationStore';
 import { useAuthStore } from '@/src/store/authStore';
 import { AppIcon } from '@/src/constants/icons';
 import { STRINGS } from '@/src/constants/strings';
 import { navigateFromNotification } from '@/src/utils/notificationNavigation';
+import { colors, spacing, radius, typography, touchTargets } from '@/src/theme/tokens';
 
-type NotificationFilterTab = 'ALL' | 'UNREAD';
-
+/**
+ * Universal Mobile Customer Notifications Screen.
+ * Strictly compliant with Sofiya Bangles Design System & Tokens.
+ */
 export default function NotificationsScreen() {
-  const [activeTab, setActiveTab] = useState<NotificationFilterTab>('ALL');
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
@@ -41,57 +44,62 @@ export default function NotificationsScreen() {
 
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
+  // Automatically refresh notifications every time screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+    }, [fetchNotifications])
+  );
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchNotifications();
     setRefreshing(false);
   }, [fetchNotifications]);
 
-  // Tab counts
-  const tabCounts = useMemo(() => {
-    const unread = safeNotifications.filter((n) => !n.isRead).length;
-    return {
-      ALL: safeNotifications.length,
-      UNREAD: unread,
-    };
-  }, [safeNotifications]);
-
-  // Filtered notifications based on active tab
-  const filteredList = useMemo(() => {
-    if (activeTab === 'UNREAD') {
-      return safeNotifications.filter((n) => !n.isRead);
-    }
-    return safeNotifications;
-  }, [safeNotifications, activeTab]);
-
   const handleDelete = async (idsToDelete: string[]) => {
-    Alert.alert('Delete Notifications', 'Are you sure you want to remove the selected notifications?', [
-      { text: STRINGS.common.cancel, style: 'cancel' },
-      {
-        text: STRINGS.common.delete,
-        style: 'destructive',
-        onPress: async () => {
-          await deleteNotifications(idsToDelete);
-          setSelectedIds([]);
-          setIsEditMode(false);
+    if (idsToDelete.length === 0) return;
+    const isSingle = idsToDelete.length === 1;
+
+    Alert.alert(
+      isSingle ? 'Delete Notification' : 'Delete Notifications',
+      isSingle
+        ? 'Are you sure you want to remove this notification?'
+        : `Are you sure you want to remove ${idsToDelete.length} selected notifications?`,
+      [
+        { text: STRINGS.common.cancel, style: 'cancel' },
+        {
+          text: STRINGS.common.delete,
+          style: 'destructive',
+          onPress: async () => {
+            await deleteNotifications(idsToDelete);
+            setSelectedIds((prev) => prev.filter((id) => !idsToDelete.includes(id)));
+            if (isEditMode && selectedIds.length <= idsToDelete.length) {
+              setIsEditMode(false);
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleClearAll = async () => {
-    Alert.alert('Clear All Notifications', 'Are you sure you want to clear all notifications from your feed?', [
-      { text: STRINGS.common.cancel, style: 'cancel' },
-      {
-        text: 'Clear All',
-        style: 'destructive',
-        onPress: async () => {
-          await clearAllNotifications();
-          setSelectedIds([]);
-          setIsEditMode(false);
+    Alert.alert(
+      'Clear All Notifications',
+      'Are you sure you want to clear all notifications from your feed?',
+      [
+        { text: STRINGS.common.cancel, style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            await clearAllNotifications();
+            setSelectedIds([]);
+            setIsEditMode(false);
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleMarkAllRead = async () => {
@@ -104,73 +112,235 @@ export default function NotificationsScreen() {
     );
   };
 
+  const handleSelectAll = () => {
+    if (selectedIds.length === safeNotifications.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(safeNotifications.map((n) => n.id));
+    }
+  };
+
   const handleNotificationPress = async (notif: AppNotification) => {
     if (isEditMode) {
       toggleSelection(notif.id);
       return;
     }
 
-    // Mark as read immediately
     if (!notif.isRead) {
       await markAsRead(notif.id);
     }
 
-    // Navigate to appropriate destination
     navigateFromNotification(router, notif, user?.role);
   };
 
-  const getNotificationCategoryBadge = (notif: AppNotification) => {
-    const typeLower = (notif.type || '').toLowerCase();
-    const titleLower = (notif.title || '').toLowerCase();
-
-    if (typeLower.includes('back_in_stock') || titleLower.includes('back in stock')) {
-      return { label: 'BACK IN STOCK', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
-    }
-    if (typeLower.includes('stock') || titleLower.includes('stock')) {
-      return { label: 'RESTOCK', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' };
-    }
-    if (typeLower.includes('arrival') || titleLower.includes('arrival')) {
-      return { label: 'NEW ARRIVAL', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' };
-    }
-    if (typeLower.includes('order') || typeLower.includes('sale') || titleLower.includes('order')) {
-      return { label: 'ORDER UPDATE', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
-    }
-    return { label: 'ANNOUNCEMENT', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
+  /**
+   * Extracts clean Product Name from notification title.
+   */
+  const getCleanProductName = (notif: AppNotification): string => {
+    let title = (notif.title || '').trim();
+    const prefixRegex =
+      /^(back\s+in\s+stock|new\s+arrival|restock(ed)?|stock\s+alert|exclusive\s+offer|flash\s+sale|special\s+discount|limited\s+offer|product\s+alert)\s*[:\-–]\s*/i;
+    title = title.replace(prefixRegex, '').trim();
+    return title || 'Bangles Collection';
   };
 
-  const getActionLabel = (notif: AppNotification) => {
+  /**
+   * Generates a concise, exact 2-word short description.
+   */
+  const getShortDescription = (notif: AppNotification): string => {
     const typeLower = (notif.type || '').toLowerCase();
-    if (typeLower.includes('order') || typeLower.includes('sale') || notif.orderId || notif.orderNumber) {
-      return 'Track Order →';
+    const titleLower = (notif.title || '').toLowerCase();
+    const descLower = (notif.desc || '').toLowerCase();
+
+    if (
+      titleLower.includes('out of stock') ||
+      descLower.includes('out of stock') ||
+      descLower.includes('sold out') ||
+      typeLower.includes('out_of_stock')
+    ) {
+      return 'Out of stock';
     }
-    if (notif.productId) {
-      return 'View Product →';
+    if (
+      titleLower.includes('limited stock') ||
+      descLower.includes('limited stock') ||
+      descLower.includes('only ') ||
+      typeLower.includes('low_stock')
+    ) {
+      return 'Limited stock';
     }
-    if (typeLower.includes('arrival')) {
-      return 'See New Arrivals →';
+    if (
+      typeLower.includes('back_in_stock') ||
+      titleLower.includes('back in stock') ||
+      descLower.includes('back in stock')
+    ) {
+      return 'Back in stock';
     }
-    return 'Explore →';
+    if (
+      typeLower.includes('stock') ||
+      titleLower.includes('restock') ||
+      descLower.includes('restock') ||
+      titleLower.includes('stock increased') ||
+      descLower.includes('fresh stock')
+    ) {
+      return 'Restocked now';
+    }
+    if (
+      typeLower.includes('arrival') ||
+      titleLower.includes('arrival') ||
+      descLower.includes('arrival')
+    ) {
+      return 'New arrival';
+    }
+    if (
+      typeLower.includes('order') ||
+      typeLower.includes('sale') ||
+      notif.orderId ||
+      notif.orderNumber ||
+      titleLower.includes('order')
+    ) {
+      if (descLower.includes('deliver') || titleLower.includes('deliver')) return 'Order delivered';
+      if (descLower.includes('ship') || titleLower.includes('ship')) return 'Order shipped';
+      return 'Order placed';
+    }
+    if (
+      titleLower.includes('discount') ||
+      titleLower.includes('offer') ||
+      descLower.includes('discount')
+    ) {
+      return 'Special offer';
+    }
+    if (descLower.includes('limited')) {
+      return 'Limited stock';
+    }
+
+    const words = (notif.desc || notif.title || '').trim().split(/\s+/).filter(Boolean);
+    if (words.length >= 2) {
+      return `${words[0]} ${words[1]}`;
+    }
+    return 'Ready to ship';
+  };
+
+  /**
+   * Resolves category icon and semantic color tints strictly using tokens.ts.
+   */
+  const getCategoryMeta = (notif: AppNotification) => {
+    const typeLower = (notif.type || '').toLowerCase();
+    const titleLower = (notif.title || '').toLowerCase();
+    const descLower = (notif.desc || '').toLowerCase();
+
+    if (
+      titleLower.includes('out of stock') ||
+      descLower.includes('out of stock') ||
+      descLower.includes('sold out') ||
+      typeLower.includes('out_of_stock')
+    ) {
+      return {
+        iconName: 'closeCircle' as const,
+        iconBg: colors.status.errorLight,
+        iconColor: colors.status.error,
+        borderColor: colors.status.error,
+      };
+    }
+
+    if (
+      titleLower.includes('limited stock') ||
+      descLower.includes('limited stock') ||
+      descLower.includes('only ') ||
+      typeLower.includes('low_stock')
+    ) {
+      return {
+        iconName: 'timeOutline' as const,
+        iconBg: colors.status.warningLight,
+        iconColor: colors.status.warning,
+        borderColor: colors.status.warning,
+      };
+    }
+
+    if (typeLower.includes('arrival') || titleLower.includes('arrival')) {
+      return {
+        iconName: 'sparklesOutline' as const,
+        iconBg: colors.brand.primaryLight,
+        iconColor: colors.brand.primary,
+        borderColor: colors.brand.primary,
+      };
+    }
+
+    if (typeLower.includes('stock') || titleLower.includes('stock') || notif.productId) {
+      return {
+        iconName: 'cubeOutline' as const,
+        iconBg: colors.status.successLight,
+        iconColor: colors.status.success,
+        borderColor: colors.status.success,
+      };
+    }
+
+    if (
+      typeLower.includes('order') ||
+      typeLower.includes('sale') ||
+      notif.orderId ||
+      notif.orderNumber ||
+      titleLower.includes('order')
+    ) {
+      return {
+        iconName: 'bagOutline' as const,
+        iconBg: colors.status.infoLight,
+        iconColor: colors.status.info,
+        borderColor: colors.status.info,
+      };
+    }
+
+    return {
+      iconName: 'notificationsOutline' as const,
+      iconBg: colors.brand.primaryLight,
+      iconColor: colors.brand.primary,
+      borderColor: colors.brand.primary,
+    };
   };
 
   return (
-    <View className="flex-1 bg-[#F9FAFB]">
+    <View className="flex-1" style={{ backgroundColor: colors.surface.secondary }}>
       {/* Top Header */}
       <View
-        className="px-5 pb-3 bg-[#FFF0F3] rounded-b-3xl shadow-xs border-b border-rose-100"
-        style={{ paddingTop: Math.max(insets.top + 12, 38) }}
+        style={{
+          paddingTop: Math.max(insets.top + spacing[2], spacing[8]),
+          paddingHorizontal: spacing[4],
+          paddingBottom: spacing[3],
+          backgroundColor: colors.surface.primary,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border.default,
+        }}
       >
         <View className="flex-row justify-between items-center mb-1">
           <View className="flex-row items-center">
-            <Text className="text-headline-md font-extrabold text-slate-900">Notifications</Text>
+            <Text
+              style={[typography.headlineSm, { color: colors.text.primary }]}
+            >
+              Notifications
+            </Text>
             {unreadCount > 0 && (
-              <View className="ml-2.5 bg-primary px-2.5 py-0.5 rounded-full">
-                <Text className="text-white text-caption font-bold">{unreadCount} new</Text>
+              <View
+                style={{
+                  marginLeft: spacing[2],
+                  paddingHorizontal: spacing[2],
+                  paddingVertical: 2,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.brand.primaryLight,
+                  borderWidth: 1,
+                  borderColor: colors.border.brand,
+                }}
+              >
+                <Text
+                  style={[typography.caption, { color: colors.brand.primary, fontWeight: '700' }]}
+                >
+                  {unreadCount} new
+                </Text>
               </View>
             )}
           </View>
 
           {safeNotifications.length > 0 && (
-            <View className="flex-row items-center gap-2">
+            <View className="flex-row items-center" style={{ gap: spacing[2] }}>
+              {/* Select Option Button */}
               <TouchableOpacity
                 onPress={() => {
                   if (isEditMode) {
@@ -180,244 +350,506 @@ export default function NotificationsScreen() {
                     setIsEditMode(true);
                   }
                 }}
-                className="py-1 px-3 rounded-lg bg-rose-100"
+                style={{
+                  minWidth: touchTargets.minWidth,
+                  minHeight: 36,
+                  paddingHorizontal: spacing[3],
+                  borderRadius: radius.full,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isEditMode ? colors.brand.primary : colors.brand.primaryLight,
+                  borderWidth: isEditMode ? 0 : 1,
+                  borderColor: colors.border.brand,
+                  gap: 6,
+                }}
+                activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel={isEditMode ? STRINGS.common.cancel : 'Select notifications'}
               >
-                <Text className="text-primary font-bold text-label-sm">
-                  {isEditMode ? STRINGS.common.cancel : 'Select'}
+                <AppIcon
+                  name={isEditMode ? 'close' : 'checkCircle'}
+                  size={16}
+                  color={isEditMode ? colors.text.inverse : colors.brand.primary}
+                />
+                <Text
+                  style={[
+                    typography.labelSm,
+                    { color: isEditMode ? colors.text.inverse : colors.brand.primary, fontWeight: '700' },
+                  ]}
+                >
+                  {isEditMode ? 'Done' : 'Select'}
                 </Text>
               </TouchableOpacity>
 
               {!isEditMode && (
                 <TouchableOpacity
                   onPress={handleClearAll}
-                  className="py-1 px-3 rounded-lg bg-white border border-rose-200"
+                  style={{
+                    minWidth: touchTargets.minWidth,
+                    minHeight: 36,
+                    paddingHorizontal: spacing[3],
+                    borderRadius: radius.full,
+                    backgroundColor: colors.surface.primary,
+                    borderWidth: 1,
+                    borderColor: colors.border.subtle,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  activeOpacity={0.85}
                   accessibilityRole="button"
                   accessibilityLabel="Clear all notifications"
                 >
-                  <Text className="text-rose-600 font-bold text-label-sm">Clear All</Text>
+                  <Text
+                    style={[typography.labelSm, { color: colors.text.secondary, fontWeight: '600' }]}
+                  >
+                    Clear All
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
           )}
         </View>
 
-        <View className="flex-row justify-between items-center mt-1">
-          <Text className="text-slate-500 text-body-sm">
-            Stay updated with your orders, stock arrivals & offers
-          </Text>
-          {unreadCount > 0 && !isEditMode && (
-            <TouchableOpacity onPress={handleMarkAllRead}>
-              <Text className="text-primary font-bold text-caption">Mark all read</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Filter Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="flex-row mt-3.5 pt-1"
-          contentContainerStyle={{ gap: 8 }}
-        >
-          <TouchableOpacity
-            onPress={() => setActiveTab('ALL')}
-            className={`px-3.5 py-1.5 rounded-full flex-row items-center ${
-              activeTab === 'ALL' ? 'bg-primary' : 'bg-white border border-rose-100'
-            }`}
-          >
+        {/* Subtitle & Mark All Read */}
+        {!isEditMode && (
+          <View className="flex-row justify-between items-center mt-0.5">
             <Text
-              className={`text-label-sm font-bold ${
-                activeTab === 'ALL' ? 'text-white' : 'text-slate-600'
-              }`}
+              style={[typography.caption, { color: colors.text.secondary, flex: 1, paddingRight: spacing[2] }]}
+              numberOfLines={1}
             >
-              All ({tabCounts.ALL})
+              All your bangle arrivals, orders & offers in one place
             </Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => setActiveTab('UNREAD')}
-            className={`px-3.5 py-1.5 rounded-full flex-row items-center ${
-              activeTab === 'UNREAD' ? 'bg-primary' : 'bg-white border border-rose-100'
-            }`}
-          >
-            <Text
-              className={`text-label-sm font-bold ${
-                activeTab === 'UNREAD' ? 'text-white' : 'text-slate-600'
-              }`}
-            >
-              Unread ({tabCounts.UNREAD})
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
+            {unreadCount > 0 && (
+              <TouchableOpacity
+                onPress={handleMarkAllRead}
+                style={{ paddingVertical: spacing[1], paddingHorizontal: spacing[1] }}
+                hitSlop={touchTargets.hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel="Mark all as read"
+              >
+                <Text
+                  style={[typography.caption, { color: colors.brand.primary, fontWeight: '700' }]}
+                >
+                  Mark all read
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
 
-      {/* Notifications List */}
+      {/* Selection Toolbar Banner (Active in Edit Mode) */}
+      {isEditMode && safeNotifications.length > 0 && (
+        <View
+          style={{
+            marginHorizontal: spacing[4],
+            marginTop: spacing[2],
+            marginBottom: spacing[2],
+            paddingHorizontal: spacing[4],
+            paddingVertical: spacing[3],
+            borderRadius: radius.xl,
+            backgroundColor: colors.brand.primaryLight,
+            borderWidth: 1,
+            borderColor: colors.border.brand,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <View className="flex-row items-center" style={{ gap: spacing[2] }}>
+            <View
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: radius.full,
+                backgroundColor: colors.brand.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: colors.text.inverse, fontSize: 11, fontWeight: '700' }}>
+                {selectedIds.length}
+              </Text>
+            </View>
+            <Text style={[typography.labelSm, { color: colors.text.primary, fontWeight: '700' }]}>
+              {selectedIds.length === 0
+                ? 'Choose items to delete'
+                : `${selectedIds.length} of ${safeNotifications.length} Selected`}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleSelectAll}
+            style={{
+              paddingHorizontal: spacing[3],
+              paddingVertical: 6,
+              borderRadius: radius.full,
+              backgroundColor: colors.surface.primary,
+              borderWidth: 1,
+              borderColor: colors.border.brand,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+            }}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={
+              selectedIds.length === safeNotifications.length ? 'Deselect all' : 'Select all'
+            }
+          >
+            <AppIcon
+              name={
+                selectedIds.length === safeNotifications.length
+                  ? 'closeCircle'
+                  : 'checkCircle'
+              }
+              size={15}
+              color={colors.brand.primary}
+            />
+            <Text style={[typography.labelSm, { color: colors.brand.primary, fontWeight: '700' }]}>
+              {selectedIds.length === safeNotifications.length ? 'Deselect All' : 'Select All'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Notifications Unified Feed */}
       <ScrollView
-        className="flex-1 px-4 pt-3"
+        style={{ flex: 1, paddingHorizontal: spacing[3], paddingTop: spacing[2] }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e11d48" />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.brand.primary}
+            colors={[colors.brand.primary]}
+          />
         }
       >
         {!initialized ? (
-          <View className="py-24 items-center justify-center">
-            <ActivityIndicator size="large" color="#e11d48" />
-            <Text className="text-slate-400 text-body-sm mt-3">Loading your notifications...</Text>
-          </View>
-        ) : filteredList.length === 0 ? (
-          <View className="py-24 items-center justify-center px-6">
-            <View className="w-16 h-16 rounded-full bg-rose-50 border border-rose-100 items-center justify-center mb-4">
-              <AppIcon name="notificationsOutline" size={32} color="#e11d48" />
-            </View>
-            <Text className="text-title-md font-bold text-slate-800 mb-1">
-              {activeTab === 'UNREAD' ? 'All Caught Up! 🎉' : 'No Notifications'}
+          <View className="py-20 items-center justify-center">
+            <ActivityIndicator size="large" color={colors.brand.primary} />
+            <Text
+              style={[typography.caption, { color: colors.text.muted, marginTop: spacing[2] }]}
+            >
+              Loading notifications...
             </Text>
-            <Text className="text-slate-500 text-body-sm text-center px-4 mb-6">
-              {activeTab === 'UNREAD'
-                ? 'You have read all your notifications. We will notify you when new stock or deals drop.'
-                : 'Discover our latest designer bangles, bridal sets, and daily wear collections.'}
+          </View>
+        ) : safeNotifications.length === 0 ? (
+          <View className="py-20 items-center justify-center" style={{ paddingHorizontal: spacing[6] }}>
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: radius.full,
+                backgroundColor: colors.brand.primaryLight,
+                borderWidth: 1,
+                borderColor: colors.border.brand,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: spacing[3],
+              }}
+            >
+              <AppIcon name="notificationsOutline" size={30} color={colors.brand.primary} />
+            </View>
+            <Text
+              style={[typography.titleMd, { color: colors.text.primary, marginBottom: spacing[1] }]}
+            >
+              No Notifications
+            </Text>
+            <Text
+              style={[
+                typography.bodySm,
+                { color: colors.text.secondary, textAlign: 'center', paddingHorizontal: spacing[4], marginBottom: spacing[5] },
+              ]}
+            >
+              You are all caught up! When new bangles arrive or stock is updated, you'll see it here.
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/search' as any)}
-              className="bg-primary px-6 py-2.5 rounded-full shadow-xs"
+              style={{
+                minHeight: touchTargets.minHeight,
+                paddingHorizontal: spacing[6],
+                paddingVertical: spacing[2],
+                borderRadius: radius.full,
+                backgroundColor: colors.brand.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              activeOpacity={0.88}
+              accessibilityRole="button"
+              accessibilityLabel="Explore Bangles Collection"
             >
-              <Text className="text-white font-bold text-label-md">Explore Bangles Collection</Text>
+              <Text
+                style={[typography.labelLg, { color: colors.text.inverse, fontWeight: '700' }]}
+              >
+                Explore Bangles Collection
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
-          filteredList.map((notif) => {
+          safeNotifications.map((notif) => {
             const isSelected = selectedIds.includes(notif.id);
-            const badge = getNotificationCategoryBadge(notif);
-            const actionText = getActionLabel(notif);
+            const productName = getCleanProductName(notif);
+            const shortDesc = getShortDescription(notif);
+            const meta = getCategoryMeta(notif);
 
             return (
               <TouchableOpacity
                 key={notif.id}
                 onPress={() => handleNotificationPress(notif)}
-                activeOpacity={0.88}
-                className={`bg-white rounded-2xl mb-3.5 shadow-xs overflow-hidden ${
-                  isSelected ? 'bg-rose-50/70 border-primary' : 'border-slate-100'
-                }`}
+                activeOpacity={0.85}
                 style={{
+                  borderRadius: radius.lg,
+                  marginBottom: spacing[2],
                   borderWidth: 1,
-                  borderLeftWidth: notif.isRead && !isSelected ? 1 : 4,
-                  borderLeftColor: isSelected ? '#e11d48' : notif.isRead ? '#f1f5f9' : '#e11d48',
+                  borderColor: isSelected
+                    ? colors.border.brand
+                    : notif.isRead
+                    ? colors.border.default
+                    : colors.border.subtle,
+                  backgroundColor: isSelected
+                    ? colors.brand.primaryLight
+                    : colors.surface.primary,
+                  borderLeftWidth: isSelected ? 4 : notif.isRead ? 1 : 3.5,
+                  borderLeftColor: isSelected
+                    ? colors.brand.primary
+                    : notif.isRead
+                    ? colors.border.default
+                    : meta.borderColor,
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`${productName}, ${shortDesc}`}
               >
-                <View className="p-4">
-                  <View className="flex-row items-start">
-                    {/* Multi-select checkbox in Edit Mode */}
-                    {isEditMode && (
-                      <View className="mr-3 self-center">
+                <View
+                  style={{
+                    paddingVertical: spacing[3],
+                    paddingHorizontal: spacing[3],
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}
+                >
+                  {/* Multi-Radio Select Circular Option */}
+                  {isEditMode && (
+                    <TouchableOpacity
+                      onPress={() => toggleSelection(notif.id)}
+                      style={{
+                        minWidth: touchTargets.minWidth,
+                        minHeight: touchTargets.minHeight,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginLeft: -spacing[1],
+                        marginRight: spacing[1],
+                      }}
+                      hitSlop={touchTargets.hitSlop}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: isSelected }}
+                      accessibilityLabel={`Select ${productName}`}
+                    >
+                      {isSelected ? (
+                        <View
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: radius.full,
+                            backgroundColor: colors.brand.primary,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: colors.brand.primary,
+                          }}
+                        >
+                          <AppIcon name="check" size={12} color={colors.text.inverse} />
+                        </View>
+                      ) : (
+                        <View
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: radius.full,
+                            borderWidth: 2,
+                            borderColor: colors.border.strong,
+                            backgroundColor: colors.surface.primary,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Leading Compact Thumbnail or Icon (42x42) */}
+                  <View style={{ marginRight: spacing[3], position: 'relative' }}>
+                    {notif.imageUrl ? (
+                      <Image
+                        source={{ uri: notif.imageUrl }}
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: radius.md,
+                          backgroundColor: colors.surface.muted,
+                          borderWidth: 1,
+                          borderColor: colors.border.default,
+                        }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: radius.md,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: meta.iconBg,
+                        }}
+                      >
                         <AppIcon
-                          name={isSelected ? 'checkCircle' : 'cubeOutline'}
-                          size={22}
-                          color={isSelected ? '#e11d48' : '#cbd5e1'}
+                          name={meta.iconName}
+                          size={20}
+                          color={meta.iconColor}
                         />
                       </View>
                     )}
 
-                    {/* Leading Thumbnail or Icon */}
-                    <View className="mr-3.5 relative">
-                      {notif.imageUrl ? (
-                        <Image
-                          source={{ uri: notif.imageUrl }}
-                          className="w-13 h-13 rounded-2xl bg-slate-100"
-                          style={{ width: 52, height: 52, borderRadius: 14 }}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View
-                          className={`w-13 h-13 rounded-2xl items-center justify-center shadow-xs ${
-                            badge.label === 'ORDER UPDATE'
-                              ? 'bg-blue-600'
-                              : badge.label === 'NEW ARRIVAL'
-                              ? 'bg-purple-600'
-                              : 'bg-primary'
-                          }`}
-                          style={{ width: 52, height: 52, borderRadius: 14 }}
-                        >
-                          <AppIcon
-                            name={(notif.icon as any) || 'notifications'}
-                            size={24}
-                            color="white"
-                          />
-                        </View>
-                      )}
+                    {!notif.isRead && (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: -1,
+                          right: -1,
+                          width: 10,
+                          height: 10,
+                          borderRadius: radius.full,
+                          backgroundColor: colors.brand.primary,
+                          borderWidth: 2,
+                          borderColor: colors.surface.primary,
+                        }}
+                        accessibilityLabel="Unread notification indicator"
+                      />
+                    )}
+                  </View>
 
-                      {!notif.isRead && (
-                        <View className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-primary border-2 border-white" />
-                      )}
-                    </View>
+                  {/* Center Content: Product Name (Top) & Short 2-word Description (Bottom) */}
+                  <View style={{ flex: 1, justifyContent: 'center', marginRight: spacing[2] }}>
+                    {/* Product Name */}
+                    <Text
+                      style={[
+                        typography.titleSm,
+                        {
+                          color: isSelected
+                            ? colors.brand.primary
+                            : notif.isRead
+                            ? colors.text.secondary
+                            : colors.text.primary,
+                          fontWeight: notif.isRead ? '600' : '700',
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {productName}
+                    </Text>
 
-                    {/* Middle Content */}
-                    <View className="flex-1">
-                      {/* Category Badge & Timestamp */}
-                      <View className="flex-row justify-between items-center mb-1">
-                        <View className={`px-2 py-0.5 rounded-md border ${badge.bg} ${badge.border}`}>
-                          <Text className={`text-[10px] font-extrabold tracking-wider ${badge.text}`}>
-                            {badge.label}
-                          </Text>
-                        </View>
-                        <Text className="text-slate-400 text-caption font-medium">{notif.time}</Text>
-                      </View>
-
-                      {/* Title */}
+                    {/* Short Description (2 words) + Relative Time */}
+                    <View className="flex-row items-center" style={{ marginTop: 2 }}>
                       <Text
-                        className={`text-label-lg font-bold mb-1 ${
-                          notif.isRead ? 'text-slate-700' : 'text-slate-900'
-                        }`}
-                        numberOfLines={2}
+                        style={[
+                          typography.caption,
+                          {
+                            color: isSelected ? colors.brand.primaryDark : colors.text.secondary,
+                            fontWeight: '500',
+                          },
+                        ]}
                       >
-                        {notif.title}
+                        {shortDesc}
                       </Text>
-
-                      {/* Description */}
-                      <Text className="text-slate-500 text-body-sm leading-5 mb-2.5" numberOfLines={3}>
-                        {notif.desc}
+                      <Text
+                        style={{
+                          color: colors.text.muted,
+                          fontSize: 10,
+                          marginHorizontal: 6,
+                        }}
+                      >
+                        •
                       </Text>
-
-                      {/* Action Link Footer */}
-                      <View className="flex-row items-center justify-between pt-1 border-t border-slate-50">
-                        <Text className="text-primary font-bold text-label-sm">{actionText}</Text>
-                        {!isEditMode && (
-                          <TouchableOpacity
-                            onPress={(e) => {
-                              e.stopPropagation?.();
-                              handleDelete([notif.id]);
-                            }}
-                            className="p-1 -mr-1"
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityRole="button"
-                            accessibilityLabel={STRINGS.common.delete}
-                          >
-                            <AppIcon name="close" size={16} color="#94a3b8" />
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                      <Text
+                        style={[typography.caption, { color: colors.text.muted }]}
+                      >
+                        {notif.time}
+                      </Text>
                     </View>
                   </View>
+
+                  {/* Right Column: Quick Single-Delete Icon */}
+                  {!isEditMode && (
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        handleDelete([notif.id]);
+                      }}
+                      style={{
+                        minWidth: 36,
+                        minHeight: 36,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: -spacing[1],
+                      }}
+                      hitSlop={touchTargets.hitSlop}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete notification: ${productName}`}
+                    >
+                      <AppIcon name="close" size={16} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </TouchableOpacity>
             );
           })
         )}
-        <View className="h-32" />
+        <View style={{ height: spacing[24] }} />
       </ScrollView>
 
-      {/* Floating Action Bar when selecting in Edit Mode */}
+      {/* Floating Action Bar in Selection Mode */}
       {isEditMode && selectedIds.length > 0 && (
-        <View className="absolute bottom-20 left-6 right-6 z-20">
+        <View
+          style={{
+            position: 'absolute',
+            bottom: spacing[5],
+            left: spacing[4],
+            right: spacing[4],
+            zIndex: 20,
+          }}
+        >
           <TouchableOpacity
-            className="bg-primary py-4 rounded-full items-center shadow-lg flex-row justify-center min-h-[48px]"
+            style={{
+              backgroundColor: colors.brand.primary,
+              minHeight: 48,
+              paddingVertical: spacing[3],
+              paddingHorizontal: spacing[5],
+              borderRadius: radius.full,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              shadowColor: colors.brand.primary,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 6,
+            }}
             onPress={() => handleDelete(selectedIds)}
             activeOpacity={0.88}
             accessibilityRole="button"
+            accessibilityLabel={`Delete ${selectedIds.length} selected notifications`}
           >
-            <AppIcon name="closeCircleFilled" size={20} color="white" />
-            <Text className="text-white font-bold text-label-lg ml-2">
+            <AppIcon name="closeCircleFilled" size={18} color={colors.text.inverse} />
+            <Text
+              style={[
+                typography.labelLg,
+                { color: colors.text.inverse, fontWeight: '700', marginLeft: spacing[2] },
+              ]}
+            >
               Delete Selected ({selectedIds.length})
             </Text>
           </TouchableOpacity>

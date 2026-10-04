@@ -563,8 +563,8 @@ export class SuperAdminService {
   /**
    * SuperAdmin Notifications
    */
-  static async getNotifications(userId?: string): Promise<Notification[]> {
-    return await getSuperAdminNotificationsDb(userId);
+  static async getNotifications(userId?: string, role?: string): Promise<Notification[]> {
+    return await getSuperAdminNotificationsDb(userId, role);
   }
 
   static async markNotificationRead(notificationId: string): Promise<void> {

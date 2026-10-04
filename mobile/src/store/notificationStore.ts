@@ -71,23 +71,50 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
         if (parsedDeleted.includes(n.id)) continue;
         if (seenIds.has(n.id)) continue;
 
-        const sig = n.product_id
-          ? `${n.type || 'stock'}:${n.product_id}`
-          : `${n.type || 'msg'}:${(n.title || '').trim().toLowerCase()}`;
+        const prodId =
+          n.product_id ||
+          (n.link_url ? n.link_url.match(/\/products\/([a-zA-Z0-9_-]+)/)?.[1] : undefined);
+        const orderRef =
+          n.order_id ||
+          n.order_number ||
+          (n.title + ' ' + (n.body || '')).match(/ORD-[\w\d-]+/i)?.[0];
+
+        let sig = '';
+        if (prodId) {
+          sig = `product:${prodId}`;
+        } else if (orderRef) {
+          sig = `order:${orderRef.toUpperCase()}`;
+        } else {
+          const normTitle = (n.title || '').trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+          const normBody = (n.body || '').trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+          sig = normTitle ? `msg:${normTitle}:${normBody}` : `id:${n.id}`;
+        }
 
         if (seenSignatures.has(sig)) continue;
 
         seenIds.add(n.id);
         seenSignatures.add(sig);
 
-        let icon = 'notifications-outline';
+        let icon = 'notificationsOutline';
         const typeLower = (n.type || '').toLowerCase();
-        if (typeLower.includes('stock')) {
-          icon = 'cube-outline';
-        } else if (typeLower.includes('arrival')) {
-          icon = 'sparkles-outline';
-        } else if (typeLower.includes('order') || typeLower.includes('sale')) {
-          icon = 'bag-handle-outline';
+        const titleLower = (n.title || '').toLowerCase();
+        if (typeLower.includes('arrival') || titleLower.includes('arrival')) {
+          icon = 'sparklesOutline';
+        } else if (
+          typeLower.includes('stock') ||
+          typeLower.includes('back_in_stock') ||
+          titleLower.includes('stock') ||
+          titleLower.includes('restock')
+        ) {
+          icon = 'cubeOutline';
+        } else if (
+          typeLower.includes('order') ||
+          typeLower.includes('sale') ||
+          titleLower.includes('order') ||
+          n.order_id ||
+          n.order_number
+        ) {
+          icon = 'bagOutline';
         }
 
         const isLocallyRead = parsedRead.includes(n.id);
@@ -100,7 +127,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
           icon,
           isRead: Boolean(n.is_read || isLocallyRead),
           type: n.type || 'announcement',
-          productId: n.product_id || undefined,
+          productId: prodId || undefined,
           imageUrl: n.image_url || undefined,
           orderId: n.order_id || undefined,
           orderNumber: n.order_number || undefined,
@@ -110,14 +137,16 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
 
       const unreadCount = parsedNotifs.filter(n => !n.isRead).length;
 
-      // Check if there is a brand new unread notification (less than 2 minutes old) to feature in banner
+      // Check if there is a brand new unread notification to feature in in-app banner
       const prevNotifs = get().notifications;
       const latest = parsedNotifs[0];
       let newBanner: AppNotification | null = get().activeInAppBanner;
 
-      if (latest && !latest.isRead && prevNotifs.length > 0 && !prevNotifs.some(p => p.id === latest.id)) {
+      if (latest && !latest.isRead) {
         const timeDiff = Date.now() - new Date(latest.rawTime).getTime();
-        if (timeDiff < 2 * 60 * 1000) {
+        const isBrandNew = prevNotifs.length > 0 && !prevNotifs.some(p => p.id === latest.id);
+        const isFreshUnread = prevNotifs.length === 0 && timeDiff < 5 * 60 * 1000;
+        if ((isBrandNew && timeDiff < 10 * 60 * 1000) || isFreshUnread) {
           newBanner = latest;
         }
       }

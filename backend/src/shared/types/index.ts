@@ -509,6 +509,12 @@ export interface Notification {
   order_id?: string | null;
   order_number?: string | null;
   link_url?: string | null;
+  dismissed_by?: string[] | null;
+  read_by?: string[] | null;
+  message?: string | null;
+  unique_code?: string | null;
+  priority?: string | null;
+  category?: string | null;
 }
 
 export interface AuditLog {

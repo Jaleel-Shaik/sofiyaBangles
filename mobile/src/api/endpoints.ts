@@ -69,5 +69,12 @@ export const API_ENDPOINTS = {
     COMPLETE: (id: string) => `/orders/${id}/complete`,
     REFUND: (id: string) => `/orders/${id}/refund`,
     STATUS: (id: string) => `/orders/${id}/status`,
+  },
+  ADMIN_NOTIFICATIONS: {
+    BASE: '/super-admin/notifications',
+    MARK_READ: (id: string) => `/super-admin/notifications/${id}/read`,
+    MARK_ALL_READ: '/super-admin/notifications/read-all',
+    CLEAR_ALL: '/super-admin/notifications/clear-all',
+    BY_ID: (id: string) => `/super-admin/notifications/${id}`,
   }
 };

@@ -239,16 +239,30 @@ export const createProductService = async (
     new_data: { product_name: product.product_name, price: product.price, created_by_role: actorRole || 'admin' },
   });
 
-  // Broadcast new arrival notification when added with stock
-  if (product.quantity > 0) {
-    batchInsertBroadcastNotificationsDb({
-      title: `New Arrival: ${product.product_name} ✨`,
-      body: `Check out our latest arrival "${product.product_name}" available now for ₹${product.price}!`,
-      type: "new_arrival",
-      product_id: product.id,
-      image_url: product.image_url || null,
-      sent_by: actorId,
-    }).catch((err) => console.error("New arrival notification error (non-fatal):", err));
+  // Broadcast new arrival notification to customer mobile module when added as an active product
+  const shouldNotify =
+    product.is_active !== false &&
+    product.status !== "draft" &&
+    product.status !== "archived";
+
+  if (shouldNotify) {
+    const coverImage =
+      product.image_url ||
+      (images.length > 0 ? images[0].image_url : null) ||
+      (allImageUrls.length > 0 ? allImageUrls[0] : null);
+
+    try {
+      await batchInsertBroadcastNotificationsDb({
+        title: `New Arrival: ${product.product_name} ✨`,
+        body: `Check out our latest arrival "${product.product_name}" available now for ₹${product.price}!`,
+        type: "new_arrival",
+        product_id: product.id,
+        image_url: coverImage,
+        sent_by: actorId || "admin",
+      });
+    } catch (notifErr) {
+      console.error("New arrival notification error (non-fatal):", notifErr);
+    }
   }
 
   return product;
@@ -464,7 +478,130 @@ const cleanupCloudinaryImages = async (imageUrls: string[]) => {
 };
 
 /**
- * Service: Notify users when a product's stock is increased or back in stock.
+ * Service: Synchronize product stock notification for customer feed.
+ * Handles all edge cases:
+ * 1. Stock Decreased to 0 (Out of stock / Sold out)
+ * 2. Stock Decreased to Limited Stock (<= 5 items remaining)
+ * 3. Stock Increased from 0 (Back in stock)
+ * 4. Stock Increased (Restocked with higher quantity)
+ */
+export const syncProductStockNotificationService = async (
+  product: Product,
+  oldQty: number,
+  newQty: number,
+  actorId: string,
+) => {
+  if (oldQty === newQty) return;
+
+  const now = new Date().toISOString();
+
+  // Case 1: Out of Stock (quantity dropped to 0)
+  if (newQty <= 0 && oldQty > 0) {
+    try {
+      await batchInsertBroadcastNotificationsDb({
+        title: `Out of Stock: ${product.product_name}`,
+        body: `"${product.product_name}" is currently sold out. We will notify you as soon as fresh stock arrives!`,
+        type: "stock_update",
+        product_id: product.id,
+        image_url: product.image_url || null,
+        sent_by: actorId,
+      });
+
+      await insertAuditLogDb({
+        actor_id: actorId,
+        action: "PRODUCT_OUT_OF_STOCK_NOTIFIED",
+        table_name: "products",
+        record_id: product.id,
+        old_data: { quantity: oldQty },
+        new_data: { quantity: newQty, status: "out_of_stock", notified: true },
+      });
+    } catch (err) {
+      console.error("Out of stock notification error (non-fatal):", err);
+    }
+    return;
+  }
+
+  // Case 2: Limited / Low Stock (quantity decreased to 5 or fewer items remaining)
+  if (newQty < oldQty && newQty <= 5 && newQty > 0) {
+    try {
+      await batchInsertBroadcastNotificationsDb({
+        title: `Limited Stock: ${product.product_name} ⏳`,
+        body: `Hurry! Only ${newQty} item(s) left for "${product.product_name}". Order before it sells out!`,
+        type: "stock_update",
+        product_id: product.id,
+        image_url: product.image_url || null,
+        sent_by: actorId,
+      });
+
+      await insertAuditLogDb({
+        actor_id: actorId,
+        action: "PRODUCT_LOW_STOCK_NOTIFIED",
+        table_name: "products",
+        record_id: product.id,
+        old_data: { quantity: oldQty },
+        new_data: { quantity: newQty, notified: true },
+      });
+    } catch (err) {
+      console.error("Limited stock notification error (non-fatal):", err);
+    }
+    return;
+  }
+
+  // Case 3: Back in Stock (quantity increased from 0 to positive)
+  if (oldQty <= 0 && newQty > 0) {
+    try {
+      await batchInsertBroadcastNotificationsDb({
+        title: `Back in Stock: ${product.product_name} ✨`,
+        body: `Great news! "${product.product_name}" is now back in stock with ${newQty} item(s) available. Tap to view and shop before it sells out!`,
+        type: "stock_update",
+        product_id: product.id,
+        image_url: product.image_url || null,
+        sent_by: actorId,
+      });
+
+      await insertAuditLogDb({
+        actor_id: actorId,
+        action: "PRODUCT_BACK_IN_STOCK_NOTIFIED",
+        table_name: "products",
+        record_id: product.id,
+        old_data: { quantity: oldQty },
+        new_data: { quantity: newQty, notified: true },
+      });
+    } catch (err) {
+      console.error("Back in stock notification error (non-fatal):", err);
+    }
+    return;
+  }
+
+  // Case 4: Stock Increased (restocked with higher quantity)
+  if (newQty > oldQty) {
+    try {
+      await batchInsertBroadcastNotificationsDb({
+        title: `Stock Increased: ${product.product_name} 📦`,
+        body: `Fresh stock added! "${product.product_name}" now has ${newQty} item(s) available. Check it out!`,
+        type: "stock_update",
+        product_id: product.id,
+        image_url: product.image_url || null,
+        sent_by: actorId,
+      });
+
+      await insertAuditLogDb({
+        actor_id: actorId,
+        action: "PRODUCT_STOCK_INCREASED_NOTIFIED",
+        table_name: "products",
+        record_id: product.id,
+        old_data: { quantity: oldQty },
+        new_data: { quantity: newQty, notified: true },
+      });
+    } catch (err) {
+      console.error("Stock increase notification error (non-fatal):", err);
+    }
+    return;
+  }
+};
+
+/**
+ * Backward compatible wrapper for stock notification service.
  */
 export const notifyStockIncreaseService = async (
   product: Product,
@@ -472,44 +609,7 @@ export const notifyStockIncreaseService = async (
   newQty: number,
   actorId: string,
 ) => {
-  if (newQty <= oldQty && !(oldQty <= 0 && newQty > 0)) {
-    return;
-  }
-
-  const isBackInStock = oldQty <= 0 && newQty > 0;
-  const now = new Date().toISOString();
-
-  const title = isBackInStock
-    ? `Back in Stock: ${product.product_name} ✨`
-    : `Stock Increased: ${product.product_name} 📦`;
-
-  const body = isBackInStock
-    ? `Great news! "${product.product_name}" is now back in stock with ${newQty} item(s) available. Tap to view and shop before it sells out!`
-    : `Fresh stock added! "${product.product_name}" now has ${newQty} item(s) available. Check it out!`;
-
-  try {
-    // 1. Broadcast single clean notification to all active users
-    await batchInsertBroadcastNotificationsDb({
-      title,
-      body,
-      type: "stock_update",
-      product_id: product.id,
-      image_url: product.image_url || null,
-      sent_by: actorId,
-    });
-
-    // 3. Audit log
-    await insertAuditLogDb({
-      actor_id: actorId,
-      action: isBackInStock ? "PRODUCT_BACK_IN_STOCK_NOTIFIED" : "PRODUCT_STOCK_INCREASED_NOTIFIED",
-      table_name: "products",
-      record_id: product.id,
-      old_data: { quantity: oldQty },
-      new_data: { quantity: newQty, notified: true },
-    });
-  } catch (err) {
-    console.error("notifyStockIncreaseService error (non-fatal):", err);
-  }
+  return syncProductStockNotificationService(product, oldQty, newQty, actorId);
 };
 
 /**
@@ -710,10 +810,20 @@ export const updateProductService = async (
     new_data: { product_name: product.product_name, price: product.price },
   });
 
-  // Check if stock increased or back in stock
-  if (newTotalQuantity > oldQuantity || (oldQuantity <= 0 && newTotalQuantity > 0)) {
-    notifyStockIncreaseService(product, oldQuantity, newTotalQuantity, actorId)
-      .catch((err) => console.error("Stock increase notification error (non-fatal):", err));
+  // Synchronize stock notification for any change (increase, decrease, out of stock, limited stock)
+  syncProductStockNotificationService(product, oldQuantity, newTotalQuantity, actorId)
+    .catch((err) => console.error("Stock sync notification error (non-fatal):", err));
+
+  // If a draft product is published as active, notify customers
+  if (existing.status === "draft" && product.status === "active") {
+    batchInsertBroadcastNotificationsDb({
+      title: `New Arrival: ${product.product_name} ✨`,
+      body: `Check out our latest arrival "${product.product_name}" available now for ₹${product.price}!`,
+      type: "new_arrival",
+      product_id: product.id,
+      image_url: product.image_url || null,
+      sent_by: actorId || "admin",
+    }).catch((err) => console.error("New arrival publish notification error (non-fatal):", err));
   }
 
   return product;
@@ -853,11 +963,9 @@ export const updateStockService = async (
 
   const updatedProduct = await lookupProductByCodeOrIdService(existing.id, actorId);
 
-  // Send stock increase / back in stock notification
-  if (newTotalQuantity > oldQuantity || (oldQuantity <= 0 && newTotalQuantity > 0)) {
-    notifyStockIncreaseService(updatedProduct, oldQuantity, newTotalQuantity, actorId)
-      .catch((err) => console.error("Stock update notification error (non-fatal):", err));
-  }
+  // Synchronize stock notification for any change (increase, decrease, out of stock, limited stock)
+  syncProductStockNotificationService(updatedProduct, oldQuantity, newTotalQuantity, actorId)
+    .catch((err) => console.error("Stock update notification error (non-fatal):", err));
 
   return updatedProduct;
 };
@@ -1032,6 +1140,10 @@ export const sellProductService = async (
   }
   const newQuantity = existing.quantity - quantity;
   const product = await updateProductDocDb(existing.id, { quantity: newQuantity });
+
+  // Synchronize stock notification for decrease (e.g. low stock or out of stock)
+  syncProductStockNotificationService(existing, existing.quantity, newQuantity, actorId)
+    .catch((err) => console.error("Sell stock sync notification error (non-fatal):", err));
 
   const oldData: Record<string, unknown> = { quantity: existing.quantity };
   if (existing.unique_code) oldData.unique_code = existing.unique_code;

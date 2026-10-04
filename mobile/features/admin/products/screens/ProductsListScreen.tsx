@@ -1,7 +1,7 @@
 import type { Product } from '@/src/api/products';
 import type { Category } from '@/src/api/categories';
 import { api } from "@/src/api";
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, Image, TextInput, RefreshControl, Alert, ScrollView, Modal } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, Image, TextInput, RefreshControl, Alert, ScrollView, Modal, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -13,12 +13,17 @@ import { STRINGS } from '@/src/constants/strings';
 export default function ProductsListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = useMemo(() => {
+    // 12px padding on each side (24px) + 12px gap between columns = 36px total offset
+    return Math.floor((windowWidth - 36) / 2);
+  }, [windowWidth]);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
 
   // Stock Adjustment Modal State
   const [stockModalTarget, setStockModalTarget] = useState<Product | null>(null);
@@ -107,11 +112,9 @@ export default function ProductsListScreen() {
       if (!p) return false;
       const pName = (p.product_name || '').toLowerCase();
       const pCode = (p.unique_code || '').toLowerCase();
-      const matchesSearch = !lower || pName.includes(lower) || pCode.includes(lower);
-      const matchesCategory = !selectedCategory || p.category_id === selectedCategory;
-      return matchesSearch && matchesCategory;
+      return !lower || pName.includes(lower) || pCode.includes(lower);
     });
-  }, [products, search, selectedCategory]);
+  }, [products, search]);
 
   const handleDelete = (product: Product) => {
     Alert.alert(
@@ -177,7 +180,7 @@ export default function ProductsListScreen() {
         <Text className="text-text-hint text-xs font-medium ml-[52px]">{totalProducts} total products</Text>
       </View>
 
-      <View className="px-5 pt-3 pb-2">
+      <View className="px-5 pt-3 pb-3">
         <View className="flex-row items-center bg-surface rounded-2xl border border-divider px-4" style={{ height: 46 }}>
           <Ionicons name="search" size={18} color="#94a3b8" />
           <TextInput
@@ -193,27 +196,6 @@ export default function ProductsListScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-      </View>
-
-      {/* Collection Filter - Horizontal Scroll */}
-      <View className="pb-2" style={{ maxHeight: 44 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-5" contentContainerStyle={{ alignItems: 'center' }}>
-          <TouchableOpacity
-            onPress={() => setSelectedCategory('')}
-            className={`px-4 py-2 rounded-full mr-2 ${!selectedCategory ? 'bg-primary' : 'bg-surface border border-divider'}`}
-          >
-            <Text className={`text-xs font-bold ${!selectedCategory ? 'text-white' : 'text-text-secondary'}`}>{STRINGS.admin.products.filterAll}</Text>
-          </TouchableOpacity>
-          {(categories || []).map((cat, idx) => (
-            <TouchableOpacity
-              key={cat?.id || `admin-prod-cat-${idx}`}
-              onPress={() => setSelectedCategory(cat?.id || '')}
-              className={`px-4 py-2 rounded-full mr-2 ${selectedCategory === cat?.id ? 'bg-primary' : 'bg-surface border border-divider'}`}
-            >
-              <Text className={`text-xs font-bold ${selectedCategory === cat?.id ? 'text-white' : 'text-text-secondary'}`}>{cat?.category_name || cat?.name || STRINGS.admin.collections.title}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
       </View>
 
       {loading ? (
@@ -232,7 +214,7 @@ export default function ProductsListScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(true); }} colors={["#e11d48"]} tintColor="#e11d48" />
           }
           ListHeaderComponent={
-            search || selectedCategory ? (
+            search ? (
               <View className="pb-2 px-2">
                 <Text className="text-text-hint text-xs font-medium">
                   Showing {filteredCount} of {totalProducts} products
@@ -246,12 +228,12 @@ export default function ProductsListScreen() {
                 <Ionicons name="cube-outline" size={32} color="#e11d48" />
               </View>
               <Text className="text-text-secondary font-semibold text-base">
-                {search || selectedCategory ? 'No matches found' : 'No products yet'}
+                {search ? 'No matches found' : 'No products yet'}
               </Text>
               <Text className="text-text-hint text-sm mt-1">
-                {search || selectedCategory ? 'Try a different search or filter' : 'Add your first product to get started'}
+                {search ? 'Try a different search query' : 'Add your first product to get started'}
               </Text>
-              {!search && !selectedCategory && (
+              {!search && (
                 <TouchableOpacity
                   className="mt-5 bg-primary px-8 py-3.5 rounded-full shadow-sm shadow-primary/30"
                   onPress={() => router.push('/(admin)/(tabs)/add' as any)}
@@ -266,7 +248,8 @@ export default function ProductsListScreen() {
             const isOutOfStock = item.quantity <= 0;
             return (
               <TouchableOpacity
-                className="flex-1 bg-surface rounded-2xl mb-3 border border-divider overflow-hidden shadow-sm"
+                className="bg-surface rounded-2xl mb-3 border border-divider overflow-hidden shadow-sm"
+                style={{ width: cardWidth, maxWidth: cardWidth }}
                 activeOpacity={0.95}
                 onPress={() => router.push({ pathname: '/(admin)/(tabs)/product-detail/[id]', params: { id: item.id } })}
               >

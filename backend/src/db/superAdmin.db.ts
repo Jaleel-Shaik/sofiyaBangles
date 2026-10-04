@@ -75,20 +75,48 @@ export const fetchProductAnalyticsRawDataDb = async (
  * Pure Database Operation: Fetch SuperAdmin notifications.
  */
 export const getSuperAdminNotificationsDb = async (
-  userId?: string
+  userId?: string,
+  role?: string
 ): Promise<Notification[]> => {
   const snapshot = await db.collection("notifications").get();
   const rawNotifs = snapshot.docs.map((doc) => ({ ...(doc.data() as Notification), id: doc.id }));
 
-  const filtered = rawNotifs.filter(
-    (n) =>
+  const isSuperAdmin = role === "super_admin";
+
+  const filtered = rawNotifs.filter((n) => {
+    // 1. Exclude notifications dismissed by this specific user
+    if (userId && Array.isArray(n.dismissed_by) && n.dismissed_by.includes(userId)) {
+      return false;
+    }
+
+    // 2. Strict Super-Admin only check:
+    // If targeted at all_superadmins, only super_admin can see it
+    if (n.user_id === "all_superadmins" && !isSuperAdmin) {
+      return false;
+    }
+    const typeUpper = (n.type || "").toUpperCase();
+    if (
+      (typeUpper === "AUDIT_ALERT" ||
+        typeUpper === "SECURITY_ALERT" ||
+        typeUpper === "SYSTEM_SECURITY" ||
+        typeUpper === "ROLE_CHANGE" ||
+        typeUpper === "2FA_RESET") &&
+      !isSuperAdmin
+    ) {
+      return false;
+    }
+
+    // 3. User target checks:
+    const matchesTarget =
       !n.user_id ||
       n.user_id === null ||
       n.user_id === "all" ||
-      n.user_id === "all_superadmins" ||
       n.user_id === "all_admins" ||
-      (userId && n.user_id === userId)
-  );
+      (isSuperAdmin && n.user_id === "all_superadmins") ||
+      (userId && n.user_id === userId);
+
+    return matchesTarget;
+  });
   filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Strict deduplication

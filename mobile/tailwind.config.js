@@ -10,25 +10,60 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Brand Identity
+        // Brand Identity (Standardized from theme/tokens.ts)
+        brand: {
+          primary: '#e11d48',
+          primaryLight: '#FFF0F3',
+          primaryDark: '#be123c',
+          secondary: '#6366f1',
+          secondaryLight: '#e0e7ff',
+          accent: '#D4AF37',
+        },
         primary: {
-          DEFAULT: '#e11d48', // Standardized rose primary
+          DEFAULT: '#e11d48',
           light: '#FFF0F3',
           dark: '#be123c',
         },
         secondary: {
-          DEFAULT: '#6366f1', // Indigo accent
+          DEFAULT: '#6366f1',
           light: '#e0e7ff',
         },
         accent: {
-          DEFAULT: '#D4AF37', // Gold accent
+          DEFAULT: '#D4AF37',
         },
+
         // Surface & Backgrounds
-        background: '#F8FAFC', // Slate 50/100ish for main bg
-        surface: '#FFFFFF',
+        background: '#F8FAFC',
+        surface: {
+          DEFAULT: '#FFFFFF',
+          primary: '#FFFFFF',
+          secondary: '#F8FAFC',
+          muted: '#F1F5F9',
+          overlay: 'rgba(0, 0, 0, 0.45)',
+        },
         card: '#FFFFFF',
+
+        // Borders & Dividers
+        border: {
+          DEFAULT: '#f1f5f9',
+          default: '#f1f5f9',
+          subtle: '#e2e8f0',
+          strong: '#cbd5e1',
+          brand: '#fecdd3',
+        },
+        divider: '#f1f5f9',
         
-        // Semantics
+        // Semantic Status
+        status: {
+          success: '#10b981',
+          successLight: '#ecfdf5',
+          warning: '#f59e0b',
+          warningLight: '#fffbeb',
+          error: '#ef4444',
+          errorLight: '#fef2f2',
+          info: '#3b82f6',
+          infoLight: '#eff6ff',
+        },
         success: {
           DEFAULT: '#10b981',
           light: '#ecfdf5',
@@ -46,13 +81,16 @@ module.exports = {
           light: '#eff6ff',
         },
 
-        // Text & Icons
+        // Content & Typography
         text: {
-          primary: '#0f172a', // Slate 900
-          secondary: '#64748b', // Slate 500
-          hint: '#94a3b8', // Slate 400
+          primary: '#0f172a', // Slate 900 (High contrast)
+          secondary: '#64748b', // Slate 500 (Medium contrast)
+          hint: '#94a3b8', // Slate 400 (Low contrast/placeholders)
+          muted: '#94a3b8',
+          inverse: '#FFFFFF',
+          brand: '#e11d48',
+          price: '#C25B3E', // Terracotta warm gold/red for price
         },
-        divider: '#f1f5f9', // Slate 100
       },
       fontSize: {
         // Design Constitution Semantic Typography Ramp

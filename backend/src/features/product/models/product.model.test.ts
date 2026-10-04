@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateReviewStats, deleteProductModel, restoreProductModel } from './product.model';
-import { createProductService, lookupProductByCodeOrIdService, sellProductService, notifyStockIncreaseService } from '../services/product.service';
+import { createProductService, lookupProductByCodeOrIdService, sellProductService, notifyStockIncreaseService, syncProductStockNotificationService } from '../services/product.service';
 import { createProductSchema } from '../validations/product.validation';
 import { db } from '../../../shared/config/firebase';
 import { getProductByCodeOrIdDb } from '../../../db/product.db';
@@ -363,6 +363,52 @@ test('Product Model Setup and Lifecycle', async (t) => {
 
     // Cleanup
     for (const d of notifSnapAfter.docs) {
+      await db.collection("notifications").doc(d.id).delete();
+    }
+  });
+
+  await t.test('Stock synchronization handles stock decrease to limited, out of stock, and subsequent increase', async () => {
+    try {
+      await db.collection("model_types").limit(1).get();
+    } catch (err: any) {
+      if (err?.code === 7 || err?.message?.includes("ENOTFOUND")) {
+        console.log("Skipping stock sync notification test: Firestore offline/unreachable");
+        return;
+      }
+      throw err;
+    }
+
+    const testProd: any = {
+      id: "test-stock-edge-" + Date.now(),
+      product_name: "Kundan Bangle Set",
+      price: 499,
+      quantity: 20,
+      status: "active",
+    };
+
+    // 1. Decrease to limited stock (e.g. from 20 to 3)
+    await syncProductStockNotificationService(testProd, 20, 3, "admin-tester");
+    const snap1 = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.equal(snap1.empty, false, "Notification should exist for limited stock");
+    const notif1 = snap1.docs[0].data();
+    assert.ok(notif1.title.includes("Limited Stock"));
+
+    // 2. Decrease to out of stock (e.g. from 3 to 0)
+    await syncProductStockNotificationService(testProd, 3, 0, "admin-tester");
+    const snap2 = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.ok(snap2.docs.length >= 1, "Notification docs should exist after decrease to 0");
+    const notif2 = snap2.docs.find((d) => d.data().user_id === null)?.data() || snap2.docs[0].data();
+    assert.ok(notif2.title.includes("Out of Stock"));
+
+    // 3. Later increase from 0 back to 10 (back in stock)
+    await syncProductStockNotificationService(testProd, 0, 10, "admin-tester");
+    const snap3 = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.ok(snap3.docs.length >= 1, "Notification docs should exist after restock");
+    const notif3 = snap3.docs.find((d) => d.data().user_id === null)?.data() || snap3.docs[0].data();
+    assert.ok(notif3.title.includes("Back in Stock"));
+
+    // Cleanup
+    for (const d of snap3.docs) {
       await db.collection("notifications").doc(d.id).delete();
     }
   });

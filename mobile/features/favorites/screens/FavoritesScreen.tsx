@@ -92,14 +92,14 @@ export default function FavoritesScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#FAFAFA]">
+      <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator size="large" color="#e11d48" />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-[#FAFAFA]">
+    <View className="flex-1 bg-background">
       <Header title={STRINGS.favorites.title} showBack={false} />
 
       {/* Category Pills */}
