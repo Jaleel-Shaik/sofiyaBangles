@@ -30,3 +30,14 @@ export const generalApiLimiter = rateLimit({
     next(new RateLimitError("API rate limit exceeded. Please slow down."));
   },
 });
+
+export const purchaseRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // Max 10 purchase / WhatsApp requests per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, _res, next) => {
+    next(new RateLimitError("Too many purchase requests. Please wait a moment before trying again."));
+  },
+});
+

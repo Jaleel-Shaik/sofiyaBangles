@@ -272,6 +272,9 @@ export interface Order {
   refunded_at?: string | null;
   refund_reason?: string | null;
   notes?: string | null;
+  customer_name?: string;
+  customer_phone?: string;
+  order_source?: string;
   items?: OrderItem[];
   created_at: string;
   updated_at: string;
@@ -285,14 +288,20 @@ export interface OrderItem {
   category_id?: string;
   category_name_snapshot?: string;
   product_name_snapshot: string;
+  product_name?: string;
+  productNameSnapshot?: string;
   sku_snapshot?: string | null;
   size_snapshot?: string | null;
   price_snapshot: number;
+  unit_price?: number;
+  itemPrice?: number;
   quantity: number;
   subtotal: number;
   discount?: number;
   final_unit_price?: number;
   final_amount?: number;
+  image_url?: string | null;
+  status?: string;
   created_at: string;
 }
 
@@ -453,9 +462,23 @@ export interface Review {
   id: string;
   user_id: string;
   product_id: string;
-  rating: number;
-  comment: string | null;
-  damage_details: string | null;
+  order_id?: string | null;
+  order_item_id?: string | null;
+  order_number?: string | null;
+  unique_code?: string | null;
+  product_code?: string | null;
+  rating: number; // 1 to 5 stars (Product Quality)
+  suggestion?: string | null; // Any suggestions for improvement
+  comment: string | null; // Review comments
+  is_defective?: boolean; // Damage or defective flag
+  damage_details: string | null; // Damage / defect details
+  // Customer personal details (stored for admin view, omitted from public view for privacy)
+  user_name?: string;
+  user_email?: string;
+  user_phone?: string;
+  // Product info snapshot
+  product_name?: string;
+  product_image?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -482,6 +505,16 @@ export interface Notification {
   user_id: string | null;
   is_read: boolean;
   created_at: string;
+  image_url?: string | null;
+  order_id?: string | null;
+  order_number?: string | null;
+  link_url?: string | null;
+  dismissed_by?: string[] | null;
+  read_by?: string[] | null;
+  message?: string | null;
+  unique_code?: string | null;
+  priority?: string | null;
+  category?: string | null;
 }
 
 export interface AuditLog {

@@ -14,12 +14,13 @@ import {
   getNewArrivals,
   lookupProduct,
   sellProductByCode,
+  getSecureProductImage,
 } from "../controllers/product.controller";
 import { authenticate, optionalAuthenticate } from "../../../shared/middlewares/auth.middleware";
 import { requireRole } from "../../../shared/middlewares/role.middleware";
 import { upload } from "../../../shared/middlewares/upload.middleware";
 import { validate } from "../../../shared/middlewares/validate.middleware";
-import { createProductSchema, updateProductSchema, sellProductByCodeSchema } from "../validations/product.validation";
+import { createProductSchema, updateProductSchema, updateStockSchema, sellProductByCodeSchema } from "../validations/product.validation";
 
 const router = Router();
 
@@ -63,6 +64,7 @@ router.patch(
   "/:id/stock",
   authenticate,
   requireRole("admin", "super_admin"),
+  validate(updateStockSchema),
   updateStock,
 );
 router.patch(
@@ -88,6 +90,20 @@ router.delete(
   authenticate,
   requireRole("admin", "super_admin"),
   deleteProduct,
+);
+
+// Token-based secure product image endpoint for Admin Portal
+router.get(
+  "/:id/secure-image",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  getSecureProductImage
+);
+router.get(
+  "/:id/secure-image/:imageIndex",
+  authenticate,
+  requireRole("admin", "super_admin"),
+  getSecureProductImage
 );
 
 // Customer routes (publicly browsable with optional personalization)

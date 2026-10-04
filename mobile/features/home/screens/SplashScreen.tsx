@@ -5,7 +5,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "@/src/store/authStore";
-import { useSizeStore } from "@/src/store/sizeStore";
 import { getDashboardHref } from "@/src/utils/navigation";
 import { initApiClientConfig } from "@/src/api/config";
 
@@ -13,7 +12,6 @@ export default function SplashScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isLoading, token, user } = useAuthStore();
-  const { fetchPreferences } = useSizeStore();
   
   const progressAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -63,14 +61,6 @@ export default function SplashScreen() {
   useEffect(() => {
     if (!ready) return;
     
-    // Only fetch size preferences if logged in as regular customer (role === 'user')
-    if (token && user && user.role === 'user') {
-      try {
-        fetchPreferences();
-      } catch (e) {
-        console.warn("Initial size preference fetch error:", e);
-      }
-    }
     
     // Fade out animation
     Animated.timing(fadeAnim, {

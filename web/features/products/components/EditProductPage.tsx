@@ -49,9 +49,34 @@ export default function EditProductPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const initialCategoryIdRef = useRef("");
 
+  const sanitizeUrl = (val: unknown): string => {
+    if (!val) return "";
+    let s = typeof val === "string" ? val.trim() : (typeof val === "object" && val !== null && "image_url" in val ? String((val as any).image_url).trim() : "");
+    while (
+      (s.startsWith("[") && s.endsWith("]")) ||
+      (s.startsWith('"') && s.endsWith('"')) ||
+      (s.startsWith("'") && s.endsWith("'"))
+    ) {
+      if (s.startsWith("[") && s.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(s);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            s = typeof parsed[0] === "string" ? parsed[0].trim() : String(parsed[0]);
+            continue;
+          }
+        } catch {
+          s = s.slice(1, -1).trim();
+        }
+      } else {
+        s = s.slice(1, -1).trim();
+      }
+    }
+    return s.replace(/^[\\"'`]+|[\\"'`]+$/g, "").trim();
+  };
+
   useEffect(() => {
     Promise.all([api.admin.getProductById(id), api.admin.getModelTypes()])
-      .then(([product, mts]) => {
+      .then(async ([product, mts]) => {
         setModelTypes(mts);
         if (product) {
           initialCategoryIdRef.current = product.category_id || "";
@@ -61,12 +86,28 @@ export default function EditProductPage() {
             price: String(product.price || ""),
             quantity: String(product.quantity || "0"),
             category_id: product.category_id || "",
-            unique_code: product.unique_code || "",
+            unique_code: (product.unique_code || "").replace(/^#+/, "").trim().toUpperCase(),
             status: product.status || (product.is_active !== false ? "active" : "draft"),
           });
-          setSelectedModelType(product.model_type_id || "");
-          if (product.images?.length) setExistingImages(product.images.map((img) => typeof img === 'string' ? img : img.image_url));
-          else if (product.image_url) setExistingImages([product.image_url]);
+
+          let effectiveModelId = product.model_type_id || "";
+          if (!effectiveModelId && product.category_id) {
+            try {
+              const allCats = await api.admin.getCategories();
+              const foundCat = allCats.find(c => c.id === product.category_id);
+              if (foundCat?.model_type_id) {
+                effectiveModelId = foundCat.model_type_id;
+              }
+            } catch {
+              // fallback
+            }
+          }
+          setSelectedModelType(effectiveModelId);
+
+          const rawImgs = product.images?.length
+            ? product.images.map(sanitizeUrl).filter(Boolean)
+            : (product.image_url ? [sanitizeUrl(product.image_url)].filter(Boolean) : []);
+          setExistingImages(rawImgs);
           if (product.variants?.length) {
             setHasVariants(true);
             setVariants(product.variants.map((v, idx) => ({
@@ -97,40 +138,6 @@ export default function EditProductPage() {
   const filteredCategories = categories;
   const currentCategory = useMemo(() => categories.find(c => c.id === form.category_id), [categories, form.category_id]);
 
-  useEffect(() => {
-    if (!currentCategory) {
-      setHasVariants(false);
-      setVariants([]);
-      setAcceptsCustomSize(false);
-      return;
-    }
-    
-    // Only update variants if category_id has actually changed from initial load
-    if (form.category_id !== initialCategoryIdRef.current) {
-      if (currentCategory.size_type === "standard" || currentCategory.size_type === "both") {
-        setHasVariants(true);
-        if (currentCategory.standard_sizes) {
-          setVariants(currentCategory.standard_sizes.map(sz => ({
-            id: `v-${sz.replace(/\s+/g, "_")}`,
-            size: sz,
-            price: form.price || "0",
-            quantity: form.quantity || "0",
-          })));
-        }
-      } else {
-        setHasVariants(false);
-        setVariants([]);
-      }
-      
-      if (currentCategory.size_type === "custom" || currentCategory.size_type === "both") {
-        setAcceptsCustomSize(true);
-        setCustomSizePrice(form.price);
-      } else {
-        setAcceptsCustomSize(false);
-      }
-    }
-  }, [form.category_id, currentCategory, form.price]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
@@ -139,13 +146,9 @@ export default function EditProductPage() {
     if (!form.product_name.trim()) newErrors.product_name = "Product name is required";
     if (!form.price) newErrors.price = "Price is required";
     else if (parseFloat(form.price) <= 0) newErrors.price = "Price must be a positive number";
-    if (!selectedModelType) newErrors.model_type_id = "Model Type is required";
+    if (!selectedModelType && !currentCategory?.model_type_id) newErrors.model_type_id = "Model Type is required";
     if (!form.category_id) newErrors.category_id = "Category is required";
     if (existingImages.length === 0 && newImageFiles.length === 0) newErrors.images = "Please select at least one image";
-
-    if (hasVariants && variants.length === 0) {
-      newErrors.variants = "Please add at least one size variant or disable sizes";
-    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -163,34 +166,29 @@ export default function EditProductPage() {
       formData.append("price", String(parseFloat(form.price)));
       formData.append("description", form.description);
       formData.append("category_id", form.category_id);
-      if (selectedModelType) formData.append("model_type_id", selectedModelType);
+      const finalModelTypeId = selectedModelType || currentCategory?.model_type_id || "";
+      if (finalModelTypeId) formData.append("model_type_id", finalModelTypeId);
+      if (currentCategory?.category_name) formData.append("categoryName", currentCategory.category_name);
       
-      const totalQuantity = hasVariants 
-        ? variants.reduce((sum, v) => sum + (parseInt(v.quantity) || 0), 0)
-        : (parseInt(form.quantity) || 0);
+      const totalQuantity = parseInt(form.quantity) || 0;
 
       formData.append("quantity", String(totalQuantity));
       formData.append("status", form.status);
       formData.append("is_active", form.status === "active" || form.status === "out_of_stock" ? "true" : "false");
-      if (form.unique_code) formData.append("unique_code", form.unique_code);
-      formData.append("has_variants", String(hasVariants));
-      formData.append("accepts_custom_size", String(acceptsCustomSize));
-      
-      if (hasVariants && variants.length > 0) {
-        formData.append("variants", JSON.stringify(variants.map(v => ({
-          id: v.id, size: v.size, price: parseFloat(v.price) || parseFloat(form.price) || 0, quantity: parseInt(v.quantity) || 0,
-        }))));
+      if (form.unique_code) {
+        formData.append("unique_code", form.unique_code.replace(/^#+/, "").trim().toUpperCase());
       }
+      formData.append("has_variants", "false");
+      formData.append("accepts_custom_size", "false");
       
-      if (acceptsCustomSize) {
-        formData.append("custom_size_price", String(parseFloat(customSizePrice) || parseFloat(form.price)));
+      const cleanExisting = existingImages.map(sanitizeUrl).filter((url) => Boolean(url && url.startsWith("http")));
+      if (cleanExisting.length > 0) {
+        formData.append("existing_images", JSON.stringify(cleanExisting));
       }
-      
-      if (existingImages.length > 0) formData.append("existing_images", JSON.stringify(existingImages));
       newImageFiles.forEach(file => formData.append("images", file));
       
       await api.admin.updateProductDirect(id, formData);
-      toast.success("Product updated");
+      toast.success("Product updated successfully");
       router.push("/dashboard/products");
     } catch (e: any) {
       toast.error(e.message || "Failed to update product");
@@ -223,7 +221,7 @@ export default function EditProductPage() {
             {STRINGS.products.editProduct}
           </h1>
           <p className="text-xs font-semibold text-slate-400 mt-0.5">
-            Update product details, sizing models, and catalog inventory
+            Update product details and catalog inventory
           </p>
         </div>
       </div>
@@ -258,23 +256,6 @@ export default function EditProductPage() {
           setForm={setForm}
           errors={errors}
           setErrors={setErrors}
-        />
-
-        <ProductVariants
-          form={form}
-          setForm={setForm}
-          hasVariants={hasVariants}
-          setHasVariants={setHasVariants}
-          variants={variants}
-          setVariants={setVariants}
-          currentCategory={currentCategory}
-          customSizeName={customSizeName}
-          setCustomSizeName={setCustomSizeName}
-          acceptsCustomSize={acceptsCustomSize}
-          setAcceptsCustomSize={setAcceptsCustomSize}
-          customSizePrice={customSizePrice}
-          setCustomSizePrice={setCustomSizePrice}
-          errors={errors}
         />
 
         <div className="flex justify-end gap-3 pt-2">

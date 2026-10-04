@@ -79,3 +79,16 @@ export const isFavoritedDb = async (
 
   return !snapshot.empty;
 };
+
+/**
+ * Pure Database Operation: Get all favorites for a specific product.
+ */
+export const getProductFavoritesDb = async (productId: string): Promise<Favorite[]> => {
+  const snapshot = await db
+    .collection("favorites")
+    .where("product_id", "==", productId)
+    .get();
+
+  return snapshot.docs.map((doc) => doc.data() as Favorite);
+};
+

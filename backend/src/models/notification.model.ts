@@ -2,12 +2,12 @@ import { Notification } from "../shared/types";
 
 export { Notification };
 
-export type NotificationType = "new_arrival" | "announcement" | "order_status" | "system";
+export type NotificationType = "new_arrival" | "announcement" | "order_status" | "system" | "stock_update";
 
 export const NOTIFICATION_CONSTRAINTS = {
   MAX_TITLE_LENGTH: 200,
   MAX_BODY_LENGTH: 1000,
-  ALLOWED_TYPES: ["new_arrival", "announcement", "order_status", "system"] as const,
+  ALLOWED_TYPES: ["new_arrival", "announcement", "order_status", "system", "stock_update"] as const,
 } as const;
 
 export function validateNotificationData(data: { title: string; body?: string | null }): { isValid: boolean; error?: string } {

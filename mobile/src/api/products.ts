@@ -27,6 +27,7 @@ export interface Product {
   image_url: string;
   images?: string[];
   category_id: string;
+  category_name?: string;
   quantity: number;
   likes?: number;
   rating?: number;
@@ -44,34 +45,144 @@ export interface Product {
   updated_at?: string;
 }
 
-const sanitizeProduct = (p: any): Product => ({
-  ...p,
-  id: String(p?.id || ''),
-  unique_code: p?.unique_code || '',
-  product_name: p?.product_name || 'Bangle',
-  description: p?.description || '',
-  price: typeof p?.price === 'number' ? p.price : Number(p?.price) || 0,
-  image_url: p?.image_url || '',
-  images: Array.isArray(p?.images) ? p.images : (p?.image_url ? [p.image_url] : []),
-  category_id: p?.category_id || '',
-  quantity: typeof p?.quantity === 'number' ? p.quantity : Number(p?.quantity) || 0,
-  is_active: p?.is_active !== false,
-  has_variants: Boolean(p?.has_variants),
-  variants: Array.isArray(p?.variants) ? p.variants : [],
-  accepts_custom_size: Boolean(p?.accepts_custom_size),
-  model_type_id: p?.model_type_id || '',
-});
+function trimSurroundingQuotes(str: string): string {
+  let s = str.trim();
+  let start = 0;
+  while (start < s.length && (s[start] === '"' || s[start] === "'" || s[start] === '`' || s[start] === '\\')) {
+    start++;
+  }
+  let end = s.length;
+  while (end > start && (s[end - 1] === '"' || s[end - 1] === "'" || s[end - 1] === '`' || s[end - 1] === '\\')) {
+    end--;
+  }
+  return s.substring(start, end).trim();
+}
+
+export const unwrapCleanImageUrl = (raw: unknown): string => {
+  if (!raw) return '';
+  if (typeof raw !== 'string') {
+    if (typeof raw === 'object' && 'image_url' in (raw as object)) {
+      return unwrapCleanImageUrl((raw as any).image_url);
+    }
+    return '';
+  }
+  let s = raw.trim();
+  while (
+    (s.startsWith('[') && s.endsWith(']')) ||
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    if (s.startsWith('[') && s.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          s = typeof parsed[0] === 'string' ? parsed[0].trim() : String(parsed[0]);
+          continue;
+        }
+      } catch {
+        s = s.slice(1, -1).trim();
+      }
+    } else {
+      s = s.slice(1, -1).trim();
+    }
+  }
+  return trimSurroundingQuotes(s);
+};
+
+const sanitizeProduct = (p: any): Product => {
+  const cleanCover = unwrapCleanImageUrl(p?.image_url);
+  const rawImages = Array.isArray(p?.images) ? p.images : (cleanCover ? [cleanCover] : []);
+  const images: string[] = [];
+
+  for (const item of rawImages) {
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((x) => {
+              const u = unwrapCleanImageUrl(x);
+              if (u) images.push(u);
+            });
+            continue;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      const u = unwrapCleanImageUrl(trimmed);
+      if (u) images.push(u);
+    } else if (item && typeof item === 'object') {
+      const u = unwrapCleanImageUrl(item?.image_url || item?.url);
+      if (u) images.push(u);
+    }
+  }
+
+  const finalCover = cleanCover || (images.length > 0 ? images[0] : '');
+
+  return {
+    ...p,
+    id: String(p?.id || ''),
+    unique_code: (p?.unique_code || '').replace(/^#+/, '').trim().toUpperCase(),
+    product_name: p?.product_name || 'Bangle',
+    description: p?.description || '',
+    price: typeof p?.price === 'number' ? p.price : Number(p?.price) || 0,
+    image_url: finalCover,
+    images: images.length > 0 ? images : (finalCover ? [finalCover] : []),
+    category_id: p?.category_id || '',
+    category_name: p?.category_name || '',
+    quantity: typeof p?.quantity === 'number' ? p.quantity : Number(p?.quantity) || 0,
+    is_active: p?.is_active !== false,
+    has_variants: Boolean(p?.has_variants),
+    variants: Array.isArray(p?.variants) ? p.variants : [],
+    accepts_custom_size: Boolean(p?.accepts_custom_size),
+    model_type_id: p?.model_type_id || '',
+  };
+};
+
+export interface ProductFilterParams {
+  page?: number;
+  limit?: number;
+  categoryId?: string;
+  modelTypeId?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  inStock?: boolean;
+  search?: string;
+  sort?: 'newest' | 'rating';
+}
 
 export const getProducts = async (
-  page = 1,
-  limit = 10,
-  categoryId?: string,
-  search?: string
+  pageOrParams: number | ProductFilterParams = 1,
+  limitParam = 10,
+  categoryIdParam?: string,
+  searchParam?: string
 ): Promise<{ products: Product[]; total: number }> => {
   try {
+    let params: ProductFilterParams = {};
+    if (typeof pageOrParams === 'object' && pageOrParams !== null) {
+      params = pageOrParams;
+    } else {
+      params = {
+        page: pageOrParams,
+        limit: limitParam,
+        categoryId: categoryIdParam,
+        search: searchParam,
+      };
+    }
+
+    const page = params.page || 1;
+    const limit = params.limit || 10;
     let url = `${API_ENDPOINTS.PRODUCTS.BASE}?page=${page}&limit=${limit}`;
-    if (categoryId) url += `&category_id=${encodeURIComponent(categoryId)}`;
-    if (search && search.trim()) url += `&search=${encodeURIComponent(search.trim())}`;
+
+    if (params.categoryId) url += `&category_id=${encodeURIComponent(params.categoryId)}`;
+    if (params.modelTypeId) url += `&model_type_id=${encodeURIComponent(params.modelTypeId)}`;
+    if (params.minPrice !== undefined && !isNaN(params.minPrice)) url += `&min_price=${params.minPrice}`;
+    if (params.maxPrice !== undefined && !isNaN(params.maxPrice)) url += `&max_price=${params.maxPrice}`;
+    if (params.inStock) url += `&in_stock=true`;
+    if (params.sort) url += `&sort=${encodeURIComponent(params.sort)}`;
+    if (params.search && params.search.trim()) url += `&search=${encodeURIComponent(params.search.trim())}`;
 
     const res = await apiClient.get(url);
     const rawData = res.data?.data ?? res.data?.products ?? (Array.isArray(res.data) ? res.data : []);

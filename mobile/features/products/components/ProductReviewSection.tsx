@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { AppIcon } from "@/src/constants/icons";
 import { STRINGS } from "@/src/constants/strings";
+import { StarRating } from "@/src/components/StarRating";
 
 interface ProductReviewSectionProps {
   reviews: any[];
@@ -39,31 +40,80 @@ export function ProductReviewSection({
           <Text className="text-xs text-text-secondary">{STRINGS.productDetail.reviewCount(safeReviews.length)}</Text>
         </View>
         {safeReviews.length > 0 ? (
-          safeReviews.slice(0, 3).map((review) => (
-            <View
-              key={review.id || `review-${Math.random()}`}
-              className="mb-3 rounded-2xl bg-white p-3 border border-divider"
-            >
-              <View className="flex-row items-center mb-1">
-                {Array.from({ length: Math.max(0, Math.min(5, Math.floor(Number(review.rating) || 0))) }).map((_, index) => (
-                  <AppIcon
-                    key={index}
-                    name="star"
-                    size={14}
-                    color="#f59e0b"
-                  />
-                ))}
+          safeReviews.map((review) => {
+            const reviewerName = review.user_name || "Verified Buyer";
+            const initial = reviewerName.charAt(0).toUpperCase() || "C";
+            const dateStr = review.created_at
+              ? new Date(review.created_at).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : null;
+
+            return (
+              <View
+                key={review.id || `review-${Math.random()}`}
+                className="mb-3.5 rounded-2xl bg-white p-4 border border-divider shadow-xs"
+              >
+                {/* Reviewer Header */}
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row items-center flex-1 pr-2">
+                    <View className="w-8 h-8 rounded-full bg-rose-100 items-center justify-center mr-2.5">
+                      <Text className="text-xs font-bold text-[#C1275A]">{initial}</Text>
+                    </View>
+                    <View className="flex-1">
+                      <View className="flex-row items-center gap-1.5 flex-wrap">
+                        <Text className="text-xs font-bold text-slate-900">{reviewerName}</Text>
+                        <View className="bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          <Text className="text-[9px] font-extrabold text-emerald-700">
+                            ✓ Verified Buyer
+                          </Text>
+                        </View>
+                      </View>
+                      {dateStr && (
+                        <Text className="text-[10px] text-slate-400 mt-0.5">{dateStr}</Text>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Star Rating */}
+                  <StarRating rating={review.rating || 5} badge size={13} />
+                </View>
+
+                {/* Review Comment */}
+                {review.comment ? (
+                  <Text className="text-xs text-slate-700 leading-5 mb-1.5">
+                    {review.comment}
+                  </Text>
+                ) : null}
+
+                {/* Customer Suggestion */}
+                {review.suggestion ? (
+                  <View className="mt-1 p-2 rounded-xl bg-blue-50/60 border border-blue-100 flex-row items-start">
+                    <Text className="text-[11px] text-blue-900 leading-4">
+                      <Text className="font-bold">💡 Suggestion: </Text>
+                      {review.suggestion}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Defect note if reported */}
+                {review.damage_details ? (
+                  <View className="mt-1 p-2 rounded-xl bg-amber-50/60 border border-amber-200 flex-row items-start">
+                    <Text className="text-[11px] text-amber-900 leading-4">
+                      <Text className="font-bold">⚠️ Condition Note: </Text>
+                      {review.damage_details}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-              {review.comment ? (
-                <Text className="text-sm text-text-secondary">{review.comment}</Text>
-              ) : null}
-              {review.damage_details ? (
-                <Text className="text-xs text-text-hint mt-1">{STRINGS.productDetail.damageNotePrefix}{review.damage_details}</Text>
-              ) : null}
-            </View>
-          ))
+            );
+          })
         ) : (
-          <Text className="text-sm text-text-secondary">{STRINGS.productDetail.noReviews}</Text>
+          <View className="py-4 items-center">
+            <Text className="text-sm text-text-secondary">{STRINGS.productDetail.noReviews}</Text>
+          </View>
         )}
       </View>
 

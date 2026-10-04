@@ -7,8 +7,13 @@ import {
   getAllUsersService,
   getUserByIdService,
   updateUserRoleService,
+  deleteUserAccountService,
 } from "../services/user.service";
 import { NotFoundError, BadRequestError } from "../../../core/errors/app.error";
+import {
+  findUserByPhoneModel,
+  createCustomerAccountModel,
+} from "../../../shared/models/identity.model";
 
 export const getUsers = asyncHandler(async (req: AuthRequest, res: Response) => {
   const page = getQuery(req, "page");
@@ -66,3 +71,71 @@ export const updateUserRole = asyncHandler(async (req: AuthRequest, res: Respons
     throw err;
   }
 });
+
+export const lookupUserByPhone = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const phone = getQuery(req, "phone") || getParam(req, "phone");
+  if (!phone || !phone.trim()) {
+    throw new BadRequestError("Phone number query parameter is required.");
+  }
+
+  const user = await findUserByPhoneModel(phone.trim());
+  if (!user) {
+    return sendSuccess(res, { found: false, user: null }, "Customer not found.");
+  }
+
+  const { password_hash: _, two_fa_secret: __, ...safeUser } = user;
+  return sendSuccess(res, { found: true, user: safeUser }, "Customer found successfully.");
+});
+
+export const createCustomerAccount = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { full_name, phone, email, password } = req.body;
+
+  // Check if customer already exists with this phone
+  const existingPhone = await findUserByPhoneModel(phone);
+  if (existingPhone) {
+    const { password_hash: _, two_fa_secret: __, ...safeUser } = existingPhone;
+    return sendSuccess(res, safeUser, "Customer account with this phone already exists.");
+  }
+
+  const customer = await createCustomerAccountModel({
+    full_name,
+    phone,
+    email,
+    password,
+  });
+
+  const { password_hash: _, two_fa_secret: __, ...safeCustomer } = customer;
+  return sendSuccess(res, safeCustomer, {
+    message: "Customer account created and authorized successfully.",
+    statusCode: 201,
+  });
+});
+
+export const deleteSelfAccount = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId;
+  try {
+    const result = await deleteUserAccountService(userId, userId);
+    return sendSuccess(res, result, "Your account has been deleted successfully.");
+  } catch (err: any) {
+    if (err.message === "USER_NOT_FOUND") throw new NotFoundError("User account not found.");
+    if (err.message === "CANNOT_DELETE_LAST_SUPER_ADMIN") {
+      throw new BadRequestError("Cannot delete the only remaining SuperAdmin account.");
+    }
+    throw err;
+  }
+});
+
+export const deleteUser = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
+  try {
+    const result = await deleteUserAccountService(id, req.user!.userId);
+    return sendSuccess(res, result, "User account deleted successfully.");
+  } catch (err: any) {
+    if (err.message === "USER_NOT_FOUND") throw new NotFoundError("User account not found.");
+    if (err.message === "CANNOT_DELETE_LAST_SUPER_ADMIN") {
+      throw new BadRequestError("Cannot delete the only remaining SuperAdmin account.");
+    }
+    throw err;
+  }
+});
+

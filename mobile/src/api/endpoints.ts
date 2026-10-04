@@ -25,6 +25,7 @@ export const API_ENDPOINTS = {
     LOOKUP_CODE: (code: string) => `/products/lookup/${encodeURIComponent(code)}`,
     SELL: (id: string) => `/products/${id}/sell`,
     SELL_BY_CODE: '/products/sell-by-code',
+    UPDATE_STOCK: (id: string) => `/products/${id}/stock`,
   },
   CATEGORIES: {
     BASE: '/categories',
@@ -44,20 +45,22 @@ export const API_ENDPOINTS = {
   USERS: {
     BASE: '/users',
     BY_ID: (id: string) => `/users/${id}`,
+    LOOKUP: (phone: string) => `/users/lookup?phone=${encodeURIComponent(phone)}`,
+    CUSTOMERS: '/users/customers',
+    DELETE_ME: '/users/me',
   },
   FAVORITES: {
     BASE: '/favorites',
     BY_ID: (productId: string) => `/favorites/${productId}`,
-  },
-  SIZE_PREFERENCES: {
-    BASE: '/size-preferences',
-    BY_ID: (id: string) => `/size-preferences/${id}`,
   },
   NOTIFICATIONS: {
     BASE: '/notifications',
     BROADCAST: '/notifications/broadcast',
     UNREAD_COUNT: '/notifications/unread-count',
     MARK_READ: (id: string) => `/notifications/${id}/read`,
+    MARK_ALL_READ: '/notifications/read-all',
+    CLEAR_ALL: '/notifications/clear-all',
+    BY_ID: (id: string) => `/notifications/${id}`,
   },
   ORDERS: {
     BASE: '/orders',
@@ -66,5 +69,12 @@ export const API_ENDPOINTS = {
     COMPLETE: (id: string) => `/orders/${id}/complete`,
     REFUND: (id: string) => `/orders/${id}/refund`,
     STATUS: (id: string) => `/orders/${id}/status`,
+  },
+  ADMIN_NOTIFICATIONS: {
+    BASE: '/super-admin/notifications',
+    MARK_READ: (id: string) => `/super-admin/notifications/${id}/read`,
+    MARK_ALL_READ: '/super-admin/notifications/read-all',
+    CLEAR_ALL: '/super-admin/notifications/clear-all',
+    BY_ID: (id: string) => `/super-admin/notifications/${id}`,
   }
 };

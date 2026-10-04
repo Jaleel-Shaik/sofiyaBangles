@@ -63,7 +63,16 @@ export const getProductByIdDb = async (id: string): Promise<Product | null> => {
  */
 export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product | null> => {
   if (!codeOrId || typeof codeOrId !== "string") return null;
-  const trimmed = codeOrId.trim();
+
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(codeOrId);
+  } catch {
+    decoded = codeOrId;
+  }
+
+  const trimmed = decoded.trim();
+  const unhashed = trimmed.replace(/^#+/, "").trim();
 
   // 1. Try finding by Firestore doc ID directly
   const doc = await db.collection("products").doc(trimmed).get();
@@ -71,28 +80,73 @@ export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product 
     return { ...doc.data(), id: doc.id } as Product;
   }
 
-  // 2. Query by unique_code (uppercased)
-  const codeUpper = trimmed.toUpperCase();
-  const snap = await db
+  if (unhashed && unhashed !== trimmed) {
+    const docUnhashed = await db.collection("products").doc(unhashed).get();
+    if (docUnhashed.exists) {
+      return { ...docUnhashed.data(), id: docUnhashed.id } as Product;
+    }
+  }
+
+  // 2. Query by unique_code (uppercased without #)
+  const unhashedUpper = unhashed.toUpperCase();
+  const snapUnhashed = await db
     .collection("products")
-    .where("unique_code", "==", codeUpper)
+    .where("unique_code", "==", unhashedUpper)
     .limit(1)
     .get();
 
-  if (!snap.empty) {
-    const matchedDoc = snap.docs[0];
+  if (!snapUnhashed.empty) {
+    const matchedDoc = snapUnhashed.docs[0];
     return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
   }
 
-  // 3. Fallback: query without uppercase transformation
-  if (trimmed !== codeUpper) {
+  // 3. Query by unique_code (uppercased raw)
+  const codeUpper = trimmed.toUpperCase();
+  if (codeUpper !== unhashedUpper) {
+    const snap = await db
+      .collection("products")
+      .where("unique_code", "==", codeUpper)
+      .limit(1)
+      .get();
+
+    if (!snap.empty) {
+      const matchedDoc = snap.docs[0];
+      return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
+    }
+  }
+
+  // 4. Fallback: query without uppercase transformation
+  if (unhashed !== unhashedUpper) {
     const snapRaw = await db
       .collection("products")
-      .where("unique_code", "==", trimmed)
+      .where("unique_code", "==", unhashed)
       .limit(1)
       .get();
     if (!snapRaw.empty) {
       const matchedDoc = snapRaw.docs[0];
+      return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
+    }
+  }
+
+  // 5. Fallback: Query by internal 'id' field
+  const snapById = await db
+    .collection("products")
+    .where("id", "==", trimmed)
+    .limit(1)
+    .get();
+  if (!snapById.empty) {
+    const matchedDoc = snapById.docs[0];
+    return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
+  }
+
+  if (unhashed !== trimmed) {
+    const snapByIdUnhashed = await db
+      .collection("products")
+      .where("id", "==", unhashed)
+      .limit(1)
+      .get();
+    if (!snapByIdUnhashed.empty) {
+      const matchedDoc = snapByIdUnhashed.docs[0];
       return { ...matchedDoc.data(), id: matchedDoc.id } as Product;
     }
   }
@@ -103,7 +157,7 @@ export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product 
 /**
  * Pure Database Operation: Retrieve all active product documents.
  */
-export const getActiveProductsDb = async (categoryId?: string): Promise<Product[]> => {
+export const getActiveProductsDb = async (categoryId?: string, modelTypeId?: string): Promise<Product[]> => {
   try {
     let query: FirebaseFirestore.Query = db
       .collection("products")
@@ -111,6 +165,9 @@ export const getActiveProductsDb = async (categoryId?: string): Promise<Product[
 
     if (categoryId) {
       query = query.where("category_id", "==", categoryId);
+    }
+    if (modelTypeId) {
+      query = query.where("model_type_id", "==", modelTypeId);
     }
 
     const snapshot = await query.get();
@@ -255,6 +312,38 @@ export const getVariantsByProductDb = async (productId: string): Promise<Product
 
   const variants = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as ProductVariant));
   return variants.filter((v) => v.status === "active" || v.status === "out_of_stock");
+};
+
+/**
+ * Pure Database Operation: Update a single variant document.
+ */
+export const updateVariantDocDb = async (
+  id: string,
+  data: Partial<ProductVariant>
+): Promise<void> => {
+  await db.collection("product_variants").doc(id).update({
+    ...data,
+    updated_at: new Date().toISOString(),
+  });
+};
+
+/**
+ * Pure Database Operation: Batch update multiple variants.
+ */
+export const updateVariantsBatchDb = async (
+  variants: Array<{ id: string; quantity: number; status?: 'active' | 'out_of_stock' }>
+): Promise<void> => {
+  if (variants.length === 0) return;
+  const batch = db.batch();
+  variants.forEach((v) => {
+    const ref = db.collection("product_variants").doc(v.id);
+    batch.update(ref, {
+      quantity: v.quantity,
+      status: v.status || (v.quantity > 0 ? "active" : "out_of_stock"),
+      updated_at: new Date().toISOString(),
+    });
+  });
+  await batch.commit();
 };
 
 /**

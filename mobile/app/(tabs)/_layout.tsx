@@ -21,7 +21,16 @@ export default function TabLayout() {
     if (!notifInit) {
       fetchNotifications();
     }
-  }, [favInit, notifInit, fetchFavorites, fetchNotifications]);
+
+    // Live background polling for new product arrivals & notifications (every 30s)
+    const interval = setInterval(() => {
+      if (token) {
+        fetchNotifications();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [favInit, notifInit, fetchFavorites, fetchNotifications, token]);
 
   if (isLoading) {
     return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
@@ -92,7 +101,7 @@ export default function TabLayout() {
             <View>
               <AppIcon name={focused ? "notifications" : "notificationsOutline"} size={26} color={color} />
               {unreadCount > 0 && (
-                <View className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+                <View className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full border-2 border-white" />
               )}
             </View>
           ),
@@ -105,13 +114,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <AppIcon name={focused ? "profile" : "profileOutline"} size={26} color={color} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="size-preferences"
-        options={{
-          href: null,
-          title: 'My Sizes',
         }}
       />
     </Tabs>

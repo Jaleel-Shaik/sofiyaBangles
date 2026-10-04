@@ -10,7 +10,6 @@ export interface User {
   phone?: string;
   avatar_url?: string;
   address?: string;
-  size_preference?: string;
   language?: string;
   is_2fa_enabled?: boolean;
 }

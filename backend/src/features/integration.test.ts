@@ -79,6 +79,28 @@ describe("Universal Backend Architecture & Client Integration Suite", () => {
     assert.ok(body.requestId);
   });
 
+  it("DELETE /api/users/me requires authentication and returns 401 envelope", async () => {
+    const res = await fetch(`${baseUrl}/api/users/me`, { method: "DELETE" });
+    const body = (await res.json()) as any;
+    assert.strictEqual(res.status, 401);
+    assert.strictEqual(body.success, false);
+    assert.strictEqual(body.error.code, "UNAUTHORIZED");
+    assert.ok(body.requestId);
+  });
+
+  it("POST /api/orders requires authentication and returns 401 envelope", async () => {
+    const res = await fetch(`${baseUrl}/api/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [] }),
+    });
+    const body = (await res.json()) as any;
+    assert.strictEqual(res.status, 401);
+    assert.strictEqual(body.success, false);
+    assert.strictEqual(body.error.code, "UNAUTHORIZED");
+    assert.ok(body.requestId);
+  });
+
   it("stops test server cleanly", async () => {
     if (server) {
       await new Promise<void>((resolve) => server.close(() => resolve()));

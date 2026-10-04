@@ -10,69 +10,179 @@ export interface StockDeductionItem {
 }
 
 /**
- * Pure Database Operation: Atomically save an order, its items, and deduct variant/product stocks.
+ * Pure Database Operation: Atomically save an order, its items, and deduct variant/product stocks
+ * inside a database transaction to prevent concurrency race conditions and negative inventory.
  */
 export const insertOrderWithItemsDb = async (
   order: Order,
   items: OrderItem[],
   stockDeductions: StockDeductionItem[]
 ): Promise<Order> => {
-  const batch = db.batch();
+  const sanitizeDoc = (obj: any) => {
+    const clean: any = {};
+    Object.keys(obj).forEach((k) => {
+      if (obj[k] !== undefined) clean[k] = obj[k];
+    });
+    return clean;
+  };
 
-  // 1. Order document
-  batch.set(db.collection("orders").doc(order.id), order);
+  await db.runTransaction(async (transaction) => {
+    // 1. Transactional Reads: Verify all stock availability before committing writes
+    const readDocs: Array<{
+      ref: FirebaseFirestore.DocumentReference;
+      currentQty: number;
+      deductQty: number;
+      id: string;
+      isVariant: boolean;
+    }> = [];
 
-  // 2. Order items documents
-  items.forEach((item) => {
-    batch.set(db.collection("order_items").doc(item.id), item);
-  });
+    for (const deduction of stockDeductions) {
+      const isVariant = deduction.type === "variant" || deduction.variantId !== undefined;
+      const targetId = deduction.id || (isVariant ? deduction.variantId : deduction.productId);
 
-  // 3. Stock deductions
-  const now = new Date().toISOString();
-  for (const deduction of stockDeductions) {
-    const isVariant = deduction.type === "variant" || deduction.variantId !== undefined;
-    const targetId = deduction.id || (isVariant ? deduction.variantId : deduction.productId);
+      if (targetId) {
+        const ref = isVariant
+          ? db.collection("product_variants").doc(targetId)
+          : db.collection("products").doc(targetId);
 
-    if (targetId) {
-      if (isVariant) {
-        const vRef = db.collection("product_variants").doc(targetId);
-        batch.update(vRef, {
-          quantity: FirebaseFirestore.FieldValue.increment(-deduction.quantity),
-          updated_at: now,
-        });
-      } else {
-        const pRef = db.collection("products").doc(targetId);
-        batch.update(pRef, {
-          quantity: FirebaseFirestore.FieldValue.increment(-deduction.quantity),
-          updated_at: now,
+        const snap = await transaction.get(ref);
+        if (!snap.exists) {
+          throw new Error(`ITEM_NOT_FOUND: Record ${targetId} was not found.`);
+        }
+        const currentQty = Number(snap.data()?.quantity) || 0;
+        if (currentQty < deduction.quantity) {
+          throw new Error(
+            `INSUFFICIENT_STOCK: Item only has ${currentQty} units available, cannot fulfill ${deduction.quantity}.`
+          );
+        }
+
+        readDocs.push({
+          ref,
+          currentQty,
+          deductQty: deduction.quantity,
+          id: targetId,
+          isVariant,
         });
       }
     }
-  }
 
-  await batch.commit();
+    // 2. Transactional Writes: Deduct stock and commit order + items
+    const now = new Date().toISOString();
+    for (const docInfo of readDocs) {
+      transaction.update(docInfo.ref, {
+        quantity: docInfo.currentQty - docInfo.deductQty,
+        updated_at: now,
+      });
+    }
+
+    // 3. Set order document
+    transaction.set(db.collection("orders").doc(order.id), sanitizeDoc(order));
+
+    // 4. Set order items documents
+    items.forEach((item) => {
+      transaction.set(db.collection("order_items").doc(item.id), sanitizeDoc(item));
+    });
+  });
+
   return order;
 };
 
+
 /**
- * Pure Database Operation: Retrieve order by ID.
+ * Pure Database Operation: Retrieve order by ID or Order Number.
  */
 export const getOrderByIdDb = async (id: string): Promise<Order | null> => {
-  const doc = await db.collection("orders").doc(id).get();
-  if (!doc.exists) return null;
-  return doc.data() as Order;
+  if (!id) return null;
+  const cleanId = id.trim();
+  const doc = await db.collection("orders").doc(cleanId).get();
+  if (doc.exists) return doc.data() as Order;
+
+  // Fallback: Check if the string passed is an order_number (e.g. ORD-123456 or #ORD-123456)
+  return await getOrderByOrderNumberDb(cleanId);
+};
+
+/**
+ * Pure Database Operation: Retrieve order by its unique order number (e.g. ORD-123456).
+ */
+export const getOrderByOrderNumberDb = async (orderNumber: string): Promise<Order | null> => {
+  if (!orderNumber) return null;
+  const clean = orderNumber.replace(/^#/, "").trim();
+
+  // Try exact match with stripped hash
+  let snapshot = await db
+    .collection("orders")
+    .where("order_number", "==", clean)
+    .limit(1)
+    .get();
+
+  if (!snapshot.empty) return snapshot.docs[0].data() as Order;
+
+  // Try match with leading hash
+  snapshot = await db
+    .collection("orders")
+    .where("order_number", "==", `#${clean}`)
+    .limit(1)
+    .get();
+
+  if (!snapshot.empty) return snapshot.docs[0].data() as Order;
+
+  return null;
 };
 
 /**
  * Pure Database Operation: Retrieve all orders for a user.
+ * Also searches by the customer's phone number to seamlessly claim/retrieve orders
+ * placed via WhatsApp or Unique ID Quick Sell.
  */
-export const getUserOrdersDb = async (userId: string): Promise<Order[]> => {
+export const getUserOrdersDb = async (userId: string, userPhone?: string | null): Promise<Order[]> => {
+  const ordersMap = new Map<string, Order>();
+
+  // 1. Fetch orders directly by user_id
   const snapshot = await db
     .collection("orders")
     .where("user_id", "==", userId)
     .get();
 
-  const orders = snapshot.docs.map((doc) => doc.data() as Order);
+  snapshot.docs.forEach((doc) => {
+    const data = doc.data() as Order;
+    ordersMap.set(data.id, data);
+  });
+
+  // 2. Fetch orders matching the customer's phone number if provided
+  if (userPhone && userPhone.trim()) {
+    const rawClean = userPhone.trim();
+    const digits = rawClean.replace(/\D/g, "");
+    const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+    const e164 = last10.length === 10 ? `91${last10}` : digits;
+    const plusE164 = `+${e164}`;
+
+    const candidates = Array.from(
+      new Set([rawClean, digits, last10, e164, plusE164, `+91${last10}`, `+91 ${last10}`])
+    ).filter(Boolean);
+
+    for (const cand of candidates) {
+      try {
+        const phoneSnap = await db
+          .collection("orders")
+          .where("customer_phone", "==", cand)
+          .get();
+
+        for (const doc of phoneSnap.docs) {
+          const data = doc.data() as Order;
+          // Claim order if not already claimed by this user
+          if (data.user_id !== userId) {
+            db.collection("orders").doc(doc.id).update({ user_id: userId, updated_at: new Date().toISOString() }).catch(() => {});
+            data.user_id = userId;
+          }
+          ordersMap.set(data.id, data);
+        }
+      } catch {
+        // Ignore single candidate lookup errors
+      }
+    }
+  }
+
+  const orders = Array.from(ordersMap.values());
   orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return orders;
 };
@@ -99,12 +209,23 @@ export const getAllAdminOrdersDb = async (options?: {
   let orders = snapshot.docs.map((doc) => doc.data() as Order);
 
   if (options?.search) {
-    const s = options.search.toLowerCase();
+    const s = options.search.toLowerCase().trim();
+    const cleanSearch = s.replace(/^#/, "");
     orders = orders.filter(
       (o) =>
-        (o.order_number && o.order_number.toLowerCase().includes(s)) ||
+        (o.id && (o.id.toLowerCase() === s || o.id.toLowerCase().includes(s))) ||
+        (o.order_number && (
+          o.order_number.toLowerCase().includes(s) ||
+          o.order_number.toLowerCase().replace(/^#/, "").includes(cleanSearch)
+        )) ||
+        (o.customer_name && o.customer_name.toLowerCase().includes(s)) ||
+        (o.customer_phone && o.customer_phone.toLowerCase().includes(s)) ||
         (o.shipping_address_snapshot?.name &&
-          o.shipping_address_snapshot.name.toLowerCase().includes(s))
+          o.shipping_address_snapshot.name.toLowerCase().includes(s)) ||
+        ((o.shipping_address_snapshot as any)?.full_name &&
+          (o.shipping_address_snapshot as any).full_name.toLowerCase().includes(s)) ||
+        (o.shipping_address_snapshot?.phone &&
+          o.shipping_address_snapshot.phone.toLowerCase().includes(s))
     );
   }
 
@@ -168,21 +289,72 @@ export const insertReviewDb = async (review: Review): Promise<Review> => {
 };
 
 /**
- * Pure Database Operation: Find completed order items for a user and product.
+ * Pure Database Operation: Retrieve all reviews for admin.
+ */
+export const getAllReviewsForAdminDb = async (): Promise<Review[]> => {
+  const snapshot = await db.collection("product_reviews").get();
+  const reviews = snapshot.docs.map((doc) => doc.data() as Review);
+  reviews.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return reviews;
+};
+
+/**
+ * Pure Database Operation: Mark an order item as reviewed.
+ */
+export const markOrderItemReviewedDb = async (
+  orderId: string | null | undefined,
+  productId: string,
+  reviewId: string
+): Promise<void> => {
+  let query: FirebaseFirestore.Query = db.collection("order_items").where("product_id", "==", productId);
+  if (orderId) {
+    query = query.where("order_id", "==", orderId);
+  }
+  const snapshot = await query.limit(1).get();
+  if (!snapshot.empty) {
+    await snapshot.docs[0].ref.update({
+      is_reviewed: true,
+      review_id: reviewId,
+      updated_at: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Pure Database Operation: Find purchased order items for a user and product.
+ * Permits rating for any non-cancelled order placed by the user.
  */
 export const findUserOrderItemsForProductDb = async (
   userId: string,
-  productId: string
+  productId: string,
+  orderId?: string | null
 ): Promise<OrderItem[]> => {
-  const ordersSnap = await db
-    .collection("orders")
-    .where("user_id", "==", userId)
-    .where("status", "==", "completed")
-    .get();
+  let ordersSnap: FirebaseFirestore.QuerySnapshot;
+  if (orderId) {
+    const singleOrderDoc = await db.collection("orders").doc(orderId).get();
+    if (!singleOrderDoc.exists) return [];
+    const data = singleOrderDoc.data();
+    if (data?.user_id !== userId || data?.status === "cancelled") return [];
+    ordersSnap = {
+      empty: false,
+      docs: [singleOrderDoc],
+    } as any;
+  } else {
+    ordersSnap = await db
+      .collection("orders")
+      .where("user_id", "==", userId)
+      .get();
+  }
 
   if (ordersSnap.empty) return [];
 
-  const completedOrderIds = ordersSnap.docs.map((d) => d.id);
+  // Valid orders are those not cancelled
+  const validOrderIds = ordersSnap.docs
+    .filter((d) => d.data().status !== "cancelled")
+    .map((d) => d.id);
+
+  if (validOrderIds.length === 0) return [];
+
   const itemsSnap = await db
     .collection("order_items")
     .where("product_id", "==", productId)
@@ -190,5 +362,26 @@ export const findUserOrderItemsForProductDb = async (
 
   return itemsSnap.docs
     .map((d) => d.data() as OrderItem)
-    .filter((i) => completedOrderIds.includes(i.order_id));
+    .filter((i) => validOrderIds.includes(i.order_id));
+};
+
+/**
+ * Pure Database Operation: Delete an order and its items and revenue entries atomically.
+ */
+export const deleteOrderDb = async (orderId: string): Promise<void> => {
+  const batch = db.batch();
+
+  // Delete order doc
+  const orderRef = db.collection("orders").doc(orderId);
+  batch.delete(orderRef);
+
+  // Delete order_items
+  const itemsSnap = await db.collection("order_items").where("order_id", "==", orderId).get();
+  itemsSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  // Delete revenue_ledger
+  const revSnap = await db.collection("revenue_ledger").where("order_id", "==", orderId).get();
+  revSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  await batch.commit();
 };

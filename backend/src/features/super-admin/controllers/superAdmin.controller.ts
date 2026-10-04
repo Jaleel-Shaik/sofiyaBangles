@@ -94,6 +94,8 @@ export const getRevenueLedger = asyncHandler(async (req: AuthRequest, res: Respo
   const limit = getQuery(req, "limit") ? Number(getQuery(req, "limit")) : 20;
   const fromDate = getQuery(req, "fromDate");
   const toDate = getQuery(req, "toDate");
+  const month = getQuery(req, "month") ? Number(getQuery(req, "month")) : undefined;
+  const year = getQuery(req, "year") ? Number(getQuery(req, "year")) : undefined;
   const transactionType = getQuery(req, "transactionType") as RevenueTransactionType | undefined;
   const adminId = getQuery(req, "adminId");
 
@@ -102,6 +104,8 @@ export const getRevenueLedger = asyncHandler(async (req: AuthRequest, res: Respo
     limit,
     fromDate,
     toDate,
+    month,
+    year,
     transactionType,
     adminId,
   });
@@ -146,7 +150,10 @@ export const getAdminActivity = asyncHandler(async (req: AuthRequest, res: Respo
  * SuperAdmin Notifications Handler
  */
 export const getNotifications = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const notifications = await SuperAdminService.getNotifications(req.user!.userId);
+  const notifications = await SuperAdminService.getNotifications(
+    req.user?.userId,
+    req.user?.role
+  );
   return sendSuccess(res, notifications);
 });
 
@@ -157,6 +164,31 @@ export const markNotificationRead = asyncHandler(async (req: AuthRequest, res: R
   const id = getParam(req, "id");
   await SuperAdminService.markNotificationRead(id);
   return sendSuccess(res, null, { message: "Notification marked as read." });
+});
+
+/**
+ * Mark All Notifications Read Handler
+ */
+export const markAllNotificationsRead = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const count = await SuperAdminService.markAllNotificationsRead(req.user?.userId);
+  return sendSuccess(res, { count }, { message: "All notifications marked as read." });
+});
+
+/**
+ * Clear All Notifications Handler
+ */
+export const clearAllNotifications = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const count = await SuperAdminService.clearAllNotifications(req.user?.userId);
+  return sendSuccess(res, { count }, { message: "All notifications cleared." });
+});
+
+/**
+ * Delete Single Notification Handler
+ */
+export const deleteNotification = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
+  await SuperAdminService.deleteNotification(id, req.user?.userId);
+  return sendSuccess(res, null, { message: "Notification deleted." });
 });
 
 /**

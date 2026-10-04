@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import axios, { type InternalAxiosRequestConfig, type AxiosRequestConfig } from "axios";
+import { isAxiosError, type InternalAxiosRequestConfig, type AxiosRequestConfig } from "axios";
 import { ClassifiedApiError } from "./errors";
 import { logApiError } from "@/features/error-center/lib/log";
 
@@ -51,7 +51,7 @@ export const useApiErrorBus = create<ApiErrorBusState>((set, get) => ({
 
     const now = Date.now();
     const { currentError, lastDismissedAt } = get();
-    const reqConfig = axios.isAxiosError(error) ? error.config ?? null : null;
+    const reqConfig = isAxiosError(error) ? error.config ?? null : null;
 
     // While a popup is open, refresh its content with the newest failure.
     if (currentError) {

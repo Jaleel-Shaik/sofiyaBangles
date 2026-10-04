@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useAuthStore, User } from '../store/authStore';
 import { apiClient } from './client';
+import { API_ENDPOINTS } from './endpoints';
 
 // Configure Google Sign-In (Native only)
 if (Platform.OS !== 'web') {
@@ -318,4 +319,9 @@ export const updateUserProfile = async (uid: string, data: Partial<User> & Recor
     const message = error instanceof Error ? error.message : 'Failed to update profile';
     throw new Error(message);
   }
+};
+
+export const deleteAccount = async () => {
+  const res = await apiClient.delete(API_ENDPOINTS.USERS.DELETE_ME);
+  return res.data;
 };

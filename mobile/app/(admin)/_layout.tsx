@@ -5,6 +5,7 @@ export default function AdminLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="quick-sell" />
+      <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
     </Stack>
   );
 }

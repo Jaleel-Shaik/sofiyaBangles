@@ -18,21 +18,20 @@ import {
   PlusCircle,
   AlertTriangle,
   Users,
-  UserCheck,
   TrendingUp,
   Layers,
   DollarSign,
-  CheckCheck,
   FileText,
   ClipboardList,
   Zap,
+  Star,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { api } from "@/src/lib/api";
 import { QuickSellModal } from "@/features/products/components/QuickSellModal";
+import { NotificationCenter } from "@/features/dashboard/components/NotificationCenter";
 import { STRINGS } from "@/src/constants/strings";
 
 export default function DashboardLayout({
@@ -45,41 +44,17 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notifsOpen, setNotifsOpen] = useState(false);
   const [quickSellOpen, setQuickSellOpen] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const role = (user?.role || "").toLowerCase().trim();
   const isSuperAdmin = role === "super_admin" || role === "superadmin";
 
   const superAdminOnlyPaths = [
-    "/dashboard/admins",
     "/dashboard/activity",
     "/dashboard/revenue",
     "/dashboard/forms",
   ];
-
-  // Fetch notifications for super_admin
-  useEffect(() => {
-    if (user?.role === "super_admin") {
-      api.superAdmin
-        .getNotifications()
-        .then((items) => setNotifications(items || []))
-        .catch(() => {});
-    }
-  }, [user]);
-
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-
-  const handleMarkRead = async (id: string) => {
-    try {
-      await api.superAdmin.markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-      );
-    } catch {}
-  };
 
   // Global shortcut: Alt + S opens Quick Sell
   useEffect(() => {
@@ -207,77 +182,8 @@ export default function DashboardLayout({
                 <span className="hidden sm:inline">{STRINGS.common.quickSell}</span>
               </button>
 
-              {/* Notification bell */}
-              <div className="relative">
-                <button
-                  onClick={() => setNotifsOpen(!notifsOpen)}
-                  aria-label={STRINGS.notifications.title}
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-[#F5F5F5] hover:bg-[#E5E5E5] transition-colors relative"
-                >
-                  <Bell className="w-5 h-5 text-[#525252]" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#E8436E] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {/* Notifications Dropdown */}
-                <AnimatePresence>
-                  {notifsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 5 }}
-                      className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200 py-3 z-50 overflow-hidden"
-                    >
-                      <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                          <Bell className="w-4 h-4 text-[#E8436E]" /> {STRINGS.notifications.title}
-                        </h3>
-                        {unreadCount > 0 && (
-                          <span className="text-[10px] bg-rose-50 text-[#E8436E] font-bold px-2 py-0.5 rounded-full">
-                            {STRINGS.notifications.newBadge(unreadCount)}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                        {notifications.length === 0 ? (
-                          <div className="p-6 text-center text-xs text-slate-400">
-                            {STRINGS.notifications.empty}
-                          </div>
-                        ) : (
-                          notifications.slice(0, 10).map((n) => (
-                            <div
-                              key={n.id}
-                              className={`p-3 text-xs transition-colors ${
-                                n.is_read ? "bg-white opacity-70" : "bg-rose-50/40"
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="font-semibold text-slate-800 leading-tight">
-                                  {n.title}
-                                </p>
-                                {!n.is_read && (
-                                  <button
-                                    onClick={() => handleMarkRead(n.id)}
-                                    title={STRINGS.notifications.markAsRead}
-                                    className="text-[#E8436E] hover:text-rose-700 p-1 min-h-[32px] min-w-[32px] flex items-center justify-center rounded-lg hover:bg-rose-50"
-                                  >
-                                    <CheckCheck className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-slate-500 mt-1">{n.message}</p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              {/* Notification Center */}
+              <NotificationCenter userRole={user?.role} />
 
               {/* Profile dropdown */}
               <div className="relative">
@@ -392,11 +298,12 @@ function SidebarContent({
   const role = (user?.role || "").toLowerCase().trim();
   const isSuperAdmin = role === "super_admin" || role === "superadmin";
 
-  // Regular Store Admin Navigation (6 core store management links only)
+  // Regular Store Admin Navigation
   const adminNavLinks = [
     { label: STRINGS.navigation.overview, icon: LayoutDashboard, href: "/dashboard" },
     { label: STRINGS.navigation.productsCatalog, icon: Package, href: "/dashboard/products" },
     { label: STRINGS.navigation.ordersWhatsApp, icon: ShoppingBag, href: "/dashboard/orders" },
+    { label: STRINGS.navigation.reviewsRatings, icon: Star, href: "/dashboard/reviews" },
     { label: STRINGS.navigation.collectionsCategories, icon: Layers, href: "/dashboard/categories" },
     { label: STRINGS.navigation.modelTypes, icon: Layers, href: "/dashboard/model-types" },
     { label: STRINGS.navigation.storeSettings, icon: Settings, href: "/dashboard/settings" },
@@ -407,11 +314,11 @@ function SidebarContent({
     { label: STRINGS.navigation.overview, icon: LayoutDashboard, href: "/dashboard" },
     { label: STRINGS.navigation.productsCatalog, icon: Package, href: "/dashboard/products" },
     { label: STRINGS.navigation.ordersWhatsApp, icon: ShoppingBag, href: "/dashboard/orders" },
+    { label: STRINGS.navigation.reviewsRatings, icon: Star, href: "/dashboard/reviews" },
     { label: STRINGS.navigation.collectionsCategories, icon: Layers, href: "/dashboard/categories" },
     { label: STRINGS.navigation.modelTypes, icon: Layers, href: "/dashboard/model-types" },
     { label: STRINGS.navigation.operationsLog, icon: ClipboardList, href: "/dashboard/activity" },
     { label: STRINGS.navigation.revenueLedger, icon: TrendingUp, href: "/dashboard/revenue" },
-    { label: STRINGS.navigation.staffAdmins, icon: UserCheck, href: "/dashboard/admins" },
     { label: STRINGS.navigation.googleForms, icon: FileText, href: "/dashboard/forms" },
     { label: STRINGS.navigation.storeSettings, icon: Settings, href: "/dashboard/settings" },
   ];

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ShoppingBag,
   Search,
@@ -26,6 +27,7 @@ import {
   Minus,
   Check,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { type AdminOrder, type Product } from "@/src/lib/api";
 import toast from "react-hot-toast";
@@ -42,10 +44,11 @@ export default function OrdersManagementPage() {
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Accessible Complete and Refund Dialog States
+  // Accessible Complete, Refund, and Delete Dialog States
   const [confirmCompleteId, setConfirmCompleteId] = useState<string | null>(null);
   const [refundOrderId, setRefundOrderId] = useState<string | null>(null);
   const [refundReason, setRefundReason] = useState("");
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
 
   // New WhatsApp Sale Modal State
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
@@ -67,24 +70,89 @@ export default function OrdersManagementPage() {
         limit: 20,
         search: targetSearch || undefined,
       });
-      setOrders(res.orders || []);
+      const items = res.orders || [];
+      setOrders(items);
       setTotal(res.total || 0);
+      return items;
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Failed to load orders");
+      return [];
     } finally {
       setLoading(false);
     }
   };
 
+  const searchParams = useSearchParams();
+  const urlSearchTarget = searchParams?.get("search") || searchParams?.get("orderNumber") || searchParams?.get("id") || "";
+  const urlOrderId = searchParams?.get("id") || undefined;
+  const urlAction = searchParams?.get("action");
+
+  // Inspect order target: searches orders, auto-opens the matching order drawer
+  const inspectOrderTarget = useCallback(async (targetQuery: string, targetId?: string) => {
+    const cleanQuery = (targetQuery || targetId || "").replace(/^#/, "").trim();
+    if (!cleanQuery) return;
+    setSearch(cleanQuery);
+    setPage(1);
+
+    // 1. Direct fetch: immediately retrieve full order details by ID or Order Number
+    try {
+      const directOrder = await api.superAdmin.getOrderById(targetId || cleanQuery);
+      if (directOrder && directOrder.id) {
+        setSelectedOrder(directOrder);
+        fetchOrders(1, cleanQuery);
+        return;
+      }
+    } catch {}
+
+    // 2. Fallback search across list
+    const items = await fetchOrders(1, cleanQuery);
+    if (items && items.length > 0) {
+      const match = items.find(
+        (o) =>
+          (cleanQuery && o.order_number?.toLowerCase().replace(/^#/, "") === cleanQuery.toLowerCase()) ||
+          (targetId && o.id === targetId) ||
+          o.id === cleanQuery
+      );
+      setSelectedOrder(match || items[0]);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchOrders(page, search);
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("action") === "new-sale") {
-        openNewSaleModal();
+    if (urlSearchTarget) {
+      inspectOrderTarget(urlSearchTarget, urlOrderId);
+    } else {
+      fetchOrders(page, search);
+    }
+
+    if (urlAction === "new-sale") {
+      openNewSaleModal();
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, "", window.location.pathname);
       }
     }
-  }, [page]);
+  }, [page, urlSearchTarget, urlOrderId, urlAction, inspectOrderTarget]);
+
+  // Listen to open-order-notification event from notification center dropdown
+  useEffect(() => {
+    const handleNotificationOpen = (e: any) => {
+      const orderNumber = e?.detail?.orderNumber;
+      const orderId = e?.detail?.orderId;
+      if (orderNumber || orderId) {
+        inspectOrderTarget(orderNumber || orderId, orderId);
+      }
+    };
+    window.addEventListener("open-order-notification", handleNotificationOpen);
+    return () => window.removeEventListener("open-order-notification", handleNotificationOpen);
+  }, [inspectOrderTarget]);
+
+  // Real-time synchronization: reload orders whenever a product is sold anywhere in admin
+  useEffect(() => {
+    const handleProductSold = () => {
+      fetchOrders(1, "");
+    };
+    window.addEventListener("product-sold", handleProductSold);
+    return () => window.removeEventListener("product-sold", handleProductSold);
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,27 +279,37 @@ export default function OrdersManagementPage() {
   };
 
   const handleShareOrderOnWhatsApp = (order: AdminOrder) => {
-    const rawPhone = order.customer_phone || order.shipping_address_snapshot?.phone || "";
+    const rawPhone =
+      order.customer_phone ||
+      (order.shipping_address_snapshot as any)?.phone ||
+      (order.shipping_address as any)?.phone ||
+      "";
     let cleanPhone = rawPhone.replace(/[^0-9]/g, "");
     if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
 
     const itemsSummary = (order.items || [])
       .map(
         (i) =>
-          `• ${i.product_name || i.productNameSnapshot || "Bangles Set"}\n  Qty: ${
+          `• ${i.product_name || i.productNameSnapshot || (i as any).product_name_snapshot || "Handcrafted Bangles"}\n  Qty: ${
             i.quantity
-          }  |  Rate: ₹${i.itemPrice || i.unit_price || 0}  |  Subtotal: ₹${
-            (i.itemPrice || i.unit_price || 0) * i.quantity
+          }  |  Rate: ₹${i.itemPrice || i.unit_price || (i as any).price_snapshot || 0}  |  Subtotal: ₹${
+            (i.itemPrice || i.unit_price || (i as any).price_snapshot || 0) * i.quantity
           }`
       )
       .join("\n");
+
+    const customerDisplayName =
+      order.customer_name ||
+      (order.shipping_address_snapshot as any)?.full_name ||
+      (order.shipping_address_snapshot as any)?.name ||
+      "Valued Customer";
 
     const messageLines = [
       "✨ *SOFIYA BANGLES — ORDER DETAILS* ✨",
       "━━━━━━━━━━━━━━━━━━━━",
       `*Order Number:* ${order.order_number}`,
-      `*Customer:* ${order.customer_name || "Valued Customer"}`,
-      `*Status:* ${(order.status || "Pending").toUpperCase()}`,
+      `*Customer:* ${customerDisplayName}`,
+      `*Status:* ${(order.status || "Completed").toUpperCase()}`,
       `*Date:* ${new Date(order.created_at).toLocaleDateString("en-IN")}`,
       "",
       "*Items Ordered:*",
@@ -240,10 +318,10 @@ export default function OrdersManagementPage() {
       `*Grand Total:* ₹${order.total_amount}`,
       "━━━━━━━━━━━━━━━━━━━━",
       order.shipping_address_snapshot?.address_line1
-        ? `*Delivery To:* ${order.shipping_address_snapshot.address_line1}`
+        ? `*Delivery / Pickup:* ${order.shipping_address_snapshot.address_line1}`
         : "",
       "",
-      "Thank you for shopping with Sofiya Bangles! 💫",
+      "Thank you for choosing Sofiya Bangles! 💫",
     ].filter(Boolean);
 
     const encoded = encodeURIComponent(messageLines.join("\n"));
@@ -310,6 +388,25 @@ export default function OrdersManagementPage() {
     }
   };
 
+  const handleDeleteOrderConfirm = async () => {
+    if (!deleteOrderId) return;
+    const orderId = deleteOrderId;
+    setActionLoading(true);
+    try {
+      await api.superAdmin.deleteOrder(orderId);
+      toast.success("Order deleted successfully");
+      setDeleteOrderId(null);
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(null);
+      }
+      await fetchOrders();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to delete order");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handlePrintInvoice = (order: AdminOrder) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -319,16 +416,16 @@ export default function OrdersManagementPage() {
         (i) => `
         <tr>
           <td style="padding: 8px; border-bottom: 1px solid #eee;">${
-            i.product_name || i.productNameSnapshot || "Bangles Set"
+            i.product_name || i.productNameSnapshot || (i as any).product_name_snapshot || "Handcrafted Bangles"
           }</td>
           <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${
             i.quantity
           }</td>
           <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">₹${
-            i.itemPrice || i.unit_price || 0
+            i.itemPrice || i.unit_price || (i as any).price_snapshot || 0
           }</td>
           <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold;">₹${
-            (i.itemPrice || i.unit_price || 0) * i.quantity
+            (i.itemPrice || i.unit_price || (i as any).price_snapshot || 0) * i.quantity
           }</td>
         </tr>
       `
@@ -523,34 +620,48 @@ export default function OrdersManagementPage() {
                       {/* Customer Info */}
                       <td className="p-4">
                         <p className="font-bold text-slate-900 leading-tight">
-                          {order.customer_name || "Customer"}
+                          {order.customer_name ||
+                            (order.shipping_address_snapshot as any)?.full_name ||
+                            (order.shipping_address_snapshot as any)?.name ||
+                            "In-Store Customer"}
                         </p>
-                        {order.customer_phone ? (
-                          <a
-                            href={`https://wa.me/${order.customer_phone.replace(/[^0-9]/g, "")}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold hover:underline mt-0.5"
-                          >
-                            <MessageCircle className="w-3 h-3 fill-emerald-600" />
-                            {order.customer_phone}
-                          </a>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">Direct Customer</span>
-                        )}
+                        {(() => {
+                          const phone =
+                            order.customer_phone ||
+                            (order.shipping_address_snapshot as any)?.phone ||
+                            (order.shipping_address as any)?.phone;
+                          if (!phone) return <span className="text-[11px] text-slate-400 italic">No phone provided</span>;
+                          const cleanPhone = phone.replace(/[^0-9]/g, "");
+                          const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+                          return (
+                            <a
+                              href={`https://wa.me/${waPhone}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold hover:underline mt-0.5"
+                            >
+                              <MessageCircle className="w-3 h-3 fill-emerald-600" />
+                              {phone}
+                            </a>
+                          );
+                        })()}
                       </td>
 
                       {/* Line Items Summary */}
                       <td className="p-4 max-w-xs">
                         <div className="space-y-1">
-                          {(order.items || []).slice(0, 2).map((item, idx) => (
-                            <p key={idx} className="text-xs text-slate-800 font-medium truncate">
-                              • {item.product_name || item.productNameSnapshot || "Bangles Set"}{" "}
-                              <span className="text-slate-400 font-normal">
-                                (Qty: {item.quantity})
-                              </span>
-                            </p>
-                          ))}
+                          {(order.items || []).length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">• Handcrafted Bangles (Qty: 1)</p>
+                          ) : (
+                            (order.items || []).slice(0, 2).map((item, idx) => (
+                              <p key={idx} className="text-xs text-slate-800 font-medium truncate">
+                                • {item.product_name || item.productNameSnapshot || (item as any).product_name_snapshot || "Handcrafted Bangles"}{" "}
+                                <span className="text-slate-400 font-normal">
+                                  (Qty: {item.quantity})
+                                </span>
+                              </p>
+                            ))
+                          )}
                           {(order.items || []).length > 2 && (
                             <span className="text-[10px] text-slate-400 font-semibold">
                               +{(order.items || []).length - 2} more item(s)
@@ -623,6 +734,15 @@ export default function OrdersManagementPage() {
                             className="p-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors text-[11px] font-bold flex items-center gap-1"
                           >
                             <Eye className="w-3.5 h-3.5" /> View
+                          </button>
+
+                          {/* Delete Order Button */}
+                          <button
+                            onClick={() => setDeleteOrderId(order.id)}
+                            title="Delete Order"
+                            className="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -896,15 +1016,20 @@ export default function OrdersManagementPage() {
                 <div className="text-xs space-y-1 text-slate-600">
                   <p>
                     <span className="font-semibold text-slate-900">Name:</span>{" "}
-                    {selectedOrder.customer_name || "Customer"}
+                    {selectedOrder.customer_name ||
+                      (selectedOrder.shipping_address_snapshot as any)?.full_name ||
+                      (selectedOrder.shipping_address_snapshot as any)?.name ||
+                      "Direct Customer"}
                   </p>
                   <p>
                     <span className="font-semibold text-slate-900">Phone:</span>{" "}
-                    {selectedOrder.customer_phone || "Not provided"}
+                    {selectedOrder.customer_phone ||
+                      (selectedOrder.shipping_address_snapshot as any)?.phone ||
+                      "Not provided"}
                   </p>
                   <p>
                     <span className="font-semibold text-slate-900">Address:</span>{" "}
-                    {(selectedOrder.shipping_address_snapshot as any)?.address_line1 || "Store Pickup"}
+                    {(selectedOrder.shipping_address_snapshot as any)?.address_line1 || "Store Pickup / Direct Sale"}
                   </p>
                 </div>
               </div>
@@ -919,14 +1044,14 @@ export default function OrdersManagementPage() {
                     <div key={i} className="p-3 flex items-center justify-between text-xs">
                       <div>
                         <p className="font-bold text-slate-900">
-                          {item.product_name || item.productNameSnapshot || "Bangles Set"}
+                          {item.product_name || item.productNameSnapshot || (item as any).product_name_snapshot || "Handcrafted Bangles"}
                         </p>
                         <p className="text-[11px] text-slate-400">
-                          Qty: {item.quantity} × ₹{item.itemPrice || item.unit_price || 0}
+                          Qty: {item.quantity} × ₹{item.itemPrice || item.unit_price || (item as any).price_snapshot || 0}
                         </p>
                       </div>
                       <span className="font-bold text-slate-900">
-                        ₹{(item.itemPrice || item.unit_price || 0) * item.quantity}
+                        ₹{(item.itemPrice || item.unit_price || (item as any).price_snapshot || 0) * item.quantity}
                       </span>
                     </div>
                   ))}
@@ -984,6 +1109,14 @@ export default function OrdersManagementPage() {
                 >
                   Cancel / Refund
                 </button>
+                <button
+                  disabled={actionLoading}
+                  onClick={() => setDeleteOrderId(selectedOrder.id)}
+                  className="p-2.5 min-h-[44px] rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center"
+                  title="Delete Order"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
 
               <button
@@ -1007,6 +1140,19 @@ export default function OrdersManagementPage() {
         confirmLabel="Complete Order"
         cancelLabel={STRINGS.common.cancel}
         variant="primary"
+        isLoading={actionLoading}
+      />
+
+      {/* Accessible Delete Order Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteOrderId)}
+        onClose={() => setDeleteOrderId(null)}
+        onConfirm={handleDeleteOrderConfirm}
+        title="Delete Order Record"
+        message="Are you sure you want to permanently delete this order and its items? This action cannot be undone."
+        confirmLabel="Delete Order"
+        cancelLabel={STRINGS.common.cancel}
+        variant="danger"
         isLoading={actionLoading}
       />
 

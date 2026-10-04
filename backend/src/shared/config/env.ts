@@ -11,6 +11,10 @@ export const env = {
   // Leave empty in dev to allow all origins
   CORS_ORIGINS: process.env.CORS_ORIGINS || "",
 
+  // Admin Portal Web URL & Mobile Scheme
+  ADMIN_PORTAL_URL: process.env.ADMIN_PORTAL_URL || "http://localhost:3000",
+  MOBILE_APP_SCHEME: process.env.MOBILE_APP_SCHEME || "sofiyabangles",
+
   // Database
   DB_HOST: process.env.DB_HOST || "",
   DB_PORT: Number(process.env.DB_PORT) || 5432,
@@ -36,6 +40,9 @@ export const env = {
 
   // WhatsApp
   WHATSAPP_NUMBER: process.env.WHATSAPP_NUMBER || "",
+  WHATSAPP_API_TOKEN: process.env.WHATSAPP_API_TOKEN || "",
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+  WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || "",
 
   // Twilio SMS
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || "",

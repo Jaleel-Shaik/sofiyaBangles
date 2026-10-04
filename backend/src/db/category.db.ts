@@ -52,7 +52,9 @@ export const findCategoryByNameDb = async (
  * Pure Database Operation: Insert a new category document.
  */
 export const insertCategoryDb = async (category: Category): Promise<Category> => {
-  await db.collection("categories").doc(category.id).set(category);
+  const data: Record<string, unknown> = { ...category };
+  Object.keys(data).forEach((key) => data[key] === undefined && delete data[key]);
+  await db.collection("categories").doc(category.id).set(data);
   return category;
 };
 

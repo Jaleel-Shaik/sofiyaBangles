@@ -12,6 +12,9 @@ import {
   getAdminActivity,
   getNotifications,
   markNotificationRead,
+  markAllNotificationsRead,
+  clearAllNotifications,
+  deleteNotification,
   getCommissionSettings,
   updateCommissionSettings,
   exportSalesCsv,
@@ -35,8 +38,17 @@ import {
 
 const router = Router();
 
-// Protect all SuperAdmin endpoints with authentication and super_admin role check
+// Protect all SuperAdmin endpoints with authentication
 router.use(authenticate);
+
+// Notifications for all dashboard users (admin and super_admin)
+router.get("/notifications", requireRole("admin", "super_admin"), getNotifications);
+router.patch("/notifications/read-all", requireRole("admin", "super_admin"), markAllNotificationsRead);
+router.delete("/notifications/clear-all", requireRole("admin", "super_admin"), clearAllNotifications);
+router.patch("/notifications/:id/read", requireRole("admin", "super_admin"), markNotificationRead);
+router.delete("/notifications/:id", requireRole("admin", "super_admin"), deleteNotification);
+
+// Protect all remaining SuperAdmin endpoints with super_admin role check
 router.use(requireRole("super_admin"));
 
 // Sub-admin management
@@ -53,8 +65,6 @@ router.get("/products-analytics", getProductsAnalytics);
 router.get("/products-analytics/:id", getProductAnalyticsDetail);
 router.get("/revenue", getRevenueLedger);
 router.get("/activity", getAdminActivity);
-router.get("/notifications", getNotifications);
-router.patch("/notifications/:id/read", markNotificationRead);
 
 // Settings & Commissions
 router.get("/settings/commission", getCommissionSettings);

@@ -67,20 +67,25 @@ export function ProductBasicInfo({
             placeholder="Write a beautiful description..." 
           />
         </div>
-        <div className="col-span-2">
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-700">Special Product ID:</span>
-              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
-                ⚡ Auto-generated upon creation (e.g. SIL-101, GLA-101)
-              </span>
-            </div>
-            <span className="text-[11px] text-slate-400 hidden sm:inline">
-              Derived automatically from Model Type
-            </span>
-          </div>
+
+        <div className="col-span-2 md:col-span-1">
+          <label className="block text-sm font-semibold text-[#525252] mb-1.5">Stock Quantity *</label>
+          <input 
+            type="number" 
+            value={form.quantity} 
+            onChange={e => {
+              setForm(f => ({ ...f, quantity: e.target.value }));
+              if (errors.quantity) setErrors(prev => { const c = { ...prev }; delete c.quantity; return c; });
+            }} 
+            className={`w-full px-4 py-2.5 border rounded-xl outline-none focus:border-[#E8436E] transition-colors ${
+              errors.quantity ? "border-red-500 bg-red-50/10 focus:border-red-500" : "border-[#E5E5E5]"
+            }`} 
+            placeholder="e.g. 10" 
+          />
+          {errors.quantity && <p className="text-red-500 text-xs mt-1.5 font-semibold">{errors.quantity}</p>}
         </div>
-        <div className="col-span-2">
+
+        <div className="col-span-2 md:col-span-1">
           <label className="block text-sm font-semibold text-[#525252] mb-1.5">Product Status *</label>
           <select
             value={form.status}

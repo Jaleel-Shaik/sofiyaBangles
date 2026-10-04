@@ -68,7 +68,6 @@ app.get("/api", (_req, res) => {
       "/api/analytics",
       "/api/notifications",
       "/api/model-types",
-      "/api/size-preferences",
       "/api/orders",
       "/api/cart",
       "/api/super-admin",

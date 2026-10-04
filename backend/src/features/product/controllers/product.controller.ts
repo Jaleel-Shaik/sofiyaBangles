@@ -49,8 +49,13 @@ export const createProduct = asyncHandler(async (req: AuthRequest, res: Response
 export const getProducts = asyncHandler(async (req: AuthRequest, res: Response) => {
   const page = getQuery(req, "page");
   const limit = getQuery(req, "limit");
-  const category_id = getQuery(req, "category_id");
-  const search = getQuery(req, "search");
+  const category_id = getQuery(req, "category_id") || getQuery(req, "categoryId");
+  const model_type_id = getQuery(req, "model_type_id") || getQuery(req, "modelTypeId");
+  const min_price = getQuery(req, "min_price") || getQuery(req, "minPrice");
+  const max_price = getQuery(req, "max_price") || getQuery(req, "maxPrice");
+  const in_stock = getQuery(req, "in_stock") || getQuery(req, "inStock");
+  const search = getQuery(req, "search") || getQuery(req, "q");
+  const sort = getQuery(req, "sort") || getQuery(req, "sortBy");
 
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 20;
@@ -59,7 +64,12 @@ export const getProducts = asyncHandler(async (req: AuthRequest, res: Response) 
     page: page ? pageNum : undefined,
     limit: limit ? limitNum : undefined,
     categoryId: category_id,
+    modelTypeId: model_type_id,
+    minPrice: min_price ? Number(min_price) : undefined,
+    maxPrice: max_price ? Number(max_price) : undefined,
+    inStock: in_stock === "true" || in_stock === "1" ? true : undefined,
     search: search,
+    sort: (sort === "rating" ? "rating" : "newest") as "newest" | "rating",
     userId: req.user?.userId,
   });
 
@@ -147,7 +157,7 @@ export const updateProduct = asyncHandler(async (req: AuthRequest, res: Response
 export const updateStock = asyncHandler(async (req: AuthRequest, res: Response) => {
   const id = getParam(req, "id");
   try {
-    const product = await updateStockService(id, req.body.quantity, req.user!.userId);
+    const product = await updateStockService(id, req.body, req.user!.userId);
     return sendSuccess(res, product, "Stock updated successfully.");
   } catch (err: any) {
     if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError("Product not found.");
@@ -175,6 +185,7 @@ export const sellProduct = asyncHandler(async (req: AuthRequest, res: Response) 
     customer_name: req.body.customer_name,
     customer_phone: req.body.customer_phone,
     notes: req.body.notes,
+    order_number: req.body.order_number || req.body.orderNumber,
   };
   try {
     const product = await sellProductService(idOrCode, quantity, req.user!.userId, extra);
@@ -182,23 +193,33 @@ export const sellProduct = asyncHandler(async (req: AuthRequest, res: Response) 
   } catch (err: any) {
     if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError("Product not found.");
     if (err.message === "INSUFFICIENT_STOCK") throw new BadRequestError("Insufficient stock.");
+    if (err.message === "CUSTOMER_NOT_FOUND") {
+      throw new NotFoundError(
+        "Customer account not found for this mobile number. Only authenticated and authorized registered customers can purchase products. Please create a customer account first."
+      );
+    }
     throw err;
   }
 });
 
 export const sellProductByCode = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { code, quantity, customer_name, customer_phone, notes } = req.body;
+  const { code, quantity, customer_name, customer_phone, notes, order_number, orderNumber } = req.body;
   try {
     const product = await sellProductService(
       code,
       Number(quantity) || 1,
       req.user!.userId,
-      { customer_name, customer_phone, notes }
+      { customer_name, customer_phone, notes, order_number: order_number || orderNumber }
     );
     return sendSuccess(res, product, "Product sold successfully.");
   } catch (err: any) {
     if (err.message === "PRODUCT_NOT_FOUND") throw new NotFoundError(`Product '${code}' not found.`);
     if (err.message === "INSUFFICIENT_STOCK") throw new BadRequestError("Insufficient stock.");
+    if (err.message === "CUSTOMER_NOT_FOUND") {
+      throw new NotFoundError(
+        "Customer account not found for this mobile number. Only authenticated and authorized registered customers can purchase products. Please create a customer account first."
+      );
+    }
     throw err;
   }
 });
@@ -290,4 +311,41 @@ export const getNewArrivals = asyncHandler(async (req: AuthRequest, res: Respons
       totalPages: Math.ceil(result.total / limitNum),
     },
   });
+});
+
+export const getSecureProductImage = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = getParam(req, "id");
+  const rawIndex = req.params.imageIndex;
+  const indexStr = Array.isArray(rawIndex) ? rawIndex[0] : rawIndex;
+  const imageIndex = indexStr ? parseInt(indexStr, 10) : 0;
+
+  const product = await getProductByIdService(id, req.user?.userId);
+  if (!product) throw new NotFoundError("Product not found.");
+
+  let imageUrl: string | null = null;
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    const item = product.images[imageIndex] || product.images[0];
+    imageUrl = typeof item === "string" ? item : item?.image_url || null;
+  } else if (product.image_url) {
+    imageUrl = product.image_url;
+  }
+
+  if (!imageUrl) {
+    throw new NotFoundError("No image found for this product.");
+  }
+
+  // If the image is an HTTP URL, proxy stream it with private cache headers
+  try {
+    const imageRes = await fetch(imageUrl);
+    if (!imageRes.ok) {
+      return res.redirect(imageUrl);
+    }
+    const contentType = imageRes.headers.get("content-type") || "image/jpeg";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "private, no-transform, max-age=3600");
+    const arrayBuffer = await imageRes.arrayBuffer();
+    return res.send(Buffer.from(arrayBuffer));
+  } catch (err) {
+    return res.redirect(imageUrl);
+  }
 });

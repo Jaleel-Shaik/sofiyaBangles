@@ -11,6 +11,7 @@ import { useAuthStore } from "@/src/store/authStore";
 import { getDashboardHref } from "@/src/utils/navigation";
 import { startAppStateListener, stopAppStateListener } from "@/src/api/client";
 import NetworkErrorModal from "@/src/components/NetworkErrorModal";
+import InAppNotificationBanner from "@/src/components/InAppNotificationBanner";
 import "../global.css";
 
 /**
@@ -95,8 +96,10 @@ export default function RootLayout() {
         <Stack.Screen name="category/[id]" />
         <Stack.Screen name="search" />
         <Stack.Screen name="orders" />
+        <Stack.Screen name="order-review" />
         <Stack.Screen name="server-settings" />
         <Stack.Screen name="error-center" />
+        <Stack.Screen name="quick-sell" />
       </Stack>
       {isNavigating && (
         <View style={StyleSheet.absoluteFill}>
@@ -104,6 +107,7 @@ export default function RootLayout() {
         </View>
       )}
       <NetworkErrorModal />
+      <InAppNotificationBanner />
     </View>
   );
 }

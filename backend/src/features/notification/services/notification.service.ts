@@ -2,6 +2,9 @@ import {
   batchInsertBroadcastNotificationsDb,
   queryUserNotificationsDb,
   updateNotificationReadDb,
+  markAllNotificationsReadDb,
+  deleteNotificationDb,
+  clearAllUserNotificationsDb,
   countUnreadNotificationsDb,
 } from "../../../db/notification.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
@@ -30,7 +33,7 @@ export const broadcastNotificationService = async (
 };
 
 export const getUserNotificationsService = async (
-  userId: string,
+  userId?: string | null,
   page?: number,
   limit?: number,
 ) => {
@@ -48,6 +51,23 @@ export const markNotificationReadService = async (
   return notification;
 };
 
-export const getUnreadCountService = async (userId: string) => {
+export const markAllNotificationsReadService = async (userId: string) => {
+  return markAllNotificationsReadDb(userId);
+};
+
+export const deleteNotificationService = async (id: string, userId?: string | null) => {
+  const success = await deleteNotificationDb(id, userId);
+  if (!success) {
+    throw new Error("NOTIFICATION_NOT_FOUND");
+  }
+  return { success: true };
+};
+
+export const clearAllNotificationsService = async (userId: string) => {
+  const count = await clearAllUserNotificationsDb(userId);
+  return { clearedCount: count };
+};
+
+export const getUnreadCountService = async (userId?: string | null) => {
   return countUnreadNotificationsDb(userId);
 };

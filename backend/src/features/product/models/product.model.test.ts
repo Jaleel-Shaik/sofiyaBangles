@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateReviewStats, deleteProductModel, restoreProductModel } from './product.model';
-import { createProductService, lookupProductByCodeOrIdService, sellProductService } from '../services/product.service';
+import { createProductService, lookupProductByCodeOrIdService, sellProductService, notifyStockIncreaseService, syncProductStockNotificationService } from '../services/product.service';
 import { createProductSchema } from '../validations/product.validation';
 import { db } from '../../../shared/config/firebase';
 import { getProductByCodeOrIdDb } from '../../../db/product.db';
+import { createCustomerAccountModel } from '../../../shared/models/identity.model';
+import { OrderService } from '../../order/services/order.service';
 
 test('Product Model Setup and Lifecycle', async (t) => {
   await t.test('calculateReviewStats averages ratings and preserves review count', () => {
@@ -186,27 +188,228 @@ test('Product Model Setup and Lifecycle', async (t) => {
       assert.equal(serviceLookup.category_name, "Silk Thread Regular");
       assert.equal(serviceLookup.model_type_name, "Silk Bangles");
 
-      // 3. Test sellProductService using the special code
-      const soldProduct = await sellProductService(specialCode, 3, 'test-admin-actor');
-      assert.ok(soldProduct, 'Sold product must be returned');
-      assert.equal(soldProduct.quantity, 12, 'Stock quantity must decrement from 15 to 12');
+      let soldProductOrderId: string | null = null;
+      try {
+        // 3. Test sellProductService using the special code
+        const soldProduct = await sellProductService(specialCode, 3, 'test-admin-actor');
+        assert.ok(soldProduct, 'Sold product must be returned');
+        assert.equal(soldProduct.quantity, 12, 'Stock quantity must decrement from 15 to 12');
+        soldProductOrderId = (soldProduct as any)?.order?.id || null;
 
-      // Verify Firestore state
-      const docCheck = await db.collection("products").doc(testProdId).get();
-      assert.equal(docCheck.data()?.quantity, 12, 'Persisted Firestore quantity must be 12');
+        // Verify Firestore state
+        const docCheck = await db.collection("products").doc(testProdId).get();
+        assert.equal(docCheck.data()?.quantity, 12, 'Persisted Firestore quantity must be 12');
 
-      // 4. Test insufficient stock throws error
-      await assert.rejects(
-        async () => {
-          await sellProductService(specialCode, 20, 'test-admin-actor');
-        },
-        { message: 'INSUFFICIENT_STOCK' }
-      );
+        // 4. Test insufficient stock throws error
+        await assert.rejects(
+          async () => {
+            await sellProductService(specialCode, 20, 'test-admin-actor');
+          },
+          { message: 'INSUFFICIENT_STOCK' }
+        );
+
+        // 5. Test sellProductService fulfilling an existing customer order by order_number
+        const customerOrderId = "test-ord-" + Date.now();
+        const customerOrderNumber = "ORD-" + Date.now().toString().slice(-6);
+        const testCustomerUserId = "cust-" + Date.now();
+
+        await db.collection("orders").doc(customerOrderId).set({
+          id: customerOrderId,
+          order_number: customerOrderNumber,
+          user_id: testCustomerUserId,
+          status: "pending",
+          payment_status: "pending",
+          total_amount: 1500,
+          subtotal: 1500,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+        await db.collection("order_items").doc("item-" + customerOrderId).set({
+          id: "item-" + customerOrderId,
+          order_id: customerOrderId,
+          product_id: testProdId,
+          product_name_snapshot: "Test Special Bangles",
+          price_snapshot: 500,
+          quantity: 3,
+          subtotal: 1500,
+          image_url: "https://example.com/bangles.jpg",
+          created_at: new Date().toISOString(),
+        });
+
+        // Admin fulfills the order using the order_number
+        const fulfilledResult = await sellProductService(specialCode, 3, 'test-admin-actor', {
+          order_number: customerOrderNumber,
+        });
+
+        // Verify customer order transitioned to completed in Firestore
+        const updatedOrderDoc = await db.collection("orders").doc(customerOrderId).get();
+        assert.equal(updatedOrderDoc.data()?.status, "completed", "Order must transition to completed");
+        assert.equal(updatedOrderDoc.data()?.payment_status, "paid", "Order payment_status must transition to paid");
+
+        // Verify stock was NOT decremented again (remains 12)
+        assert.equal(fulfilledResult.quantity, 12, "Stock must NOT be double deducted when fulfilling an existing order");
+
+        // Cleanup customer test order
+        await db.collection("orders").doc(customerOrderId).delete();
+        await db.collection("order_items").doc("item-" + customerOrderId).delete();
+
+        // 6. Test sellProductService with customer phone
+        const testUnregisteredPhone = "9999990001";
+        // 6a. Attempting to sell to unregistered phone must reject with CUSTOMER_NOT_FOUND
+        await assert.rejects(
+          async () => {
+            await sellProductService(specialCode, 1, 'test-admin-actor', {
+              customer_phone: testUnregisteredPhone,
+            });
+          },
+          { message: 'CUSTOMER_NOT_FOUND' },
+          "Selling with unregistered customer phone must be rejected"
+        );
+
+        // 6b. Register authorized customer account
+        const testCustomerPhone = "98888" + Date.now().toString().slice(-5);
+        const registeredCustomer = await createCustomerAccountModel({
+          full_name: "Test Authorized Buyer",
+          phone: testCustomerPhone,
+          email: `test_buyer_${Date.now()}@example.com`,
+          password: "Password@123",
+        });
+
+        let customerSaleOrderId: string | null = null;
+        try {
+          // 6c. Now sell product to registered customer
+          const customerSaleResult = await sellProductService(specialCode, 2, 'test-admin-actor', {
+            customer_phone: testCustomerPhone,
+            customer_name: "Test Authorized Buyer",
+          });
+
+          customerSaleOrderId = (customerSaleResult as any)?.order?.id;
+          assert.ok(customerSaleOrderId, "Order must be created for customer");
+          assert.equal(
+            (customerSaleResult as any)?.order?.user_id,
+            registeredCustomer.id,
+            "Order must be linked to the registered customer user ID"
+          );
+
+          // 6d. Verify the order appears in the customer's mobile app order list
+          const customerOrders = await OrderService.getUserOrders(registeredCustomer.id);
+          assert.ok(customerOrders.length > 0, "Customer must have at least 1 order");
+          const foundOrder = customerOrders.find((o) => o.id === customerSaleOrderId);
+          assert.ok(foundOrder, "Customer order list must contain the quick-sold order");
+          assert.equal(foundOrder.status, "completed");
+          assert.ok(foundOrder.items && foundOrder.items.length > 0, "Order must contain items");
+        } finally {
+          if (customerSaleOrderId) {
+            await db.collection("orders").doc(customerSaleOrderId).delete();
+            const itemsSnap = await db.collection("order_items").where("order_id", "==", customerSaleOrderId).get();
+            for (const d of itemsSnap.docs) await db.collection("order_items").doc(d.id).delete();
+            const revSnap = await db.collection("revenue_ledger").where("order_id", "==", customerSaleOrderId).get();
+            for (const d of revSnap.docs) await db.collection("revenue_ledger").doc(d.id).delete();
+          }
+          await db.collection("users").doc(registeredCustomer.id).delete();
+        }
+      } finally {
+        // Cleanup all test orders created during sellProductService
+        if (soldProductOrderId) {
+          await db.collection("orders").doc(soldProductOrderId).delete();
+          const itemsSnap = await db.collection("order_items").where("order_id", "==", soldProductOrderId).get();
+          for (const itemDoc of itemsSnap.docs) {
+            await db.collection("order_items").doc(itemDoc.id).delete();
+          }
+          const revSnap = await db.collection("revenue_ledger").where("order_id", "==", soldProductOrderId).get();
+          for (const revDoc of revSnap.docs) {
+            await db.collection("revenue_ledger").doc(revDoc.id).delete();
+          }
+        }
+      }
     } finally {
       // Cleanup
       await db.collection("products").doc(testProdId).delete();
       await db.collection("categories").doc(testCatId).delete();
       await db.collection("model_types").doc(testMtId).delete();
+    }
+  });
+
+  await t.test('Stock increase from 0 triggers back in stock notification', async () => {
+    try {
+      await db.collection("notifications").limit(1).get();
+    } catch (err: any) {
+      if (err.code === 16 || err.message?.includes("UNAUTHENTICATED")) {
+        console.warn("⚠️ Skipping live Firestore notification test: Mock/unauthenticated credentials.");
+        return;
+      }
+      throw err;
+    }
+
+    const testProd: any = {
+      id: "test-prod-" + Date.now(),
+      product_name: "Diamond Bangles",
+      price: 250,
+      quantity: 0,
+      status: "out_of_stock",
+    };
+
+    const notifSnapBefore = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.equal(notifSnapBefore.empty, true);
+
+    await notifyStockIncreaseService(testProd, 0, 15, "admin-tester");
+
+    const notifSnapAfter = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.equal(notifSnapAfter.empty, false, "Notification should be created for product restock");
+    const notif = notifSnapAfter.docs[0].data();
+    assert.ok(notif.title.includes("Back in Stock") || notif.title.includes("Stock Increased"));
+    assert.equal(notif.type, "stock_update");
+
+    // Cleanup
+    for (const d of notifSnapAfter.docs) {
+      await db.collection("notifications").doc(d.id).delete();
+    }
+  });
+
+  await t.test('Stock synchronization handles stock decrease to limited, out of stock, and subsequent increase', async () => {
+    try {
+      await db.collection("model_types").limit(1).get();
+    } catch (err: any) {
+      if (err?.code === 7 || err?.message?.includes("ENOTFOUND")) {
+        console.log("Skipping stock sync notification test: Firestore offline/unreachable");
+        return;
+      }
+      throw err;
+    }
+
+    const testProd: any = {
+      id: "test-stock-edge-" + Date.now(),
+      product_name: "Kundan Bangle Set",
+      price: 499,
+      quantity: 20,
+      status: "active",
+    };
+
+    // 1. Decrease to limited stock (e.g. from 20 to 3)
+    await syncProductStockNotificationService(testProd, 20, 3, "admin-tester");
+    const snap1 = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.equal(snap1.empty, false, "Notification should exist for limited stock");
+    const notif1 = snap1.docs[0].data();
+    assert.ok(notif1.title.includes("Limited Stock"));
+
+    // 2. Decrease to out of stock (e.g. from 3 to 0)
+    await syncProductStockNotificationService(testProd, 3, 0, "admin-tester");
+    const snap2 = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.ok(snap2.docs.length >= 1, "Notification docs should exist after decrease to 0");
+    const notif2 = snap2.docs.find((d) => d.data().user_id === null)?.data() || snap2.docs[0].data();
+    assert.ok(notif2.title.includes("Out of Stock"));
+
+    // 3. Later increase from 0 back to 10 (back in stock)
+    await syncProductStockNotificationService(testProd, 0, 10, "admin-tester");
+    const snap3 = await db.collection("notifications").where("product_id", "==", testProd.id).get();
+    assert.ok(snap3.docs.length >= 1, "Notification docs should exist after restock");
+    const notif3 = snap3.docs.find((d) => d.data().user_id === null)?.data() || snap3.docs[0].data();
+    assert.ok(notif3.title.includes("Back in Stock"));
+
+    // Cleanup
+    for (const d of snap3.docs) {
+      await db.collection("notifications").doc(d.id).delete();
     }
   });
 });

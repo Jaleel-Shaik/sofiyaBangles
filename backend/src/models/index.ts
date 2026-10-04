@@ -9,7 +9,6 @@ export * from "./audit.model";
 export * from "./cart.model";
 export * from "./notification.model";
 export * from "./settings.model";
-export * from "./sizePreference.model";
 export * from "./user.model";
 export * from "./auth.model";
 export * from "./analytics.model";

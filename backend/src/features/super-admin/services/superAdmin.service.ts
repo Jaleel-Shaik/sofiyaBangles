@@ -18,6 +18,11 @@ import {
   getSuperAdminNotificationsDb,
   markNotificationReadDb,
 } from "../../../db/superAdmin.db";
+import {
+  markAllNotificationsReadDb,
+  clearAllUserNotificationsDb,
+  deleteNotificationDb,
+} from "../../../db/notification.db";
 import { queryAuditLogsDb, insertAuditLogDb } from "../../../db/audit.db";
 import { resolveDateRange } from "../models/superAdminAnalytics.model";
 import {
@@ -519,6 +524,8 @@ export class SuperAdminService {
     limit?: number;
     fromDate?: string;
     toDate?: string;
+    month?: number;
+    year?: number;
     transactionType?: RevenueTransactionType;
     adminId?: string;
   }) {
@@ -556,12 +563,30 @@ export class SuperAdminService {
   /**
    * SuperAdmin Notifications
    */
-  static async getNotifications(userId?: string): Promise<Notification[]> {
-    return await getSuperAdminNotificationsDb(userId);
+  static async getNotifications(userId?: string, role?: string): Promise<Notification[]> {
+    return await getSuperAdminNotificationsDb(userId, role);
   }
 
   static async markNotificationRead(notificationId: string): Promise<void> {
     await markNotificationReadDb(notificationId);
+  }
+
+  static async markAllNotificationsRead(userId?: string): Promise<number> {
+    if (userId) {
+      return await markAllNotificationsReadDb(userId);
+    }
+    return 0;
+  }
+
+  static async clearAllNotifications(userId?: string): Promise<number> {
+    if (userId) {
+      return await clearAllUserNotificationsDb(userId);
+    }
+    return 0;
+  }
+
+  static async deleteNotification(notificationId: string, userId?: string): Promise<boolean> {
+    return await deleteNotificationDb(notificationId, userId);
   }
 
   /**

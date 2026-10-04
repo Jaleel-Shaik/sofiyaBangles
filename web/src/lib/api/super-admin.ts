@@ -36,7 +36,7 @@ export const superAdminApi = {
   getProductAnalyticsDetail: (id: string) =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.PRODUCT_ANALYTICS_BY_ID(id)).then((r) => extractData<ProductAnalyticsDetail>(r)),
 
-  getRevenueLedger: (params?: { page?: number; limit?: number; fromDate?: string; toDate?: string; transactionType?: string; adminId?: string }) =>
+  getRevenueLedger: (params?: { page?: number; limit?: number; fromDate?: string; toDate?: string; month?: number; year?: number; transactionType?: string; adminId?: string }) =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.REVENUE, { params }).then((r) => ({
       items: extractData<RevenueLedgerItem[]>(r),
       total: r.data?.pagination?.total || 0,
@@ -53,6 +53,15 @@ export const superAdminApi = {
 
   markNotificationRead: (id: string) =>
     apiClient.patch(API_ENDPOINTS.SUPER_ADMIN.MARK_NOTIFICATION_READ(id)).then((r) => r.data),
+
+  markAllNotificationsRead: () =>
+    apiClient.patch(API_ENDPOINTS.SUPER_ADMIN.MARK_ALL_NOTIFICATIONS_READ).then((r) => r.data),
+
+  clearAllNotifications: () =>
+    apiClient.delete(API_ENDPOINTS.SUPER_ADMIN.CLEAR_ALL_NOTIFICATIONS).then((r) => r.data),
+
+  deleteNotification: (id: string) =>
+    apiClient.delete(API_ENDPOINTS.SUPER_ADMIN.DELETE_NOTIFICATION(id)).then((r) => r.data),
 
   getCommissionSettings: () =>
     apiClient.get(API_ENDPOINTS.SUPER_ADMIN.COMMISSION).then((r) => extractData<CommissionSettings>(r)),
@@ -87,6 +96,9 @@ export const superAdminApi = {
       totalPages: r.data?.pagination?.totalPages || 1,
     })),
 
+  getOrderById: (id: string) =>
+    apiClient.get(API_ENDPOINTS.ORDERS.BY_ID(id)).then((r) => r.data?.data as AdminOrder),
+
   createOrder: (data: {
     items: Array<{ productId: string; variantId?: string | null; quantity: number }>;
     shippingAddressSnapshot?: ShippingAddressSnapshot;
@@ -94,6 +106,9 @@ export const superAdminApi = {
 
   updateOrderStatus: (id: string, status: string, notes?: string) =>
     apiClient.patch(API_ENDPOINTS.ORDERS.STATUS(id), { status, notes }).then((r) => r.data),
+
+  deleteOrder: (id: string) =>
+    apiClient.delete(API_ENDPOINTS.ORDERS.BY_ID(id)).then((r) => r.data),
 
   // Customer Management
   getCustomers: (params?: { page?: number; limit?: number; search?: string }) =>

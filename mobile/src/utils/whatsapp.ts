@@ -25,8 +25,7 @@ export function normalizeWhatsAppNumber(phone: string): string {
 
 /**
  * Constructs the mapped direct URL to the product's page in the Admin Portal.
- * This allows the admin to click the link in WhatsApp, view details,
- * and immediately sell/decrement inventory.
+ * This is strictly for the admin/super-admin perspective (e.g., Quick Sell, Inventory audits).
  */
 export function getAdminProductUrl(productId: string, quantity?: number): string {
   const query = quantity && quantity > 1 ? `?qty=${quantity}` : '';
@@ -91,12 +90,15 @@ export interface ProductShareDetails {
   uniqueCode?: string;
   quantity?: number;
   adminProductUrl?: string;
+  /** Admin links and internal order tools are strictly reserved for admin perspective */
+  isAdminPerspective?: boolean;
   imageUrl?: string;
   customMeasurements?: Record<string, string>;
 }
 
 /**
- * Builds a WhatsApp enquiry URL with full product details including mapped Admin Product link.
+ * Builds a WhatsApp enquiry URL for customers.
+ * Note: Admin product links are strictly excluded from user enquiries unless explicitly requested by an admin.
  */
 export function buildWhatsAppEnquiryUrl(params: ProductShareDetails & {
   shopWhatsAppNumber: string;
@@ -112,6 +114,7 @@ export function buildWhatsAppEnquiryUrl(params: ProductShareDetails & {
     uniqueCode,
     quantity,
     adminProductUrl,
+    isAdminPerspective,
     customMeasurements,
   } = params;
 
@@ -141,9 +144,12 @@ export function buildWhatsAppEnquiryUrl(params: ProductShareDetails & {
     lines.push('Size: Not Applicable');
   }
 
-  const adminLink = adminProductUrl || (productId ? getAdminProductUrl(productId, quantity) : undefined);
-  if (adminLink) {
-    lines.push(`Admin Product Link: ${adminLink}`);
+  // Admin link is strictly for admin/super-admin perspective
+  if (isAdminPerspective) {
+    const adminLink = adminProductUrl || (productId ? getAdminProductUrl(productId, quantity) : undefined);
+    if (adminLink) {
+      lines.push(`Admin Product Link: ${adminLink}`);
+    }
   }
 
   if (customMeasurements && Object.keys(customMeasurements).length > 0) {
@@ -189,6 +195,7 @@ export async function openWhatsAppEnquiry(params: ProductShareDetails): Promise<
 
 /**
  * Builds a formatted message for native product sharing.
+ * Strictly excludes admin links for regular customer sharing.
  */
 export function buildProductShareMessage(params: ProductShareDetails): string {
   const lines: string[] = ['Check out this product from Sofiya Bangles! ✨', ''];
@@ -209,16 +216,20 @@ export function buildProductShareMessage(params: ProductShareDetails): string {
   if (params.size) {
     lines.push(`Size: ${params.size}`);
   }
-  const adminLink = params.adminProductUrl || (params.productId ? getAdminProductUrl(params.productId, params.quantity) : undefined);
-  if (adminLink) {
-    lines.push(`Admin Product Link: ${adminLink}`);
+
+  // Admin link is strictly for admin/super-admin perspective
+  if (params.isAdminPerspective) {
+    const adminLink = params.adminProductUrl || (params.productId ? getAdminProductUrl(params.productId, params.quantity) : undefined);
+    if (adminLink) {
+      lines.push(`Admin Product Link: ${adminLink}`);
+    }
   }
 
   return lines.join('\n');
 }
 
 /**
- * Opens the native share dialog with product details and mapped admin product link.
+ * Opens the native share dialog with product details.
  */
 export async function shareProduct(params: ProductShareDetails): Promise<void> {
   const message = buildProductShareMessage(params);
@@ -233,4 +244,54 @@ export async function shareProduct(params: ProductShareDetails): Promise<void> {
   }
 }
 
+export interface SaleReceiptDetails {
+  name: string;
+  code: string;
+  qty: number;
+  remaining: number;
+  total: number;
+  paymentMethod?: string;
+  orderNumber?: string;
+  customerPhone?: string;
+  customerName?: string;
+  date?: string;
+}
+
+/**
+ * Builds a standardized WhatsApp sale receipt message for customers.
+ */
+export function buildWhatsAppSaleReceiptMessage(receipt: SaleReceiptDetails): string {
+  const lines = [
+    '✨ *SOFIYA BANGLES — SALE RECEIPT* ✨',
+    '━━━━━━━━━━━━━━━━━━━━',
+    ...(receipt.orderNumber ? [`*Order Number:* ${receipt.orderNumber}`] : []),
+    ...(receipt.customerName ? [`*Customer:* ${receipt.customerName}`] : []),
+    `*Product:* ${receipt.name}`,
+    `*Special ID:* ${receipt.code}`,
+    `*Quantity:* ${receipt.qty} set(s)`,
+    ...(receipt.paymentMethod ? [`*Payment Mode:* ${receipt.paymentMethod}`] : []),
+    `*Total Amount:* ₹${receipt.total}`,
+    `*Date:* ${receipt.date || new Date().toLocaleDateString('en-IN')}`,
+    '━━━━━━━━━━━━━━━━━━━━',
+    '💖 *Thank you for shopping with Sofiya Bangles!*',
+  ];
+
+  return lines.join('\n');
+}
+
+/**
+ * Opens WhatsApp with the sale receipt directed to the customer.
+ * Normalizes phone numbers (adding '91' for 10-digit Indian numbers).
+ */
+export async function openWhatsAppSaleReceipt(receipt: SaleReceiptDetails): Promise<void> {
+  const cleanPhone = (receipt.customerPhone || '').replace(/[^0-9]/g, '');
+  const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+  const message = buildWhatsAppSaleReceiptMessage(receipt);
+  const encoded = encodeURIComponent(message);
+  const url = formattedPhone
+    ? `https://wa.me/${formattedPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+
+  await Linking.openURL(url);
+}
 
