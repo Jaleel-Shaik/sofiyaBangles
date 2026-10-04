@@ -37,7 +37,7 @@ app.use("/api", generalApiLimiter);
 app.use(apiLogMiddleware);
 
 // 6. Health check endpoints
-app.get(["/health", "/api/health"], (_req, res) => {
+app.get(["/", "/health", "/api/health"], (_req, res) => {
   res.status(200).json({
     success: true,
     status: "ok",
