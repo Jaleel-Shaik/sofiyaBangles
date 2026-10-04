@@ -45,10 +45,23 @@ export interface Product {
   updated_at?: string;
 }
 
+function trimSurroundingQuotes(str: string): string {
+  let s = str.trim();
+  let start = 0;
+  while (start < s.length && (s[start] === '"' || s[start] === "'" || s[start] === '`' || s[start] === '\\')) {
+    start++;
+  }
+  let end = s.length;
+  while (end > start && (s[end - 1] === '"' || s[end - 1] === "'" || s[end - 1] === '`' || s[end - 1] === '\\')) {
+    end--;
+  }
+  return s.substring(start, end).trim();
+}
+
 export const unwrapCleanImageUrl = (raw: unknown): string => {
   if (!raw) return '';
   if (typeof raw !== 'string') {
-    if (typeof raw === 'object' && raw !== null && 'image_url' in raw) {
+    if (typeof raw === 'object' && 'image_url' in (raw as object)) {
       return unwrapCleanImageUrl((raw as any).image_url);
     }
     return '';
@@ -73,7 +86,7 @@ export const unwrapCleanImageUrl = (raw: unknown): string => {
       s = s.slice(1, -1).trim();
     }
   }
-  return s.replace(/^[\\"'`]+|[\\"'`]+$/g, '').trim();
+  return trimSurroundingQuotes(s);
 };
 
 const sanitizeProduct = (p: any): Product => {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api } from '@/src/api';
-import type { Order, OrderItem } from '@/src/api/orders';
+import type { Order } from '@/src/api/orders';
 
 export interface PurchasedProductInfo {
   orderId: string;

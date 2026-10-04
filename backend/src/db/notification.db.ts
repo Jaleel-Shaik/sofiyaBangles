@@ -419,7 +419,7 @@ export const clearAllUserNotificationsDb = async (userId: string): Promise<numbe
       if (targetUserId === userId) {
         batch.delete(doc.ref);
         count++;
-      } else if (!targetUserId || targetUserId === null) {
+      } else if (!targetUserId) {
         // For global broadcast notification, NEVER delete the document! Only append userId to dismissed_by
         if (!Array.isArray(data.dismissed_by) || !data.dismissed_by.includes(userId)) {
           batch.update(doc.ref, { dismissed_by: FieldValue.arrayUnion(userId) });

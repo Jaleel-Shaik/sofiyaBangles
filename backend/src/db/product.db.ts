@@ -64,7 +64,7 @@ export const getProductByIdDb = async (id: string): Promise<Product | null> => {
 export const getProductByCodeOrIdDb = async (codeOrId: string): Promise<Product | null> => {
   if (!codeOrId || typeof codeOrId !== "string") return null;
 
-  let decoded = codeOrId;
+  let decoded: string;
   try {
     decoded = decodeURIComponent(codeOrId);
   } catch {

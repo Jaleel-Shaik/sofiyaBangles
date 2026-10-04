@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
-  Linking,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -32,11 +31,10 @@ import { Typography } from '@/src/components/ui/Typography';
 import { colors, touchTargets } from '@/src/theme/tokens';
 
 export default function ProductDetailScreen() {
-  const { id, qty, orderNumber, action } = useLocalSearchParams<{
+  const { id, qty, orderNumber } = useLocalSearchParams<{
     id: string;
     qty?: string;
     orderNumber?: string;
-    action?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();

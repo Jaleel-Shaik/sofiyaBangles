@@ -21,12 +21,12 @@ import {
 } from "../../../db/product.db";
 import { getCategoryByIdDb, getCategoriesDb } from "../../../db/category.db";
 import { getModelTypeByIdDb } from "../../../db/modelType.db";
-import { isFavoritedDb, getProductFavoritesDb } from "../../../db/favorite.db";
+import { isFavoritedDb } from "../../../db/favorite.db";
 import { insertAuditLogDb } from "../../../db/audit.db";
 import { insertOrderWithItemsDb, getOrderByOrderNumberDb, updateOrderDocDb, getOrderItemsDb } from "../../../db/order.db";
 import { insertNotificationDb, batchInsertBroadcastNotificationsDb } from "../../../db/notification.db";
 import { createRevenueAllocationModel } from "../../order/models/revenueLedger.model";
-import { Order, OrderItem, Notification } from "../../../shared/types";
+import { Order, OrderItem } from "../../../shared/types";
 import { v4 as uuidv4 } from "uuid";
 import { Product, ProductImage, ProductVariant } from "../../../models/product.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.validation";
@@ -47,13 +47,26 @@ interface VariantInput {
   [key: string]: unknown;
 }
 
+function trimSurroundingQuotes(str: string): string {
+  let s = str.trim();
+  let start = 0;
+  while (start < s.length && (s[start] === '"' || s[start] === "'" || s[start] === '`' || s[start] === '\\')) {
+    start++;
+  }
+  let end = s.length;
+  while (end > start && (s[end - 1] === '"' || s[end - 1] === "'" || s[end - 1] === '`' || s[end - 1] === '\\')) {
+    end--;
+  }
+  return s.substring(start, end).trim();
+}
+
 /**
  * Robustly unwraps any image URL, parsing nested JSON string arrays or escaped quotes if present.
  */
 export function unwrapCleanImageUrl(raw: unknown): string {
   if (!raw) return "";
   if (typeof raw !== "string") {
-    if (typeof raw === "object" && raw !== null && "image_url" in raw) {
+    if (typeof raw === "object" && "image_url" in (raw as object)) {
       return unwrapCleanImageUrl((raw as any).image_url);
     }
     return "";
@@ -78,7 +91,7 @@ export function unwrapCleanImageUrl(raw: unknown): string {
       s = s.slice(1, -1).trim();
     }
   }
-  s = s.replace(/^[\\"'`]+|[\\"'`]+$/g, "").trim();
+  s = trimSurroundingQuotes(s);
   return s;
 }
 
@@ -492,8 +505,6 @@ export const syncProductStockNotificationService = async (
   actorId: string,
 ) => {
   if (oldQty === newQty) return;
-
-  const now = new Date().toISOString();
 
   // Case 1: Out of Stock (quantity dropped to 0)
   if (newQty <= 0 && oldQty > 0) {

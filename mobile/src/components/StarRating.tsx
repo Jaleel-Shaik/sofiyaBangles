@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -23,9 +23,7 @@ export function StarRating({
   badge = false,
   style,
 }: StarRatingProps) {
-  const [hoverRating, setHoverRating] = useState<number | null>(null);
-
-  const activeRating = hoverRating !== null ? hoverRating : rating;
+  const activeRating = rating;
 
   const renderStars = () => {
     return Array.from({ length: maxStars }).map((_, index) => {

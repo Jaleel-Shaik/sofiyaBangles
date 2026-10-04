@@ -5,10 +5,23 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { db } from '../shared/config/firebase';
 
+function trimSurroundingQuotes(str: string): string {
+  let s = str.trim();
+  let start = 0;
+  while (start < s.length && (s[start] === '"' || s[start] === "'" || s[start] === '`' || s[start] === '\\')) {
+    start++;
+  }
+  let end = s.length;
+  while (end > start && (s[end - 1] === '"' || s[end - 1] === "'" || s[end - 1] === '`' || s[end - 1] === '\\')) {
+    end--;
+  }
+  return s.substring(start, end).trim();
+}
+
 function sanitizeSingleUrl(raw: unknown): string {
   if (!raw) return '';
   if (typeof raw !== 'string') {
-    if (typeof raw === 'object' && raw !== null && 'image_url' in raw) {
+    if (typeof raw === 'object' && 'image_url' in (raw as object)) {
       return sanitizeSingleUrl((raw as any).image_url);
     }
     return '';
@@ -33,7 +46,7 @@ function sanitizeSingleUrl(raw: unknown): string {
       s = s.slice(1, -1).trim();
     }
   }
-  s = s.replace(/^[\\"'`]+|[\\"'`]+$/g, '').trim();
+  s = trimSurroundingQuotes(s);
   return s;
 }
 

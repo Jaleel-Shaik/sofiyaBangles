@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   Image,
   Animated,
   StyleSheet,
-  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -14,8 +13,6 @@ import { useNotificationStore } from "../store/notificationStore";
 import { useAuthStore } from "../store/authStore";
 import { AppIcon } from "../constants/icons";
 import { navigateFromNotification } from "../utils/notificationNavigation";
-
-const { width } = Dimensions.get("window");
 
 export default function InAppNotificationBanner() {
   const insets = useSafeAreaInsets();
@@ -26,6 +23,24 @@ export default function InAppNotificationBanner() {
   const translateY = useRef(new Animated.Value(-120)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleDismiss = useCallback(() => {
+    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -120,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      dismissInAppBanner();
+    });
+  }, [dismissInAppBanner, opacity, translateY]);
 
   useEffect(() => {
     if (activeInAppBanner) {
@@ -69,27 +84,9 @@ export default function InAppNotificationBanner() {
     return () => {
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
     };
-  }, [activeInAppBanner]);
+  }, [activeInAppBanner, handleDismiss, opacity, translateY]);
 
   if (!activeInAppBanner) return null;
-
-  const handleDismiss = () => {
-    if (dismissTimer.current) clearTimeout(dismissTimer.current);
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: -120,
-        duration: 220,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 220,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      dismissInAppBanner();
-    });
-  };
 
   const handlePress = async () => {
     const notif = activeInAppBanner;

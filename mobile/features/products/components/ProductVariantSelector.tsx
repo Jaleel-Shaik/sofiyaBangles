@@ -1,6 +1,4 @@
-import { View, Text, TouchableOpacity, Alert } from "react-native";
-import { STRINGS } from "@/src/constants/strings";
-import { Ionicons } from "@expo/vector-icons";
+
 
 interface ProductVariantSelectorProps {
   product: any;

@@ -1,5 +1,4 @@
 import { db } from "../shared/config/firebase";
-import { FieldValue } from "firebase-admin/firestore";
 import { Order, OrderItem, Review } from "../shared/types";
 
 export interface StockDeductionItem {
