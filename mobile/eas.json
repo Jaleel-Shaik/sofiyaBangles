@@ -17,9 +17,6 @@
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.sofiyabangles.com/api"
       }
     }
   },

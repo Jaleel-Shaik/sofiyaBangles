@@ -22,10 +22,23 @@ function isOriginAllowed(origin: string): boolean {
     .map((o) => o.trim().toLowerCase())
     .filter(Boolean);
 
-  const lowerOrigin = origin.toLowerCase();
+  // Automatically include origin from configured ADMIN_PORTAL_URL
+  const adminUrl = process.env.ADMIN_PORTAL_URL || env.ADMIN_PORTAL_URL;
+  if (adminUrl) {
+    try {
+      const adminOrigin = new URL(adminUrl).origin.toLowerCase();
+      if (!originsFromEnv.includes(adminOrigin)) {
+        originsFromEnv.push(adminOrigin);
+      }
+    } catch {
+      // Ignore invalid URL
+    }
+  }
 
-  // Direct match from env
-  if (originsFromEnv.some((allowed) => allowed === lowerOrigin)) {
+  const lowerOrigin = origin.toLowerCase().replace(/\/+$/, "");
+
+  // Direct match from configured env origins
+  if (originsFromEnv.some((allowed) => allowed.replace(/\/+$/, "") === lowerOrigin)) {
     return true;
   }
 
