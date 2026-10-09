@@ -84,4 +84,7 @@ app.use(notFoundHandler);
 // 10. Global central error handler
 app.use(errorHandler);
 
+// Export both default and module.exports for seamless Vercel Serverless Function compatibility
+module.exports = app;
+module.exports.default = app;
 export default app;
