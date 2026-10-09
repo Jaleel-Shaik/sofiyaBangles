@@ -75,7 +75,7 @@ export async function clearStoredOverride(): Promise<void> {
   }
 }
 
-export const PRODUCTION_FALLBACK_URL = "https://api.sofiyabangles.com/api";
+export const PRODUCTION_FALLBACK_URL = "https://sofiyabangles-api.vistaarapps.com/api";
 
 /**
  * Best synchronous guess at the API base URL (no SecureStore read):

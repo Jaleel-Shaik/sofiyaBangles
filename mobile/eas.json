@@ -11,6 +11,9 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://sofiyabangles-api.vistaarapps.com/api"
       }
     },
     "production": {
@@ -19,7 +22,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.sofiyabangles.com/api"
+        "EXPO_PUBLIC_API_URL": "https://sofiyabangles-api.vistaarapps.com/api"
       }
     }
   },
