@@ -15,13 +15,6 @@ export const env = {
   ADMIN_PORTAL_URL: process.env.ADMIN_PORTAL_URL || "http://localhost:3000",
   MOBILE_APP_SCHEME: process.env.MOBILE_APP_SCHEME || "sofiyabangles",
 
-  // Database
-  DB_HOST: process.env.DB_HOST || "",
-  DB_PORT: Number(process.env.DB_PORT) || 5432,
-  DB_NAME: process.env.DB_NAME || "postgres",
-  DB_USER: process.env.DB_USER || "postgres",
-  DB_PASSWORD: process.env.DB_PASSWORD || "",
-
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || "",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
