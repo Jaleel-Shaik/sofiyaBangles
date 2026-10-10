@@ -1,6 +1,6 @@
 import { db } from "../../../shared/config/firebase";
 import { DeviceInformation, SecurityEvent, UserType } from "../../../shared/types";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 
 /**
  * Long-retention security events: brute force, account lock, token rotation,

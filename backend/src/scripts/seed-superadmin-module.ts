@@ -1,7 +1,7 @@
 import { db } from "../shared/config/firebase";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 import { createRevenueAllocationModel, createRefundReversalModel } from "../features/order/models/revenueLedger.model";
 import { createAuditLogModel } from "../shared/models/audit.model";
 

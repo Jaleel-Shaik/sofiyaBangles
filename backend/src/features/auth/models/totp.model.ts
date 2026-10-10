@@ -10,7 +10,7 @@ import {
   Platform,
 } from "../../../shared/types";
 import { findIdentityByIdModel, updateIdentityModel } from "../../../shared/models/identity.model";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 import crypto from "crypto";
 import { env } from "../../../shared/config/env";
 import { toISTISO, nowISTISO } from "../../../shared/utils/datetime";
