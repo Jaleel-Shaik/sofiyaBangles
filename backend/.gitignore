@@ -15,6 +15,7 @@ dist/
 
 # Firebase & Secrets
 service-account.json
+vercel-env.json
 *.pem
 *.key
 
