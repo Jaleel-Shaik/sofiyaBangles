@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "type": "commonjs",
-  "main": "src/app.ts",
+  "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
