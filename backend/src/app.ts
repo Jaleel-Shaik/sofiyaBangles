@@ -75,8 +75,12 @@ app.get("/api", (_req, res) => {
   });
 });
 
-// 8. Core API routes
+// 7b. Favicon handler (returns 204 No Content cleanly when browser requests icon)
+app.get("/favicon.ico", (_req, res) => res.status(204).end());
+
+// 8. Core API routes - mounted at /api and root / for custom domain resilience
 app.use("/api", apiRouter);
+app.use("/", apiRouter);
 
 // 9. 404 Route handler
 app.use(notFoundHandler);

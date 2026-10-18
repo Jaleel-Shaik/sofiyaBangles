@@ -46,7 +46,12 @@ function isOriginAllowed(origin: string): boolean {
   try {
     const url = new URL(origin);
     const hostname = url.hostname.toLowerCase();
-    if (hostname === "vercel.app" || hostname.endsWith(".vercel.app")) {
+    if (
+      hostname === "vistaarapps.com" ||
+      hostname.endsWith(".vistaarapps.com") ||
+      hostname === "vercel.app" ||
+      hostname.endsWith(".vercel.app")
+    ) {
       return true;
     }
     // Allow local development
