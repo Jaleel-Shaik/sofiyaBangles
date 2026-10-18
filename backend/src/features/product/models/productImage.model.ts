@@ -1,6 +1,6 @@
 import { db } from "../../../shared/config/firebase";
 import { ProductImage } from "../../../shared/types";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 
 export const getImagesByProductModel = async (productId: string): Promise<ProductImage[]> => {
   const snapshot = await db

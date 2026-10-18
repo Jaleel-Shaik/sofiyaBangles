@@ -27,7 +27,7 @@ import { insertOrderWithItemsDb, getOrderByOrderNumberDb, updateOrderDocDb, getO
 import { insertNotificationDb, batchInsertBroadcastNotificationsDb } from "../../../db/notification.db";
 import { createRevenueAllocationModel } from "../../order/models/revenueLedger.model";
 import { Order, OrderItem } from "../../../shared/types";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 import { Product, ProductImage, ProductVariant } from "../../../models/product.model";
 import { CreateProductInput, UpdateProductInput } from "../validations/product.validation";
 import { findUserByPhoneModel } from "../../../shared/models/identity.model";

@@ -1,7 +1,7 @@
 import { db } from "../shared/config/firebase";
 import { Profile, UserRole, UserType } from "../shared/types";
 import { nowISTISO } from "../shared/utils/datetime";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 
 export const IDENTITY_COLLECTIONS: Record<UserType, string> = {
   user: "users",

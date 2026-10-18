@@ -1,6 +1,6 @@
 import { db } from "../../../shared/config/firebase";
 import { ProductVariant } from "../../../shared/types";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 
 export const getVariantsByProductModel = async (productId: string): Promise<ProductVariant[]> => {
   const snapshot = await db

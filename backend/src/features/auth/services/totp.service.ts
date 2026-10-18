@@ -43,7 +43,7 @@ import { getRoleAuthConfig, requires2FAEnforcement } from "../../../shared/utils
 import { nowISTISO } from "../../../shared/utils/datetime";
 import { assertPlatformAccess } from "../../../shared/utils/platform";
 import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 
 /**
  * Step 1: Initial Login (Password verification)

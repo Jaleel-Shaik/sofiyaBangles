@@ -1,6 +1,6 @@
 import { db } from "../config/firebase";
 import { Profile, UserRole, UserType } from "../types";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 import { nowISTISO } from "../utils/datetime";
 import bcrypt from "bcryptjs";
 

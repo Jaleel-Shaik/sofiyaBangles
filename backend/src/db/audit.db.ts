@@ -1,6 +1,6 @@
 import { db } from "../shared/config/firebase";
 import { AuditLog, UserRole } from "../shared/types";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 
 /**
  * Pure Database Operation: Insert an audit log record into Firestore.

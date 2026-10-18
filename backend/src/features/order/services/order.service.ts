@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 import { Order, OrderItem, Review } from "../../../shared/types";
 import { canTransitionOrderStatus, OrderStatus } from "../../../models/order.model";
 import { Product, ProductVariant } from "../../../models/product.model";

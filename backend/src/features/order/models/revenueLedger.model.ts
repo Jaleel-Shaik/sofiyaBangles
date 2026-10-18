@@ -1,6 +1,6 @@
 import { db } from "../../../shared/config/firebase";
 import { RevenueLedgerItem, PlatformCommissionSettings, RevenueTransactionType } from "../../../shared/types";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID as uuidv4 } from "crypto";
 
 const DEFAULT_COMMISSION_SETTINGS: PlatformCommissionSettings = {
   admin_percentage: 70,
