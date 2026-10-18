@@ -65,3 +65,16 @@ function handler(req, res) {
 
 module.exports = handler;
 module.exports.default = handler;
+
+// Standalone execution: when executed via `node api/index.js` or `npm start`
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  if (expressApp && typeof expressApp.listen === "function") {
+    expressApp.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+    });
+  } else {
+    console.error("❌ Cannot start server: expressApp is not initialized.");
+    process.exit(1);
+  }
+}
