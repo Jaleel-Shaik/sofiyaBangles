@@ -1,0 +1,3 @@
+# Gitleaks ignore list for false-positives or historical sample commits
+# Format: fingerprint (hash:path:rule:line)
+dc65385c316a8d01c8aadc607e4a63dd4342a39e:docs/oracle-cloud-deployment.md:generic-api-key:214

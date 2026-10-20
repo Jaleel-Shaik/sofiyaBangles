@@ -197,21 +197,23 @@ ADMIN_PORTAL_URL=https://admin.yourdomain.com
 MOBILE_APP_SCHEME=sofiyabangles
 
 # ── DATABASE (PostgreSQL / Supabase) ─────────────────────────
-DB_HOST=db.xejjtaovyapmshzivoef.supabase.co
+DB_HOST=db.your_supabase_project_ref.supabase.co
 DB_PORT=5432
 DB_NAME=postgres
 DB_USER=postgres
 DB_PASSWORD=your_postgres_password
 
 # ── CLOUDINARY MEDIA STORAGE ─────────────────────────────────
-CLOUD_NAME=dcmphghhh
-CLOUD_API_KEY=755968463342693
+CLOUD_NAME=your_cloudinary_cloud_name
+CLOUD_API_KEY=your_cloudinary_api_key
 CLOUD_API_SECRET=your_cloudinary_secret
 
 # ── SECURITY & JWT ───────────────────────────────────────────
+# Generate 64-char JWT secret: openssl rand -hex 32
 JWT_SECRET=your_64_character_random_jwt_secret
 JWT_EXPIRES_IN=7d
-TOTP_ENCRYPTION_KEY=99cce8fe31a8f8f32f690c0295d2d177ce4ab003d7b33b080cee7056e56b2e39
+# Generate 32-byte TOTP encryption key: openssl rand -hex 32
+TOTP_ENCRYPTION_KEY=your_32_byte_hex_encryption_key
 
 # ── CLEANUP & RETENTION ──────────────────────────────────────
 LOGIN_CHALLENGE_TTL_MS=300000
@@ -221,8 +223,8 @@ AUDIT_RETENTION_DAYS=90
 SECURITY_EVENT_RETENTION_DAYS=365
 
 # ── NOTIFICATIONS & INTEGRATIONS ────────────────────────────
-FIREBASE_STORAGE_BUCKET=sofiya-bangles.firebasestorage.app
-WHATSAPP_NUMBER=9390902587
+FIREBASE_STORAGE_BUCKET=your-firebase-project.firebasestorage.app
+WHATSAPP_NUMBER=your_whatsapp_phone_number
 
 # ── FIREBASE SERVICE ACCOUNT ─────────────────────────────────
 # Option A: Place service-account.json in the backend directory:
