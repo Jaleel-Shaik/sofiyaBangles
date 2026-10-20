@@ -13,6 +13,10 @@ import apiRouter from "./api";
 
 const app = express();
 
+// 0. Trust reverse proxy (Nginx / Cloudflare / Load Balancers on Oracle Cloud)
+// Ensures express-rate-limit, logs, and req.ip correctly detect the client's real public IP
+app.set("trust proxy", 1);
+
 // 1. Request correlation tracing
 app.use(requestIdMiddleware);
 
@@ -88,7 +92,4 @@ app.use(notFoundHandler);
 // 10. Global central error handler
 app.use(errorHandler);
 
-// Export both default and module.exports for seamless Vercel Serverless Function compatibility
-module.exports = app;
-module.exports.default = app;
 export default app;

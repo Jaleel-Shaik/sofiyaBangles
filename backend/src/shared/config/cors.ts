@@ -42,10 +42,32 @@ function isOriginAllowed(origin: string): boolean {
     return true;
   }
 
-  // Allow all Vercel deployment URLs (production, git branch previews, commit previews)
+  // Check URL origin against configured domains and subdomains
   try {
     const url = new URL(origin);
     const hostname = url.hostname.toLowerCase();
+
+    // Check if origin matches any allowed hostname or subdomain of allowed domains
+    for (const allowed of originsFromEnv) {
+      try {
+        const allowedUrl = allowed.startsWith("http://") || allowed.startsWith("https://")
+          ? new URL(allowed)
+          : new URL(`https://${allowed}`);
+        const allowedHost = allowedUrl.hostname.toLowerCase();
+
+        // Exact host match or subdomain match (e.g., admin.yourdomain.com under yourdomain.com)
+        if (hostname === allowedHost || hostname.endsWith(`.${allowedHost}`)) {
+          return true;
+        }
+      } catch {
+        const cleaned = allowed.replace(/^https?:\/\//, "").split("/")[0].toLowerCase();
+        if (hostname === cleaned || hostname.endsWith(`.${cleaned}`)) {
+          return true;
+        }
+      }
+    }
+
+    // Default known hosts & preview deployment domains
     if (
       hostname === "vistaarapps.com" ||
       hostname.endsWith(".vistaarapps.com") ||
@@ -59,7 +81,10 @@ function isOriginAllowed(origin: string): boolean {
       return true;
     }
   } catch {
-    // Malformed origin URL
+    // Malformed origin URL or non-standard mobile scheme
+    if (origin.startsWith("sofiyabangles://") || origin.startsWith("exp://")) {
+      return true;
+    }
   }
 
   return false;
