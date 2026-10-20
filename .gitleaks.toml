@@ -11,6 +11,7 @@ paths = [
   '''^backend/\.env\.example$''',
   '''^web/\.env\.example$''',
   '''^BRANCH_PROTECTION_GUIDE\.md$''',
+  '''^docs/''',
 ]
 regexes = [
   '''ci-test-jwt-secret.*''',
@@ -18,4 +19,5 @@ regexes = [
   '''MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7V''',
   '''ci-tester@sofiya-bangles-ci\.iam\.gserviceaccount\.com''',
   '''-----BEGIN PRIVATE KEY-----''',
+  '''99cce8fe31a8f8f32f690c0295d2d177ce4ab003d7b33b080cee7056e56b2e39''',
 ]

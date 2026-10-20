@@ -224,6 +224,8 @@ docker compose logs -f
 
 For detailed containerization guides, refer to [DOCKER_GUIDE.md](DOCKER_GUIDE.md).
 
+For cloud production hosting on Oracle Cloud Always Free VM with custom domain and SSL, refer to [docs/oracle-cloud-deployment.md](docs/oracle-cloud-deployment.md).
+
 ---
 
 ## 🔒 Security & Compliance

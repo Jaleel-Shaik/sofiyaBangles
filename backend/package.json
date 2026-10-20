@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "type": "commonjs",
-  "main": "api/index.js",
+  "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
-    "start": "node api/index.js",
+    "start": "node dist/server.js",
     "delete-products": "npx ts-node src/scripts/delete-all-products.ts",
     "create-admin": "npx ts-node src/scripts/create-admin.ts",
     "recover-users": "npx ts-node src/scripts/recover-orphaned-users.ts",
